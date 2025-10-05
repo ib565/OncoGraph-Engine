@@ -1,0 +1,4 @@
+biomarker_type,biomarker_name,therapy_name,effect,disease_name,pmids,source,notes
+Gene,KRAS,Cetuximab,resistance,Colorectal Cancer,18981001,civic,"Resistance observed in metastatic colorectal cancer."
+Variant,BRAF V600E,Vemurafenib,sensitivity,Melanoma,20573937;20573938,civic,
+Variant,KRAS G12C,Sotorasib,sensitivity,Lung Cancer,33857313,onco_kb,

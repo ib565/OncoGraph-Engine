@@ -1,0 +1,4 @@
+name,hgvs_p,consequence,synonyms
+KRAS G12C,p.Gly12Cys,missense,
+KRAS G12D,p.Gly12Asp,missense,
+BRAF V600E,p.Val600Glu,missense,"BRAF V599E"
