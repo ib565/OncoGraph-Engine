@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Protocol
+from typing import Protocol
 
 
 @dataclass(frozen=True)
@@ -21,7 +21,7 @@ class QueryEngineResult:
 
     answer: str
     cypher: str
-    rows: List[Dict[str, object]]
+    rows: list[dict[str, object]]
 
 
 class InstructionExpander(Protocol):
@@ -48,18 +48,20 @@ class CypherValidator(Protocol):
 class CypherExecutor(Protocol):
     """Executes Cypher against Neo4j and returns rows as dictionaries."""
 
-    def execute_read(self, cypher: str) -> List[Dict[str, object]]:  # pragma: no cover - interface only
+    def execute_read(
+        self, cypher: str
+    ) -> list[dict[str, object]]:  # pragma: no cover - interface only
         ...
 
 
 class Summarizer(Protocol):
     """Summarizes rows into a natural language answer."""
 
-    def summarize(self, question: str, rows: List[Dict[str, object]]) -> str:  # pragma: no cover - interface only
+    def summarize(
+        self, question: str, rows: list[dict[str, object]]
+    ) -> str:  # pragma: no cover - interface only
         ...
 
 
 class PipelineError(RuntimeError):
     """Raised when a pipeline step fails."""
-
-

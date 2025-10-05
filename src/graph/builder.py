@@ -1,15 +1,16 @@
 import os
-from typing import Any, Dict, List
+from typing import Any
 
 import pandas as pd
-from neo4j import GraphDatabase
 from dotenv import load_dotenv
+from neo4j import GraphDatabase
 
 load_dotenv()
 
 DATA_DIR = "data/manual"
 
 ALLOWED_BIOMARKER_TYPES = {"Gene", "Variant"}
+
 
 class OncoGraphBuilder:
     def __init__(self):
@@ -28,15 +29,26 @@ class OncoGraphBuilder:
 
         print("\nStep 2: Ingesting nodes...")
         self.ingest_csv_data(os.path.join(DATA_DIR, "nodes/genes.csv"), self._create_gene_node)
-        self.ingest_csv_data(os.path.join(DATA_DIR, "nodes/variants.csv"), self._create_variant_node)
-        self.ingest_csv_data(os.path.join(DATA_DIR, "nodes/therapies.csv"), self._create_therapy_node)
-        self.ingest_csv_data(os.path.join(DATA_DIR, "nodes/diseases.csv"), self._create_disease_node)
+        self.ingest_csv_data(
+            os.path.join(DATA_DIR, "nodes/variants.csv"), self._create_variant_node
+        )
+        self.ingest_csv_data(
+            os.path.join(DATA_DIR, "nodes/therapies.csv"), self._create_therapy_node
+        )
+        self.ingest_csv_data(
+            os.path.join(DATA_DIR, "nodes/diseases.csv"), self._create_disease_node
+        )
 
         print("\nStep 3: Ingesting relationships...")
-        self.ingest_csv_data(os.path.join(DATA_DIR, "relationships/variant_of.csv"), self._create_variant_of_rel)
-        self.ingest_csv_data(os.path.join(DATA_DIR, "relationships/targets.csv"), self._create_targets_rel)
         self.ingest_csv_data(
-            os.path.join(DATA_DIR, "relationships/affects_response.csv"), self._create_affects_response_rel
+            os.path.join(DATA_DIR, "relationships/variant_of.csv"), self._create_variant_of_rel
+        )
+        self.ingest_csv_data(
+            os.path.join(DATA_DIR, "relationships/targets.csv"), self._create_targets_rel
+        )
+        self.ingest_csv_data(
+            os.path.join(DATA_DIR, "relationships/affects_response.csv"),
+            self._create_affects_response_rel,
         )
 
     def create_constraints(self):
@@ -59,8 +71,8 @@ class OncoGraphBuilder:
                 session.execute_write(creation_func, cleaned_row)
 
     @staticmethod
-    def _clean_row(row: Dict[str, Any]) -> Dict[str, Any]:
-        cleaned: Dict[str, Any] = {}
+    def _clean_row(row: dict[str, Any]) -> dict[str, Any]:
+        cleaned: dict[str, Any] = {}
 
         for key, value in row.items():
             if isinstance(value, str):
@@ -71,7 +83,7 @@ class OncoGraphBuilder:
                 value = None
             cleaned[key] = value
 
-        def split_semicolon_list(raw: Any) -> List[str]:
+        def split_semicolon_list(raw: Any) -> list[str]:
             if raw is None:
                 return []
             return [item.strip() for item in str(raw).split(";") if item.strip()]
@@ -140,7 +152,12 @@ class OncoGraphBuilder:
     @staticmethod
     def _create_targets_rel(tx, row):
         tx.run(
-            "MATCH (t:Therapy {name: $therapy_name}) MATCH (g:Gene {symbol: $gene_symbol}) MERGE (t)-[r:TARGETS]->(g) SET r.source = $source",
+            (
+                "MATCH (t:Therapy {name: $therapy_name}) "
+                "MATCH (g:Gene {symbol: $gene_symbol}) "
+                "MERGE (t)-[r:TARGETS]->(g) "
+                "SET r.source = $source"
+            ),
             row,
         )
 
@@ -149,10 +166,12 @@ class OncoGraphBuilder:
         # Determine the property to match the biomarker on ('symbol' for Gene, 'name' for Variant)
         biomarker_type = row.get("biomarker_type")
         if biomarker_type not in ALLOWED_BIOMARKER_TYPES:
-            raise ValueError(f"Unsupported biomarker_type '{biomarker_type}' in affects_response.csv")
+            raise ValueError(
+                f"Unsupported biomarker_type '{biomarker_type}' in affects_response.csv"
+            )
 
         biomarker_prop = "symbol" if biomarker_type == "Gene" else "name"
-        
+
         query = f"""
         MATCH (b:{biomarker_type} {{{biomarker_prop}: $biomarker_name}})
         MATCH (t:Therapy {{name: $therapy_name}})
@@ -169,7 +188,7 @@ class OncoGraphBuilder:
 
 
 if __name__ == "__main__":
-    
+
     builder = OncoGraphBuilder()
     builder.run_ingestion()
     print("\nDone.")

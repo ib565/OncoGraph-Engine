@@ -56,4 +56,3 @@ class QueryEngine:
             raise PipelineError("Summarization failed") from exc
 
         return QueryEngineResult(answer=answer, cypher=cypher, rows=rows)
-

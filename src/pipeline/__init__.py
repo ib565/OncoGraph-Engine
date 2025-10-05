@@ -8,4 +8,3 @@ __all__ = [
     "QueryEngine",
     "QueryEngineResult",
 ]
-

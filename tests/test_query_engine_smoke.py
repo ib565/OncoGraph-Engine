@@ -3,9 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List
-
-import pytest
 
 from pipeline import PipelineConfig, QueryEngine
 
@@ -39,16 +36,16 @@ class StubValidator:
 
 @dataclass
 class StubExecutor:
-    rows: List[Dict[str, object]]
+    rows: list[dict[str, object]]
 
-    def execute_read(self, cypher: str) -> List[Dict[str, object]]:
+    def execute_read(self, cypher: str) -> list[dict[str, object]]:
         assert cypher.startswith("// validated")
         return self.rows
 
 
 @dataclass
 class StubSummarizer:
-    def summarize(self, question: str, rows: List[Dict[str, object]]) -> str:
+    def summarize(self, question: str, rows: list[dict[str, object]]) -> str:
         return f"{question} -> {len(rows)} rows"
 
 
@@ -67,4 +64,3 @@ def test_query_engine_smoke():
     assert result.cypher.startswith("// validated")
     assert result.rows == [{"gene_symbol": "KRAS"}]
     assert result.answer == "What is KRAS? -> 1 rows"
-
