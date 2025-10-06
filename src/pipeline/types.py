@@ -1,4 +1,4 @@
-"""Shared dataclasses and protocols for the LLM-to-Cypher pipeline."""
+"""Shared dataclasses and protocols for the Text-to-Cypher pipeline."""
 
 from __future__ import annotations
 

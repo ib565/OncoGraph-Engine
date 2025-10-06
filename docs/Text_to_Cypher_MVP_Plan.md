@@ -1,4 +1,4 @@
-# LLM→Cypher MVP Plan
+# Text→Cypher MVP Plan
 
 ## Scope and Principles
 - **Text-only LLM outputs**: keep prompts flexible; no structured JSON enforcement.
@@ -13,7 +13,7 @@
 3. **Cypher generation** (Gemini): transform instructions into a single Cypher query.
 4. **Safety validation**: allowlist read-only clauses, inject a default `LIMIT` when missing, and reject unknown schema elements.
 5. **Execute** (Neo4j): run read-only with a reasonable timeout; return rows as dictionaries. `pmids` and `tags` remain lists.
-6. **Summarize** (Gemini): produce a concise answer using only the original question and the result rows.
+6. **Summarize** (Gemini): produce a concise answer using the original question and the result rows.
 
 ## Schema Grounding
 - **Node labels & properties**

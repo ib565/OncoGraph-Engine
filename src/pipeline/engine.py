@@ -1,4 +1,4 @@
-"""High-level coordinator for the LLM-to-Cypher pipeline."""
+"""High-level coordinator for the Text-to-Cypher pipeline."""
 
 from __future__ import annotations
 
