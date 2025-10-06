@@ -13,6 +13,7 @@ class PipelineConfig:
     default_limit: int = 100
     max_limit: int = 200
     neo4j_timeout_seconds: float = 15.0
+    neo4j_fetch_size: int = 100
 
 
 @dataclass(frozen=True)
