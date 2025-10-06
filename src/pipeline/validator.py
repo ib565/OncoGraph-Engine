@@ -1,0 +1,72 @@
+"""Rule-based Cypher validator enforcing read-only safety for the pipeline."""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+
+from .types import PipelineConfig, PipelineError
+
+FORBIDDEN_KEYWORDS = {
+    "CREATE",
+    "MERGE",
+    "SET",
+    "DELETE",
+    "REMOVE",
+    "CALL",
+    "LOAD",
+    "UNWIND",  # only allowed when explicitly needed; blocked until vetted
+    "DROP",
+    "DETACH",
+}
+
+ALLOWED_LABELS = {"Gene", "Variant", "Therapy", "Disease", "Biomarker"}
+ALLOWED_RELATIONSHIPS = {"VARIANT_OF", "TARGETS", "AFFECTS_RESPONSE_TO"}
+
+
+LIMIT_PATTERN = re.compile(r"\bLIMIT\s+(\d+)", re.IGNORECASE)
+NODE_LABEL_PATTERN = re.compile(r"(?<!\[):([A-Za-z_][A-Za-z0-9_]*)")
+REL_TYPE_PATTERN = re.compile(r"\[:([A-Za-z_][A-Za-z0-9_]*)")
+
+
+@dataclass
+class RuleBasedValidator:
+    """Validate Cypher text using simple pattern checks."""
+
+    config: PipelineConfig
+
+    def validate_cypher(self, cypher: str) -> str:
+        text = cypher.strip()
+        self._check_forbidden_keywords(text)
+        self._check_labels(text)
+        self._check_relationships(text)
+        text = self._enforce_limit(text)
+        return text
+
+    def _check_forbidden_keywords(self, text: str) -> None:
+        upper_text = text.upper()
+        for keyword in FORBIDDEN_KEYWORDS:
+            pattern = rf"\b{keyword}\b"
+            if re.search(pattern, upper_text):
+                raise PipelineError(f"Forbidden keyword detected: {keyword}")
+
+    def _check_labels(self, text: str) -> None:
+        for match in NODE_LABEL_PATTERN.findall(text):
+            if match not in ALLOWED_LABELS:
+                raise PipelineError(f"Unknown label: {match}")
+
+    def _check_relationships(self, text: str) -> None:
+        for rel in REL_TYPE_PATTERN.findall(text):
+            if rel not in ALLOWED_RELATIONSHIPS:
+                raise PipelineError(f"Unknown relationship type: {rel}")
+
+    def _enforce_limit(self, text: str) -> str:
+        match = LIMIT_PATTERN.search(text)
+        if not match:
+            return f"{text} LIMIT {self.config.default_limit}"
+
+        limit_value = int(match.group(1))
+        if limit_value > self.config.max_limit:
+            start, end = match.span(1)
+            text = f"{text[:start]}{self.config.max_limit}{text[end:]}"
+        return text
