@@ -29,6 +29,13 @@ def test_validator_rejects_write_clauses():
         validator.validate_cypher("MATCH (g:Gene) DELETE g")
 
 
+def test_validator_rejects_forbidden_keyword_case_insensitive():
+    validator = make_validator()
+
+    with pytest.raises(PipelineError):
+        validator.validate_cypher("match (g:Gene) call db.labels() return g")
+
+
 def test_validator_caps_limit_to_config_max():
     config = PipelineConfig(max_limit=150)
     validator = make_validator(config=config)
@@ -43,3 +50,17 @@ def test_validator_rejects_unknown_label():
 
     with pytest.raises(PipelineError):
         validator.validate_cypher("MATCH (x:UnknownLabel) RETURN x LIMIT 5")
+
+
+def test_validator_rejects_unknown_relationship():
+    validator = make_validator()
+
+    with pytest.raises(PipelineError):
+        validator.validate_cypher("MATCH ()-[r:UNKNOWN_REL]->() RETURN r LIMIT 5")
+
+
+def test_validator_requires_return_clause():
+    validator = make_validator()
+
+    with pytest.raises(PipelineError):
+        validator.validate_cypher("MATCH (g:Gene)")

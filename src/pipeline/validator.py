@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from .types import PipelineConfig, PipelineError
 
-FORBIDDEN_KEYWORDS = {
+FORBIDDEN_KEYWORDS = (
     "CREATE",
     "MERGE",
     "SET",
@@ -18,7 +18,7 @@ FORBIDDEN_KEYWORDS = {
     "UNWIND",  # only allowed when explicitly needed; blocked until vetted
     "DROP",
     "DETACH",
-}
+)
 
 ALLOWED_LABELS = {"Gene", "Variant", "Therapy", "Disease", "Biomarker"}
 ALLOWED_RELATIONSHIPS = {"VARIANT_OF", "TARGETS", "AFFECTS_RESPONSE_TO"}
@@ -27,6 +27,9 @@ ALLOWED_RELATIONSHIPS = {"VARIANT_OF", "TARGETS", "AFFECTS_RESPONSE_TO"}
 LIMIT_PATTERN = re.compile(r"\bLIMIT\s+(\d+)", re.IGNORECASE)
 NODE_LABEL_PATTERN = re.compile(r"(?<!\[):([A-Za-z_][A-Za-z0-9_]*)")
 REL_TYPE_PATTERN = re.compile(r"\[:([A-Za-z_][A-Za-z0-9_]*)")
+
+
+RETURN_CLAUSE_PATTERN = re.compile(r"\bRETURN\b", re.IGNORECASE)
 
 
 @dataclass
@@ -40,6 +43,7 @@ class RuleBasedValidator:
         self._check_forbidden_keywords(text)
         self._check_labels(text)
         self._check_relationships(text)
+        self._ensure_return_clause(text)
         text = self._enforce_limit(text)
         return text
 
@@ -59,6 +63,10 @@ class RuleBasedValidator:
         for rel in REL_TYPE_PATTERN.findall(text):
             if rel not in ALLOWED_RELATIONSHIPS:
                 raise PipelineError(f"Unknown relationship type: {rel}")
+
+    def _ensure_return_clause(self, text: str) -> None:
+        if not RETURN_CLAUSE_PATTERN.search(text):
+            raise PipelineError("Cypher query must include a RETURN clause")
 
     def _enforce_limit(self, text: str) -> str:
         match = LIMIT_PATTERN.search(text)
