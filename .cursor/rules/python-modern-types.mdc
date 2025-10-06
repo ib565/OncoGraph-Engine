@@ -1,0 +1,8 @@
+---
+globs: *.py
+---
+# Python Type Hinting
+
+- Use built-in collection generics introduced in PEP 585 (e.g., `list[str]`, `dict[str, Any]`) instead of `typing.List`, `typing.Dict`, etc.
+- Avoid importing `List`, `Dict`, `Set`, `Tuple`, and similar aliases from `typing` unless absolutely required for backwards compatibility.
+- Prefer `collections.abc` for abstract types (`Iterable`, `Mapping`, etc.) where needed.
