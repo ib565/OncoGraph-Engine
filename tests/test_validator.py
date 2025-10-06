@@ -9,8 +9,8 @@ from pipeline.types import PipelineError
 from pipeline.validator import RuleBasedValidator
 
 
-def make_validator() -> RuleBasedValidator:
-    return RuleBasedValidator(config=PipelineConfig())
+def make_validator(config: PipelineConfig | None = None) -> RuleBasedValidator:
+    return RuleBasedValidator(config=config or PipelineConfig())
 
 
 def test_validator_adds_default_limit_when_missing():
@@ -30,11 +30,12 @@ def test_validator_rejects_write_clauses():
 
 
 def test_validator_caps_limit_to_config_max():
-    validator = make_validator()
+    config = PipelineConfig(max_limit=150)
+    validator = make_validator(config=config)
 
     validated = validator.validate_cypher("MATCH (g:Gene) RETURN g LIMIT 999")
 
-    assert validated.endswith("LIMIT 200")
+    assert validated.endswith(f"LIMIT {config.max_limit}")
 
 
 def test_validator_rejects_unknown_label():
