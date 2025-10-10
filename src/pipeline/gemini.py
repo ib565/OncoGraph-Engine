@@ -36,7 +36,8 @@ SCHEMA_SNIPPET = dedent(
 
 INSTRUCTION_PROMPT_TEMPLATE = dedent(
     """
-    You are an oncology knowledge graph assistant. You provide instructions to guide the Cypher generator.
+    You are an oncology knowledge graph assistant. 
+    You provide clear instructions to guide the downstream Cypher generator in forming a valid Cypher query.
     {schema}
 
     Task: Rewrite the user's question as 3-6 short bullet points that reference the schema labels,
