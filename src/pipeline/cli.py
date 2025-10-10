@@ -93,7 +93,12 @@ def main(argv: list[str] | None = None) -> int:
     try:
         result = engine.run(question_text)
     except Exception as exc:  # pragma: no cover - surface errors to CLI
-        print(f"Error: {exc}", file=sys.stderr)
+        # Print detailed error including step if available
+        step = getattr(exc, "step", None)
+        if step:
+            print(f"Error in step '{step}': {exc}", file=sys.stderr)
+        else:
+            print(f"Error: {exc}", file=sys.stderr)
         if not args.no_log:
             trace_path = Path("logs/traces/") / (datetime.now(UTC).strftime("%Y%m%d") + ".jsonl")
             _log_trace(
@@ -103,6 +108,7 @@ def main(argv: list[str] | None = None) -> int:
                     "step": "error",
                     "question": question_text,
                     "error": str(exc),
+                    "error_step": step or "unknown",
                 },
             )
         return 1
