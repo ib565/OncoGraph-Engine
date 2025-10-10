@@ -82,3 +82,10 @@ def test_validator_requires_return_clause():
 
     with pytest.raises(PipelineError):
         validator.validate_cypher("MATCH (g:Gene)")
+
+
+def test_validator_rewrites_disease_name_equality_to_case_insensitive():
+    validator = make_validator()
+    cypher = "MATCH (b:Biomarker)-[r:AFFECTS_RESPONSE_TO]->(t:Therapy) WHERE r.disease_name = 'colorectal cancer' RETURN r"
+    validated = validator.validate_cypher(cypher)
+    assert "toLower(r.disease_name) = toLower('colorectal cancer')" in validated

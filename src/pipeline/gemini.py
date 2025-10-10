@@ -31,6 +31,18 @@ SCHEMA_SNIPPET = dedent(
       (Therapy)-[:TARGETS {source}]->(Gene)
       (Biomarker)-[:AFFECTS_RESPONSE_TO {effect, disease_name, disease_id?, pmids, source, notes?}]->(Therapy)
     - Array properties: pmids, tags
+
+    Query patterns (use when applicable):
+    - Gene-or-Variant biomarker for generic "<gene> mutations":
+      MATCH (g:Gene {symbol: $GENE})
+      OPTIONAL MATCH (v:Variant)-[:VARIANT_OF]->(g)
+      WITH g, v
+      // Later, allow (b = g OR b = v) when matching AFFECTS_RESPONSE_TO
+    - Therapy class by tags OR TARGETS (case-insensitive for tags):
+      MATCH (t:Therapy)
+      WHERE any(tag IN t.tags WHERE toLower(tag) CONTAINS toLower($THERAPY_CLASS))
+         OR (t)-[:TARGETS]->(:Gene {symbol: $TARGET_GENE})
+    - Disease comparisons should be case-insensitive equality; validator will normalize if needed.
     """
 ).strip()
 
@@ -43,6 +55,11 @@ INSTRUCTION_PROMPT_TEMPLATE = dedent(
     Task: Rewrite the user's question as 3-6 short bullet points that reference the schema labels,
     relationships, and property names. Keep the guidance tumor-agnostic unless a disease is
     explicitly named. Do not produce Cypher or JSON—only plain-text bullet points starting with "- ".
+
+    Guidance:
+    - If the question mentions "<gene> mutations" without a specific variant, match the biomarker as the Gene OR any Variant VARIANT_OF that Gene.
+    - For therapy classes like "anti-EGFR", match by tags OR by TARGETS to the target Gene.
+    - Treat disease matching as case-insensitive equality.
 
     User question: {question}
     """
@@ -57,7 +74,9 @@ CYPHER_PROMPT_TEMPLATE = dedent(
     - Use the provided instruction text exactly once to decide filters, MATCH clauses, and RETURN columns.
     - Produce a single Cypher query with no commentary or markdown fences.
     - Ensure the query includes a RETURN clause with readable column aliases and a LIMIT.
-    - Prefer case-insensitive comparisons for names or tags when appropriate.
+    - If the question names a gene without a specific variant, include biomarker matching for the Gene OR any Variant VARIANT_OF that Gene.
+    - For therapy classes (e.g., "anti-EGFR"), allow matching via tags OR via TARGETS to the corresponding Gene.
+    - Prefer case-insensitive comparisons for disease names and tags; the validator will normalize simple equality.
 
     Instruction text:
     {instructions}

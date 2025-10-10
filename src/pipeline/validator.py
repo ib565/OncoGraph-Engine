@@ -67,6 +67,7 @@ class RuleBasedValidator:
         self._check_relationships(text)
         self._check_properties(text)
         self._ensure_return_clause(text)
+        text = self._rewrite_case_insensitive(text)
         text = self._enforce_limit(text)
         return text
 
@@ -110,3 +111,23 @@ class RuleBasedValidator:
             start, end = match.span(1)
             text = f"{text[:start]}{self.config.max_limit}{text[end:]}"
         return text
+
+    def _rewrite_case_insensitive(self, text: str) -> str:
+        """Normalize common equality filters to case-insensitive form.
+
+        Currently targets comparisons of the form:
+          <alias>.disease_name = <expr>
+        and rewrites to:
+          toLower(<alias>.disease_name) = toLower(<expr>)
+        """
+
+        def repl(match: re.Match[str]) -> str:
+            alias = match.group(1)
+            rhs = match.group(2).strip()
+            # Ensure closing quote/paren preserved if missing in group
+            return f"toLower({alias}.disease_name) = toLower({rhs})"
+
+        pattern = re.compile(
+            r"\b([A-Za-z_][A-Za-z0-9_]*)\.disease_name\s*=\s*([^\n\r]+?)(?=\s+(?:AND|OR|RETURN|WITH|SKIP|LIMIT|ORDER\b)|$)"
+        )
+        return pattern.sub(repl, text)
