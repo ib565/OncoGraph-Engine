@@ -33,11 +33,17 @@ SCHEMA_SNIPPET = dedent(
     - Array properties: pmids, tags
 
     Query patterns (use when applicable):
-    - Gene-or-Variant biomarker for generic "<gene> mutations":
+    - Gene-or-Variant biomarker for generic "<gene> mutations" (prefer this simpler OR form):
+      MATCH (b:Biomarker)-[r:AFFECTS_RESPONSE_TO]->(t:Therapy)
+      WHERE (b:Gene AND b.symbol = $GENE)
+         OR (b:Variant)-[:VARIANT_OF]->(:Gene {symbol: $GENE})
+      // This avoids UNWIND/WITH pitfalls.
+      // If you still need to expand nodes, use this UNWIND form (note the list-comprehension filter):
       MATCH (g:Gene {symbol: $GENE})
       OPTIONAL MATCH (v:Variant)-[:VARIANT_OF]->(g)
       WITH g, v
-      // Later, allow (b = g OR b = v) when matching AFFECTS_RESPONSE_TO
+      UNWIND [x IN [g, v] WHERE x IS NOT NULL] AS biomarker_node
+      MATCH (biomarker_node:Biomarker)-[r:AFFECTS_RESPONSE_TO]->(t:Therapy)
     - Therapy class by tags OR TARGETS (case-insensitive for tags):
       MATCH (t:Therapy)
       WHERE any(tag IN t.tags WHERE toLower(tag) CONTAINS toLower($THERAPY_CLASS))
@@ -74,7 +80,7 @@ CYPHER_PROMPT_TEMPLATE = dedent(
     - Use the provided instruction text exactly once to decide filters, MATCH clauses, and RETURN columns.
     - Produce a single Cypher query with no commentary or markdown fences.
     - Ensure the query includes a RETURN clause with readable column aliases and a LIMIT.
-    - If the question names a gene without a specific variant, include biomarker matching for the Gene OR any Variant VARIANT_OF that Gene.
+    - If the question names a gene without a specific variant, include biomarker matching for the Gene OR any Variant VARIANT_OF that Gene (prefer the OR form shown in the schema patterns; avoid placing WHERE immediately after UNWIND).
     - For therapy classes (e.g., "anti-EGFR"), allow matching via tags OR via TARGETS to the corresponding Gene.
     - Prefer case-insensitive comparisons for disease names and tags; the validator will normalize simple equality.
 
