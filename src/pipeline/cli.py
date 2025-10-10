@@ -83,9 +83,32 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run OncoGraph pipeline")
     parser.add_argument("question", nargs="+", help="User question text")
     parser.add_argument("--no-log", action="store_true", help="Disable JSONL logging")
+    parser.add_argument(
+        "--debug", action="store_true", help="Print stack traces and verbose step output"
+    )
+    parser.add_argument("--trace", action="store_true", help="Stream trace events to stdout")
     args = parser.parse_args(argv)
 
     engine = _build_engine()
+
+    if args.trace:
+        from .types import TraceSink
+
+        class StdoutTrace(TraceSink):
+            def record(self, step: str, data: dict[str, object]) -> None:
+                print(f"TRACE {step}: {json.dumps(data, ensure_ascii=False)}")
+
+        if engine.trace is None:
+            engine.trace = StdoutTrace()
+        else:
+            original_trace = engine.trace
+
+            class CompositeTrace(TraceSink):
+                def record(self, step: str, data: dict[str, object]) -> None:
+                    original_trace.record(step, data)
+                    StdoutTrace().record(step, data)
+
+            engine.trace = CompositeTrace()
 
     question_text = " ".join(args.question).strip()
     started = datetime.now(UTC).isoformat()
@@ -99,6 +122,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Error in step '{step}': {exc}", file=sys.stderr)
         else:
             print(f"Error: {exc}", file=sys.stderr)
+        if args.debug:
+            import traceback
+
+            traceback.print_exc()
         if not args.no_log:
             trace_path = Path("logs/traces/") / (datetime.now(UTC).strftime("%Y%m%d") + ".jsonl")
             _log_trace(
@@ -109,6 +136,7 @@ def main(argv: list[str] | None = None) -> int:
                     "question": question_text,
                     "error": str(exc),
                     "error_step": step or "unknown",
+                    "traceback": traceback.format_exc() if args.debug else None,
                 },
             )
         return 1
@@ -119,7 +147,7 @@ def main(argv: list[str] | None = None) -> int:
     print("\nAnswer:\n" + result.answer)
 
     if not args.no_log:
-        trace_path = Path("logs/traces/") / (datetime.utcnow().strftime("%Y%m%d") + ".jsonl")
+        trace_path = Path("logs/traces/") / (datetime.now(UTC).strftime("%Y%m%d") + ".jsonl")
         _log_trace(
             trace_path,
             {
@@ -128,6 +156,7 @@ def main(argv: list[str] | None = None) -> int:
                 "question": question_text,
                 "cypher": result.cypher,
                 "row_count": len(result.rows),
+                "answer": result.answer,
             },
         )
 
