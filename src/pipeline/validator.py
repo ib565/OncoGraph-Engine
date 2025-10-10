@@ -44,8 +44,10 @@ ALLOWED_PROPERTIES = {
 
 
 LIMIT_PATTERN = re.compile(r"\bLIMIT\s+(\d+)", re.IGNORECASE)
-NODE_LABEL_PATTERN = re.compile(r"(?<!\[):([A-Za-z_][A-Za-z0-9_]*)")
-REL_TYPE_PATTERN = re.compile(r"\[:([A-Za-z_][A-Za-z0-9_]*)")
+# Match node labels like (:Gene) or (n:Gene) or (n:Gene:Biomarker), excluding rel brackets
+NODE_LABEL_PATTERN = re.compile(r"(?<!\[):\s*`?([A-Za-z_][A-Za-z0-9_]*)`?")
+# Match relationship types like [:TYPE], [: TYPE], or [:`TYPE`]
+REL_TYPE_PATTERN = re.compile(r"\[\s*:\s*`?([A-Za-z_][A-Za-z0-9_]*)`?")
 PROPERTY_PATTERN = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\.([A-Za-z_][A-Za-z0-9_]*)")
 
 
@@ -76,9 +78,13 @@ class RuleBasedValidator:
                 raise PipelineError(f"Forbidden keyword detected: {keyword}")
 
     def _check_labels(self, text: str) -> None:
-        for match in NODE_LABEL_PATTERN.findall(text):
-            if match not in ALLOWED_LABELS:
-                raise PipelineError(f"Unknown label: {match}")
+        rel_types = set(REL_TYPE_PATTERN.findall(text))
+        for label in NODE_LABEL_PATTERN.findall(text):
+            # Skip tokens that are actually relationship types
+            if label in ALLOWED_RELATIONSHIPS or label in rel_types:
+                continue
+            if label not in ALLOWED_LABELS:
+                raise PipelineError(f"Unknown label: {label}")
 
     def _check_relationships(self, text: str) -> None:
         for rel in REL_TYPE_PATTERN.findall(text):

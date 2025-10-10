@@ -59,6 +59,24 @@ def test_validator_rejects_unknown_relationship():
         validator.validate_cypher("MATCH ()-[r:UNKNOWN_REL]->() RETURN r LIMIT 5")
 
 
+def test_validator_does_not_misread_relationship_as_label():
+    validator = make_validator()
+    # Valid relationship should not be flagged as a label
+    validated = validator.validate_cypher(
+        "MATCH (a:Gene)-[:AFFECTS_RESPONSE_TO]->(t:Therapy) RETURN a, t LIMIT 5"
+    )
+    assert validated.endswith(f"LIMIT {PipelineConfig().default_limit}") or "LIMIT" in validated
+
+
+def test_validator_handles_backticked_relationship_type():
+    validator = make_validator()
+    # Backticks around relationship type should be allowed and recognized
+    validated = validator.validate_cypher(
+        "MATCH (a:Gene)-[r:`AFFECTS_RESPONSE_TO`]->(t:Therapy) RETURN r LIMIT 5"
+    )
+    assert "RETURN r" in validated
+
+
 def test_validator_requires_return_clause():
     validator = make_validator()
 
