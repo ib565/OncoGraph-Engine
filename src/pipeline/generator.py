@@ -57,10 +57,16 @@ class LLMBasedGenerator(CypherGenerator):
         if not cypher:
             raise PipelineError("LLM returned empty Cypher")
 
-        # Basic guard: forbid obvious non-Cypher boilerplate
-        if "\n" not in cypher and not cypher.upper().startswith("MATCH"):
-            # Single-line is acceptable but should start with MATCH to be safe
-            if not cypher.strip().upper().startswith("MATCH"):
+        # Basic guard: accept common read-only starters; otherwise rely on validator
+        if "\n" not in cypher:
+            start = cypher.strip().upper()
+            if not (
+                start.startswith("OPTIONAL MATCH")
+                or start.startswith("MATCH")
+                or start.startswith("WITH")
+                or start.startswith("UNWIND")
+                or start.startswith("RETURN")
+            ):
                 raise PipelineError("LLM output does not look like Cypher")
 
         return cypher.strip()

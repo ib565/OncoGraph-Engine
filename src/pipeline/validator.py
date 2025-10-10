@@ -15,7 +15,7 @@ FORBIDDEN_KEYWORDS = (
     "REMOVE",
     "CALL",
     "LOAD",
-    "UNWIND",  # only allowed when explicitly needed; blocked until vetted
+    # UNWIND is permitted in MVP per plan allowlist
     "DROP",
     "DETACH",
 )
