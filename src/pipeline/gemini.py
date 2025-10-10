@@ -1,4 +1,4 @@
-"""Gemini-powered adapters for instruction expansion and Cypher generation."""
+"""Gemini-powered adapters for instruction expansion, Cypher generation, and summaries."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from .types import (
     CypherGenerator,
     InstructionExpander,
     PipelineError,
+    Summarizer,
 )
 
 try:  # pragma: no cover - optional dependency at runtime
@@ -63,6 +64,22 @@ CYPHER_PROMPT_TEMPLATE = dedent(
 ).strip()
 
 
+SUMMARY_PROMPT_TEMPLATE = dedent(
+    """
+    You are summarizing query results from an oncology knowledge graph.
+
+    Original question:
+    {question}
+
+    Result rows:
+    {rows}
+
+    Produce a concise answer in 2-5 sentences. Cite PubMed IDs (PMIDs) inline when available.
+    If there are no rows, explicitly state that no evidence was found. Do not invent data.
+    """
+).strip()
+
+
 @dataclass(frozen=True)
 class GeminiConfig:
     """Runtime settings for Gemini calls."""
@@ -88,6 +105,23 @@ def _strip_code_fence(text: str) -> str:
             remainder = remainder[:-3]
         stripped = remainder.strip()
     return stripped
+
+
+def _format_rows(rows: list[dict[str, object]]) -> str:
+    if not rows:
+        return "(no rows)"
+
+    formatted: list[str] = []
+    for index, row in enumerate(rows, start=1):
+        parts: list[str] = []
+        for key, value in row.items():
+            if isinstance(value, list):
+                joined = ", ".join(str(item) for item in value)
+                parts.append(f"{key}: {joined}")
+            else:
+                parts.append(f"{key}: {value}")
+        formatted.append(f"{index}. " + "; ".join(parts))
+    return "\n".join(formatted)
 
 
 class _GeminiBase:
@@ -148,3 +182,16 @@ class GeminiCypherGenerator(_GeminiBase, CypherGenerator):
         )
         text = self._call_model(prompt=prompt)
         return _strip_code_fence(text)
+
+
+class GeminiSummarizer(_GeminiBase, Summarizer):
+    """Gemini-backed summarizer for Cypher results."""
+
+    def summarize(self, question: str, rows: list[dict[str, object]]) -> str:
+        formatted_rows = _format_rows(rows)
+        prompt = SUMMARY_PROMPT_TEMPLATE.format(
+            question=question.strip(),
+            rows=formatted_rows,
+        )
+        text = self._call_model(prompt=prompt)
+        return text.strip()

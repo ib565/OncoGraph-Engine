@@ -8,6 +8,8 @@ from pipeline.gemini import (
     GeminiConfig,
     GeminiCypherGenerator,
     GeminiInstructionExpander,
+    GeminiSummarizer,
+    _format_rows,
     _strip_code_fence,
 )
 from pipeline.types import PipelineError
@@ -44,6 +46,22 @@ MATCH (g:Gene) RETURN g
     assert _strip_code_fence(cypher) == "MATCH (g:Gene) RETURN g"
 
 
+def test_format_rows_handles_arrays():
+    rows = [
+        {
+            "gene_symbol": "KRAS",
+            "pmids": ["12345", "67890"],
+            "tags": ["oncogene"],
+        }
+    ]
+
+    formatted = _format_rows(rows)
+
+    assert "gene_symbol: KRAS" in formatted
+    assert "pmids: 12345, 67890" in formatted
+    assert formatted.startswith("1. ")
+
+
 def test_instruction_expander_uses_prompt(monkeypatch):
     stub_client = StubClient(["- Bullet 1\n- Bullet 2"])
 
@@ -76,3 +94,26 @@ def test_cypher_generator_errors_on_empty_text():
 
     with pytest.raises(PipelineError):
         generator.generate_cypher("Instructions")
+
+
+def test_summarizer_runs_with_rows():
+    stub_client = StubClient(["Answer with PMID 12345"])
+    summarizer = GeminiSummarizer(client=stub_client)
+
+    result = summarizer.summarize(
+        "Question?",
+        [{"therapy_name": "Cetuximab", "pmids": ["12345"]}],
+    )
+
+    assert result == "Answer with PMID 12345"
+    call = stub_client.models.calls[0]
+    assert "Cetuximab" in call["contents"][0]
+
+
+def test_summarizer_handles_empty_rows():
+    stub_client = StubClient(["No evidence found."])
+    summarizer = GeminiSummarizer(client=stub_client)
+
+    result = summarizer.summarize("Question?", [])
+
+    assert result == "No evidence found."
