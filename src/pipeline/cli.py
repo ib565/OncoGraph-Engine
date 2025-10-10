@@ -6,7 +6,7 @@ import argparse
 import json
 import os
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -21,6 +21,15 @@ from . import (
     QueryEngine,
     RuleBasedValidator,
 )
+
+
+class JsonlTraceSink:
+    def __init__(self, path: Path) -> None:
+        self._path = path
+
+    def record(self, step: str, data: dict[str, object]) -> None:  # pragma: no cover - simple IO
+        payload = {"timestamp": datetime.now(UTC).isoformat(), "step": step, **data}
+        _log_trace(self._path, payload)
 
 
 def _build_engine() -> QueryEngine:
@@ -50,6 +59,8 @@ def _build_engine() -> QueryEngine:
 
     summarizer = GeminiSummarizer(config=gemini_config)
 
+    trace_path = Path("logs/traces/") / (datetime.now(UTC).strftime("%Y%m%d") + ".jsonl")
+
     return QueryEngine(
         config=pipeline_config,
         expander=expander,
@@ -57,6 +68,7 @@ def _build_engine() -> QueryEngine:
         validator=validator,
         executor=executor,
         summarizer=summarizer,
+        trace=JsonlTraceSink(trace_path),
     )
 
 
@@ -76,12 +88,23 @@ def main(argv: list[str] | None = None) -> int:
     engine = _build_engine()
 
     question_text = " ".join(args.question).strip()
-    started = datetime.utcnow().isoformat() + "Z"
+    started = datetime.now(UTC).isoformat()
 
     try:
         result = engine.run(question_text)
     except Exception as exc:  # pragma: no cover - surface errors to CLI
         print(f"Error: {exc}", file=sys.stderr)
+        if not args.no_log:
+            trace_path = Path("logs/traces/") / (datetime.now(UTC).strftime("%Y%m%d") + ".jsonl")
+            _log_trace(
+                trace_path,
+                {
+                    "timestamp": started,
+                    "step": "error",
+                    "question": question_text,
+                    "error": str(exc),
+                },
+            )
         return 1
 
     print("Cypher:\n" + result.cypher + "\n")

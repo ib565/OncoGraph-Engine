@@ -66,3 +66,16 @@ class Summarizer(Protocol):
 
 class PipelineError(RuntimeError):
     """Raised when a pipeline step fails."""
+
+    def __init__(self, message: str, *, step: str | None = None):
+        super().__init__(message)
+        self.step = step
+
+
+class TraceSink(Protocol):
+    """Receives step-wise trace data emitted during pipeline execution."""
+
+    def record(
+        self, step: str, data: dict[str, object]
+    ) -> None:  # pragma: no cover - interface only
+        ...
