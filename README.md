@@ -27,6 +27,93 @@ with:
 
 ---
 
+## Getting Started
+
+### 1. Create a virtual environment and install dependencies
+
+```powershell
+python -m venv venv
+venv\Scripts\python.exe -m pip install --upgrade pip
+venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+### 2. Configure environment variables
+
+Create a `.env` file (or export variables) with:
+
+```
+GOOGLE_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-2.5-flash      # optional override
+GEMINI_TEMPERATURE=0.1             # optional override
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=your_password
+```
+
+### 3. Seed Neo4j
+
+Run `python -m src.graph.builder` once to ingest the CSV data into Neo4j.
+
+---
+
+## Running the CLI
+
+Use the provided launcher so `src/` is on the Python path:
+
+```powershell
+python run.py "Do KRAS mutations affect anti-EGFR therapy in colorectal cancer?"
+```
+
+### CLI flags
+
+- `--trace` – stream every pipeline step to stdout (question, instructions, Cypher drafts, row preview, summary text).
+- `--debug` – print full stack traces on errors and include them in the JSONL logs.
+- `--no-log` – disable JSONL trace writes.
+
+Examples:
+
+```powershell
+python run.py --trace --debug "Show therapies targeting BRAF"
+python run.py --no-log "Do KRAS mutations affect anti-EGFR therapy in colorectal cancer?"
+```
+
+Successful runs echo the final Cypher, result rows (JSON), and the summarised answer. Failures report `Error in step '<name>': …`; add `--debug` for stack traces.
+
+---
+
+## Logging & Debugging
+
+- All runs append structured traces to `logs/traces/YYYYMMDD.jsonl`.
+- Each pipeline step records inputs/outputs, including a preview of the first three result rows.
+- Error entries capture `error_step`, the error message, and—when `--debug` is supplied—the traceback.
+- `--trace` mirrors trace events to stdout for live debugging.
+
+Example trace entry:
+
+```json
+{"timestamp": "2025-10-10T17:55:00Z", "step": "generate_cypher", "cypher_draft": "MATCH ..."}
+```
+
+---
+
+## Testing
+
+Run the entire suite:
+
+```powershell
+venv\Scripts\python.exe -m pytest
+```
+
+Notable coverage:
+
+- `tests/test_validator.py` – clause allowlist, limit enforcement, schema allowlisting.
+- `tests/test_executor.py` – Neo4j executor configuration and list normalization.
+- `tests/test_gemini.py` – Gemini instruction, Cypher, and summary adapters via stubs.
+- `tests/test_pipeline_integration.py` – end-to-end orchestration with deterministic responses.
+- `tests/test_cli.py` – CLI output with stubbed engine.
+
+---
+
 ## Graph Schema (MVP)
 
 ### Node Labels
