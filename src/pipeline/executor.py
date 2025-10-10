@@ -52,7 +52,7 @@ class Neo4jExecutor:
 
     def execute_read(self, cypher: str) -> list[dict[str, object]]:
         try:
-            with self._driver.session(timeout=self.config.neo4j_timeout_seconds) as session:  # type: ignore[arg-type]
+            with self._driver.session() as session:
                 return session.execute_read(self._run_query, cypher)
         except Exception as exc:  # pragma: no cover - defensive
             raise PipelineError(

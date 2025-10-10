@@ -46,8 +46,7 @@ class FakeTx:
 
 
 class FakeSession:
-    def __init__(self, expected_timeout: float):
-        self.expected_timeout = expected_timeout
+    def __init__(self):
         self.tx = FakeTx()
 
     # Context manager protocol
@@ -64,12 +63,9 @@ class FakeSession:
 class FakeDriver:
     def __init__(self, session: FakeSession):
         self._session = session
-        self.last_session_timeout: float | None = None
         self.closed = False
 
-    def session(self, *, timeout: float):
-        self.last_session_timeout = timeout
-        assert timeout == self._session.expected_timeout
+    def session(self):
         return self._session
 
     def close(self):  # pragma: no cover - trivial
@@ -78,7 +74,7 @@ class FakeDriver:
 
 def test_executor_runs_query_with_configured_limits(monkeypatch):
     config = PipelineConfig(neo4j_timeout_seconds=12.5, neo4j_fetch_size=250)
-    fake_session = FakeSession(expected_timeout=config.neo4j_timeout_seconds)
+    fake_session = FakeSession()
     fake_driver = FakeDriver(fake_session)
 
     monkeypatch.setattr(
@@ -95,7 +91,6 @@ def test_executor_runs_query_with_configured_limits(monkeypatch):
 
     rows = executor.execute_read("MATCH (g:Gene) RETURN g")
 
-    assert fake_driver.last_session_timeout == config.neo4j_timeout_seconds
     assert fake_session.tx.last_kwargs == {
         "cypher": "MATCH (g:Gene) RETURN g",
         "timeout": config.neo4j_timeout_seconds,
