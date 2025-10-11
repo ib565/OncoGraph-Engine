@@ -103,4 +103,4 @@
 6. **Data ingestion automation** – begin replacing manual CSVs with loaders from CIViC/HGNC/DOID/ChEMBL while retaining provenance and helper labels.
 7. **Schema evolution** – plan reified Statement/Publication nodes, ClinicalTrial nodes, and pathway edges once validator hardening and ingestion scale are ready.
 8. **Developer ergonomics** – add linting/formatting pre-commit hooks, document contribution workflow, and consider a lightweight dev container.
-
+9. **Stretch goals** – Consider deployment and UI. A mini graph of the relevant entities and relationships.
