@@ -94,3 +94,13 @@
 6. Add JSONL logging and (optional) LangSmith spans around each LLM call.
 7. Write basic unit/integration tests and a simple CLI entrypoint for manual runs.
 
+## Next Steps (Ordered Backlog)
+1. **LangSmith tracing** – wrap Gemini and summarization calls with spans that include `schema_version`, `prompt_version`, and step metadata while preserving JSONL logs.
+2. **Query resilience fallback** – add a zero-result retry that loosens variant-only filters to gene-or-variant and considers therapy TARGETS when tag matching fails; extend validator normalization to therapy tags if needed.
+3. **Integration & regression testing** – run live Neo4j scenarios (KRAS–Cetuximab, BRAF V600E–Vemurafenib, KRAS G12C–Sotorasib) and add cached Gemini outputs for deterministic regression without extra token spend.
+4. **Benchmark script** – maintain a short suite of representative questions that can run against cached/stubbed LLM responses and report pass/fail, keeping manual runs efficient.
+5. **LLM caching / replay** – add CLI support for recording and replaying Gemini responses to speed testing and avoid redundant calls.
+6. **Data ingestion automation** – begin replacing manual CSVs with loaders from CIViC/HGNC/DOID/ChEMBL while retaining provenance and helper labels.
+7. **Schema evolution** – plan reified Statement/Publication nodes, ClinicalTrial nodes, and pathway edges once validator hardening and ingestion scale are ready.
+8. **Developer ergonomics** – add linting/formatting pre-commit hooks, document contribution workflow, and consider a lightweight dev container.
+
