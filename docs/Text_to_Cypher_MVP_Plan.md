@@ -36,7 +36,10 @@
   - Output a short list of actions or filters.
 - **Cypher generation**
   - Feed the instruction text plus a schema snippet to produce Cypher only (no prose).
-  - Prefer case-insensitive comparisons for names/tags where appropriate.
+  - Prefer case-insensitive comparisons for disease names and tags (the validator normalizes simple equality).
+  - Use robust patterns:
+    - Gene-or-Variant biomarker when variant unspecified: `(b:Gene AND b.symbol = $GENE) OR (b:Variant)-[:VARIANT_OF]->(:Gene {symbol:$GENE})`.
+    - Therapy by tags OR targets: `any(tag IN t.tags WHERE toLower(tag) CONTAINS toLower($THERAPY_CLASS)) OR (t)-[:TARGETS]->(:Gene {symbol:$TARGET_GENE})`.
   - Ensure final query returns well-named columns (`variant_name`, `gene_symbol`, `therapy_name`, `effect`, `disease_name`, `pmids`) and includes a `LIMIT`.
 - **Summarization**
   - Inputs: original question and the result rows (nothing else).
@@ -46,6 +49,7 @@
 - **Allowlist clauses**: `MATCH`, `OPTIONAL MATCH`, `WHERE`, `WITH`, `RETURN`, `ORDER BY`, `LIMIT`, `SKIP`, `UNWIND`, `COLLECT`.
 - **Block entirely**: `CREATE`, `MERGE`, `SET`, `DELETE`, `REMOVE`, `CALL` (incl. APOC), `LOAD CSV`, transaction keywords, schema operations.
 - **Limit enforcement**: auto-append `LIMIT 100` when absent; cap user-provided limits at 200.
+- **Normalization**: transform `r.disease_name = 'X'` into a case-insensitive comparison.
 - **Schema checks**: verify all labels, relationship types, and property names against this plan/README/CSV headers.
 - **Optional repair loop**: attempt `EXPLAIN` and allow a single LLM self-correction using only the error message.
 
@@ -53,6 +57,7 @@
 - Use Neo4j `execute_read` with a ~15s timeout and tuned `fetch_size` for small graphs.
 - Normalize array fields (`pmids`, `tags`) into Python lists before passing to the summarizer.
 - Preserve deterministic key casing in result dictionaries.
+ - Include a lightweight row preview and answer text in trace logs.
 
 ## Logging & Tracing
 - **Local JSONL**: `logs/traces/YYYYMMDD.jsonl`, with `timestamp`, `session_id`, `step`, `model`, `prompt_version`, `input_text` / `result_rows`, `output_text` / `cypher`, `latency_ms`, `token_usage` (if available), `row_count`, `error`.
@@ -86,6 +91,6 @@
 3. Build the safety validator (regex allowlist + schema checks + limit injection).
 4. Wire the Neo4j read-only executor with timeout and limit guard.
 5. Implement plain-text summarizer leveraging question + rows.
-6. Add JSONL logging and LangSmith spans around each LLM call.
+6. Add JSONL logging and (optional) LangSmith spans around each LLM call.
 7. Write basic unit/integration tests and a simple CLI entrypoint for manual runs.
 

@@ -96,6 +96,25 @@ Example trace entry:
 
 ---
 
+## LLM Prompts & Query Patterns
+
+- Prompts are schema‑grounded and prefer robust patterns:
+  - Gene‑or‑Variant biomarker for generic "<gene> mutations":
+    - Either match `(b:Gene {symbol:$GENE})` OR `(b:Variant)-[:VARIANT_OF]->(:Gene {symbol:$GENE})` when traversing `AFFECTS_RESPONSE_TO`.
+  - Therapy classes via tags OR targets:
+    - `any(tag IN t.tags WHERE toLower(tag) CONTAINS toLower($THERAPY_CLASS))`
+      OR `(t)-[:TARGETS]->(:Gene {symbol:$TARGET_GENE})`.
+  - Disease comparisons are treated as case‑insensitive (the validator normalizes simple equality).
+
+## Deterministic Guards
+
+- Validation allowlist: blocks write clauses; enforces `LIMIT` with max cap.
+- Schema checks: labels/relationships/properties verified against the MVP schema.
+- Normalization: validator rewrites `r.disease_name = 'X'` to `toLower(r.disease_name) = toLower('X')`.
+- Neo4j execution: per‑query timeout and fetch size, list normalization for `pmids`/`tags`.
+
+---
+
 ## Testing
 
 Run the entire suite:
