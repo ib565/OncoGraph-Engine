@@ -256,6 +256,30 @@ Routes:
 
 ---
 
+## Next.js Demo UI (Vercel)
+
+The `web/` directory contains a minimal App Router front end.
+
+Local development:
+
+```powershell
+cd web
+npm install
+set NEXT_PUBLIC_API_URL=http://localhost:8000
+npm run dev
+```
+
+Vercel deployment:
+
+1. Create a new Vercel project pointing to `web/`.
+2. Build command (default): `npm run build`.
+3. Install command (default): `npm install`.
+4. Output directory: `.next`.
+5. Env variables:
+   - `NEXT_PUBLIC_API_URL=https://<your-render-service>.onrender.com`
+
+The single-page UI collects a question, calls `/query`, and displays the answer with collapsible Cypher and rows.
+
 ## Neo4j Aura Seeding
 
 Use the existing CSVs to populate Aura Free:
