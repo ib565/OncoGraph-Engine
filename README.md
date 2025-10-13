@@ -14,7 +14,7 @@ Answer questions like:
 with:
 - A concise, grounded answer  
 - A mini‑graph of the relevant entities and relationships  
-- 2–3 PubMed citations  
+- PubMed citations  
 
 ---
 
