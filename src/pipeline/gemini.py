@@ -11,6 +11,7 @@ from .types import (
     PipelineError,
     Summarizer,
 )
+from .trace import get_global_trace
 
 try:  # pragma: no cover - optional dependency at runtime
     from google import genai  # type: ignore
@@ -173,6 +174,18 @@ class _GeminiBase:
         )
 
     def _call_model(self, *, prompt: str) -> str:
+        trace = get_global_trace()
+        if trace is not None:
+            trace.record(
+                "llm_request",
+                {
+                    "provider": "gemini",
+                    "model": self.config.model,
+                    "temperature": self.config.temperature,
+                    "prompt": prompt,
+                },
+            )
+
         config_payload = self._build_content_config()
         kwargs = {
             "model": self.config.model,
@@ -183,6 +196,17 @@ class _GeminiBase:
 
         response = self._client.models.generate_content(**kwargs)
         text = getattr(response, "text", None)
+
+        if trace is not None:
+            trace.record(
+                "llm_response",
+                {
+                    "provider": "gemini",
+                    "model": self.config.model,
+                    "response_preview": (text or "")[:400],
+                },
+            )
+
         if not text:
             raise PipelineError("Gemini response did not include text")
         return text

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
 
 from .types import (
     CypherExecutor,
@@ -36,6 +37,11 @@ class QueryEngine:
                 self.trace.record(step, data)
             except Exception:
                 pass
+        # Also emit a simple INFO log for high-level steps
+        try:
+            logging.getLogger("pipeline.engine").info("%s: %s", step, data)
+        except Exception:
+            pass
 
     def run(self, question: str) -> QueryEngineResult:
         """Execute the pipeline in sequence and return the final answer."""

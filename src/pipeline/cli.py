@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import sys
 from datetime import UTC, datetime
@@ -21,15 +22,14 @@ from . import (
     QueryEngine,
     RuleBasedValidator,
 )
-
-
-class JsonlTraceSink:
-    def __init__(self, path: Path) -> None:
-        self._path = path
-
-    def record(self, step: str, data: dict[str, object]) -> None:  # pragma: no cover - simple IO
-        payload = {"timestamp": datetime.now(UTC).isoformat(), "step": step, **data}
-        _log_trace(self._path, payload)
+from .trace import (
+    CompositeTrace,
+    JsonlTraceSink,
+    LoggingTraceSink,
+    get_daily_trace_path,
+    init_logging,
+    set_global_trace,
+)
 
 
 def _build_engine() -> QueryEngine:
@@ -59,8 +59,6 @@ def _build_engine() -> QueryEngine:
 
     summarizer = GeminiSummarizer(config=gemini_config)
 
-    trace_path = Path("logs/traces/") / (datetime.now(UTC).strftime("%Y%m%d") + ".jsonl")
-
     return QueryEngine(
         config=pipeline_config,
         expander=expander,
@@ -68,16 +66,7 @@ def _build_engine() -> QueryEngine:
         validator=validator,
         executor=executor,
         summarizer=summarizer,
-        trace=JsonlTraceSink(trace_path),
     )
-
-
-def _log_trace(output_path: Path, payload: dict[str, object]) -> None:
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    with output_path.open("a", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False)
-        f.write("\n")
-
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run OncoGraph pipeline")
@@ -86,29 +75,22 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--debug", action="store_true", help="Print stack traces and verbose step output"
     )
-    parser.add_argument("--trace", action="store_true", help="Stream trace events to stdout")
+    parser.add_argument("--trace", action="store_true", help="Enable verbose console step logs")
     args = parser.parse_args(argv)
+
+    # Initialize simple console logging
+    init_logging()
+    if args.trace:
+        logging.getLogger().setLevel(logging.DEBUG)
 
     engine = _build_engine()
 
-    if args.trace:
-        from .types import TraceSink
-
-        class StdoutTrace(TraceSink):
-            def record(self, step: str, data: dict[str, object]) -> None:
-                print(f"TRACE {step}: {json.dumps(data, ensure_ascii=False)}")
-
-        if engine.trace is None:
-            engine.trace = StdoutTrace()
-        else:
-            original_trace = engine.trace
-
-            class CompositeTrace(TraceSink):
-                def record(self, step: str, data: dict[str, object]) -> None:
-                    original_trace.record(step, data)
-                    StdoutTrace().record(step, data)
-
-            engine.trace = CompositeTrace()
+    # Configure tracing: console logging always; JSONL unless --no-log
+    sinks = [LoggingTraceSink()]
+    if not args.no_log:
+        sinks.append(JsonlTraceSink(get_daily_trace_path()))
+    engine.trace = CompositeTrace(*sinks)
+    set_global_trace(engine.trace)
 
     question_text = " ".join(args.question).strip()
     started = datetime.now(UTC).isoformat()
@@ -126,19 +108,22 @@ def main(argv: list[str] | None = None) -> int:
             import traceback
 
             traceback.print_exc()
-        if not args.no_log:
-            trace_path = Path("logs/traces/") / (datetime.now(UTC).strftime("%Y%m%d") + ".jsonl")
-            _log_trace(
-                trace_path,
-                {
-                    "timestamp": started,
-                    "step": "error",
-                    "question": question_text,
-                    "error": str(exc),
-                    "error_step": step or "unknown",
-                    "traceback": traceback.format_exc() if args.debug else None,
-                },
-            )
+        try:
+            if engine.trace is not None:
+                import traceback
+
+                engine.trace.record(
+                    "error",
+                    {
+                        "timestamp": started,
+                        "question": question_text,
+                        "error": str(exc),
+                        "error_step": step or "unknown",
+                        "traceback": traceback.format_exc() if args.debug else None,
+                    },
+                )
+        except Exception:
+            pass
         return 1
 
     print("Cypher:\n" + result.cypher + "\n")
@@ -146,19 +131,20 @@ def main(argv: list[str] | None = None) -> int:
     print(json.dumps(result.rows, indent=2))
     print("\nAnswer:\n" + result.answer)
 
-    if not args.no_log:
-        trace_path = Path("logs/traces/") / (datetime.now(UTC).strftime("%Y%m%d") + ".jsonl")
-        _log_trace(
-            trace_path,
-            {
-                "timestamp": started,
-                "step": "run",
-                "question": question_text,
-                "cypher": result.cypher,
-                "row_count": len(result.rows),
-                "answer": result.answer,
-            },
-        )
+    try:
+        if engine.trace is not None:
+            engine.trace.record(
+                "run",
+                {
+                    "timestamp": started,
+                    "question": question_text,
+                    "cypher": result.cypher,
+                    "row_count": len(result.rows),
+                    "answer": result.answer,
+                },
+            )
+    except Exception:
+        pass
 
     return 0
 

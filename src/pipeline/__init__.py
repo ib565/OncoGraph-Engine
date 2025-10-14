@@ -10,6 +10,12 @@ from .gemini import (
 )
 from .types import PipelineConfig, QueryEngineResult
 from .validator import RuleBasedValidator
+from .trace import (
+    CompositeTrace,
+    JsonlTraceSink,
+    LoggingTraceSink,
+    init_logging,
+)
 
 __all__ = [
     "GeminiConfig",
@@ -21,4 +27,8 @@ __all__ = [
     "QueryEngine",
     "QueryEngineResult",
     "RuleBasedValidator",
+    "CompositeTrace",
+    "JsonlTraceSink",
+    "LoggingTraceSink",
+    "init_logging",
 ]

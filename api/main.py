@@ -12,6 +12,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
+from pipeline.trace import (
+    CompositeTrace,
+    JsonlTraceSink,
+    LoggingTraceSink,
+    get_daily_trace_path,
+    init_logging,
+    set_global_trace,
+)
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = PROJECT_ROOT / "src"
 
@@ -19,6 +28,7 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 load_dotenv()
+init_logging()
 
 from pipeline import (
     GeminiConfig,
@@ -72,7 +82,7 @@ def build_engine() -> QueryEngine:
         config=config,
     )
 
-    return QueryEngine(
+    engine = QueryEngine(
         config=config,
         expander=GeminiInstructionExpander(config=gemini_config),
         generator=GeminiCypherGenerator(config=gemini_config),
@@ -80,6 +90,12 @@ def build_engine() -> QueryEngine:
         executor=executor,
         summarizer=GeminiSummarizer(config=gemini_config),
     )
+
+    # Enable step-by-step console logs and JSONL traces for UI runs
+    sinks = [LoggingTraceSink(), JsonlTraceSink(get_daily_trace_path())]
+    engine.trace = CompositeTrace(*sinks)
+    set_global_trace(engine.trace)
+    return engine
 
 
 def get_engine() -> QueryEngine:
