@@ -35,30 +35,107 @@ function inferEffectCategory(effect: string | undefined): "resistance" | "sensit
 export function MiniGraph({ rows, height = 320 }: MiniGraphProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const cyRef = useRef<any>(null);
+  const becameVisibleRef = useRef<boolean>(false);
+  const layoutNameRef = useRef<"cose-bilkent" | "grid">("grid");
 
   const elements = useMemo(() => {
     const nodeMap = new Map<string, { data: Record<string, unknown> }>();
     const edgeMap = new Map<string, { data: Record<string, unknown> }>();
 
+    const safeId = (...parts: string[]): string =>
+      parts
+        .filter(Boolean)
+        .join("|")
+        .replace(/[^A-Za-z0-9._-]+/g, "_");
+
     const addNode = (id: string, label: string, kind: string) => {
-      if (!nodeMap.has(id)) {
-        nodeMap.set(id, { data: { id, label, kind } });
+      const sid = safeId(id);
+      if (!nodeMap.has(sid)) {
+        nodeMap.set(sid, { data: { id: sid, label, kind } });
       }
     };
 
     const addEdge = (id: string, source: string, target: string, label: string, meta: Record<string, unknown>) => {
-      if (!edgeMap.has(id)) {
-        edgeMap.set(id, { data: { id, source, target, label, ...meta } });
+      const sid = safeId(id);
+      const sSource = safeId(source);
+      const sTarget = safeId(target);
+      if (!edgeMap.has(sid)) {
+        edgeMap.set(sid, { data: { id: sid, source: sSource, target: sTarget, label, ...meta } });
       }
     };
 
+    const getValueCI = (obj: Record<string, unknown>, candidates: string[]): unknown => {
+      const lowerKeyToValue: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(obj)) lowerKeyToValue[k.toLowerCase()] = v;
+      for (const key of candidates) {
+        const v = lowerKeyToValue[key.toLowerCase()];
+        if (v !== undefined && v !== null) return v;
+      }
+      return undefined;
+    };
+
     for (const row of rows) {
-      const geneSymbol = normalizeString(row["gene_symbol"]);
-      const variantName = normalizeString(row["variant_name"]);
-      const therapyName = normalizeString(row["therapy_name"]);
-      const diseaseName = normalizeString(row["disease_name"]);
-      const effect = normalizeString(row["effect"]);
-      const pmids = asStringArray(row["pmids"]) || [];
+      let geneSymbol = normalizeString(
+        getValueCI(row, ["gene_symbol", "GeneSymbol", "genesymbol"]) as unknown
+      );
+      let variantName = normalizeString(
+        getValueCI(row, ["variant_name", "VariantName", "variantname"]) as unknown
+      );
+      let therapyName = normalizeString(
+        getValueCI(row, ["therapy_name", "TherapyName", "therapyname"]) as unknown
+      );
+      let diseaseName = normalizeString(
+        getValueCI(row, ["disease_name", "DiseaseName", "diseasename"]) as unknown
+      );
+      let effect = normalizeString(
+        getValueCI(row, ["effect", "RelationshipEffect", "relationship_effect", "relationshipeffect"]) as unknown
+      );
+      let pmids =
+        asStringArray(
+          getValueCI(row, ["pmids", "PMIDs", "pmid", "PMID", "pmid_list", "pmidlist"]) as unknown
+        ) || [];
+
+      // Support nested shapes: Biomarker, Therapy, and relationship objects/arrays
+      const biomarkerVal = (row as Record<string, unknown>)["Biomarker"] as Record<string, unknown> | undefined;
+      if (biomarkerVal && typeof biomarkerVal === "object") {
+        const bSymbol = normalizeString((biomarkerVal as any)["symbol"]);
+        const bName = normalizeString((biomarkerVal as any)["name"]);
+        const bHgvs = normalizeString((biomarkerVal as any)["hgvs_p"]);
+        if (!geneSymbol && bSymbol) geneSymbol = bSymbol;
+        if (!variantName && (bName || bHgvs)) variantName = bName || bHgvs;
+      }
+
+      const therapyVal = (row as Record<string, unknown>)["Therapy"] as Record<string, unknown> | undefined;
+      if (therapyVal && typeof therapyVal === "object") {
+        const tName = normalizeString((therapyVal as any)["name"]);
+        if (!therapyName && tName) therapyName = tName;
+      }
+
+      const relVal = (row as Record<string, unknown>)["AffectsResponseToRelationship"] as unknown;
+      if (relVal) {
+        if (Array.isArray(relVal)) {
+          // Often serialized as [fromNode, type, toNode]
+          const relType = normalizeString(relVal[1]);
+          if (!effect && relType) effect = relType;
+          // Pull names from the endpoints if missing
+          const fromNode = relVal[0] as Record<string, unknown> | undefined;
+          const toNode = relVal[2] as Record<string, unknown> | undefined;
+          const fromSymbol = normalizeString((fromNode as any)?.symbol);
+          const fromName = normalizeString((fromNode as any)?.name) || normalizeString((fromNode as any)?.hgvs_p);
+          const toName = normalizeString((toNode as any)?.name);
+          if (!geneSymbol && fromSymbol) geneSymbol = fromSymbol;
+          if (!variantName && fromName) variantName = fromName;
+          if (!therapyName && toName) therapyName = toName;
+        } else if (typeof relVal === "object") {
+          const relObj = relVal as Record<string, unknown>;
+          const rEffect = normalizeString((relObj as any)["effect"]);
+          const rDisease = normalizeString((relObj as any)["disease_name"] || (relObj as any)["disease"]);
+          const rPmids = asStringArray((relObj as any)["pmids"]);
+          if (!effect && rEffect) effect = rEffect;
+          if (!diseaseName && rDisease) diseaseName = rDisease;
+          if (pmids.length === 0 && rPmids) pmids = rPmids;
+        }
+      }
 
       const effectCategory = inferEffectCategory(effect);
 
@@ -112,9 +189,16 @@ export function MiniGraph({ rows, height = 320 }: MiniGraphProps) {
     async function init() {
       const cytoscapeMod: CytoscapeModule = await import("cytoscape");
       const cytoscape = (cytoscapeMod as any).default ?? (cytoscapeMod as any);
-      const coseBilkentMod: CytoscapeModule = await import("cytoscape-cose-bilkent");
-      const coseBilkent = (coseBilkentMod as any).default ?? (coseBilkentMod as any);
-      cytoscape.use(coseBilkent);
+      let layoutName: "cose-bilkent" | "grid" = "grid";
+      try {
+        const coseBilkentMod: CytoscapeModule = await import("cytoscape-cose-bilkent");
+        const coseBilkent = (coseBilkentMod as any).default ?? (coseBilkentMod as any);
+        cytoscape.use(coseBilkent);
+        layoutName = "cose-bilkent";
+      } catch (err) {
+        // Fallback if layout plugin unavailable
+        layoutName = "grid";
+      }
 
       if (cancelled || !containerRef.current) return;
 
@@ -161,10 +245,16 @@ export function MiniGraph({ rows, height = 320 }: MiniGraphProps) {
           { selector: 'edge[effectCategory = "resistance"]', style: { "line-color": "#dc2626", "target-arrow-color": "#dc2626" } },
           { selector: 'edge[effectCategory = "sensitivity"]', style: { "line-color": "#16a34a", "target-arrow-color": "#16a34a" } },
         ],
-        layout: { name: "cose-bilkent", animate: "end", nodeDimensionsIncludeLabels: true },
+        layout: { name: layoutName, animate: layoutName === "cose-bilkent" ? "end" : false, nodeDimensionsIncludeLabels: true },
       });
 
       cyRef.current = cy;
+      layoutNameRef.current = layoutName;
+      cy.one("layoutstop", () => {
+        try {
+          cy.fit(undefined, 20);
+        } catch {}
+      });
     }
 
     init();
@@ -189,6 +279,33 @@ export function MiniGraph({ rows, height = 320 }: MiniGraphProps) {
     const layout = cy.layout({ name: "cose-bilkent", animate: "end", nodeDimensionsIncludeLabels: true });
     layout.run();
   }, [elements]);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const el = containerRef.current;
+    let observer: ResizeObserver | null = null;
+    if (typeof window !== "undefined" && "ResizeObserver" in window) {
+      observer = new ResizeObserver(() => {
+        if (!cyRef.current) return;
+        const rect = el.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return;
+        cyRef.current.resize();
+        if (!becameVisibleRef.current) {
+          becameVisibleRef.current = true;
+          try {
+            cyRef.current.fit(undefined, 20);
+          } catch {}
+        }
+      });
+      observer.observe(el);
+    }
+    return () => {
+      try {
+        observer?.disconnect();
+      } catch {}
+      observer = null;
+    };
+  }, []);
 
   if (!rows || rows.length === 0) {
     return (
