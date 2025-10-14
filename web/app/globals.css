@@ -16,6 +16,14 @@ main {
   padding: 3rem 1.5rem 4rem;
 }
 
+details > summary::-webkit-details-marker {
+  display: none;
+}
+
+details > summary {
+  list-style: none;
+}
+
 button {
   cursor: pointer;
 }
