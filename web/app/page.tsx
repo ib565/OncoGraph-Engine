@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import MiniGraph from "./components/MiniGraph";
 
 type QueryResponse = {
   answer: string;
@@ -150,6 +151,13 @@ export default function HomePage() {
             >
               {JSON.stringify(result.rows, null, 2)}
             </pre>
+          </details>
+
+          <details style={{ marginTop: "1.5rem" }}>
+            <summary style={{ cursor: "pointer", fontWeight: 600 }}>Mini graph (beta)</summary>
+            <div style={{ marginTop: "0.75rem" }}>
+              <MiniGraph rows={result.rows} height={360} />
+            </div>
           </details>
         </section>
       )}
