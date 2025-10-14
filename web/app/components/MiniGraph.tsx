@@ -38,6 +38,28 @@ export function MiniGraph({ rows, height = 320 }: MiniGraphProps) {
   const becameVisibleRef = useRef<boolean>(false);
   const layoutNameRef = useRef<"cose-bilkent" | "grid">("grid");
 
+  const getLayoutOptions = (name: "cose-bilkent" | "grid") => {
+    if (name === "cose-bilkent") {
+      return {
+        name: "cose-bilkent",
+        animate: "end" as const,
+        nodeDimensionsIncludeLabels: true,
+        fit: true,
+        padding: 30,
+        quality: "default",
+        randomize: true,
+        idealEdgeLength: 150,
+        edgeElasticity: 0.45,
+        nodeRepulsion: 8000,
+        gravity: 0.9,
+        numIter: 1000,
+        tile: true,
+        componentSpacing: 80,
+      };
+    }
+    return { name: "grid", fit: true, padding: 30 } as const;
+  };
+
   const elements = useMemo(() => {
     const nodeMap = new Map<string, { data: Record<string, unknown> }>();
     const edgeMap = new Map<string, { data: Record<string, unknown> }>();
@@ -211,10 +233,19 @@ export function MiniGraph({ rows, height = 320 }: MiniGraphProps) {
             style: {
               label: "data(label)",
               "font-size": 12,
-              "text-valign": "center",
+              "text-valign": "bottom",
               "text-halign": "center",
+              "text-margin-y": -6,
               "text-wrap": "wrap",
-              "text-max-width": 120,
+              "text-max-width": 160,
+              "text-background-color": "#ffffff",
+              "text-background-opacity": 0.9,
+              "text-background-padding": 2,
+              "text-border-color": "#cbd5e1",
+              "text-border-width": 1,
+              "text-border-opacity": 1,
+              "text-outline-color": "#ffffff",
+              "text-outline-width": 2,
               "background-color": "#e5e7eb",
               color: "#0f172a",
               "border-width": 1,
@@ -231,10 +262,18 @@ export function MiniGraph({ rows, height = 320 }: MiniGraphProps) {
             selector: "edge",
             style: {
               label: "data(label)",
-              "font-size": 11,
+              "font-size": 10,
               "text-rotation": "autorotate",
               "text-wrap": "wrap",
-              "text-max-width": 160,
+              "text-max-width": 200,
+              "text-background-color": "#ffffff",
+              "text-background-opacity": 0.9,
+              "text-background-padding": 2,
+              "text-border-color": "#e5e7eb",
+              "text-border-width": 1,
+              "text-border-opacity": 1,
+              "text-outline-color": "#ffffff",
+              "text-outline-width": 2,
               width: 2,
               "line-color": "#94a3b8",
               "target-arrow-color": "#94a3b8",
@@ -242,10 +281,11 @@ export function MiniGraph({ rows, height = 320 }: MiniGraphProps) {
               "target-arrow-shape": "triangle",
             },
           },
+          { selector: 'edge[relationship = "VARIANT_OF"]', style: { "text-opacity": 0 } },
           { selector: 'edge[effectCategory = "resistance"]', style: { "line-color": "#dc2626", "target-arrow-color": "#dc2626" } },
           { selector: 'edge[effectCategory = "sensitivity"]', style: { "line-color": "#16a34a", "target-arrow-color": "#16a34a" } },
         ],
-        layout: { name: layoutName, animate: layoutName === "cose-bilkent" ? "end" : false, nodeDimensionsIncludeLabels: true },
+        layout: getLayoutOptions(layoutName),
       });
 
       cyRef.current = cy;
@@ -276,7 +316,7 @@ export function MiniGraph({ rows, height = 320 }: MiniGraphProps) {
     const cy = cyRef.current as any;
     cy.elements().remove();
     cy.add([...elements.nodes, ...elements.edges]);
-    const layout = cy.layout({ name: "cose-bilkent", animate: "end", nodeDimensionsIncludeLabels: true });
+    const layout = cy.layout(getLayoutOptions(layoutNameRef.current));
     layout.run();
   }, [elements]);
 
