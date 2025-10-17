@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from pathlib import Path
+import psycopg
 
 from .types import TraceSink
 
@@ -48,6 +49,36 @@ class CompositeTraceSink:
     def record(self, step: str, data: dict[str, object]) -> None:
         self._primary.record(step, data)
         self._secondary.record(step, data)
+
+
+class PostgresTraceSink:
+    """Persist trace events to a Postgres table as JSONB rows.
+
+    Expects a table created via:
+      create table if not exists traces (
+        id bigserial primary key,
+        timestamp timestamptz not null default now(),
+        step text not null,
+        payload jsonb not null,
+        day date generated always as (timestamp::date) stored
+      );
+    """
+
+    def __init__(self, dsn: str) -> None:
+        self._dsn = dsn
+
+    def record(self, step: str, data: dict[str, object]) -> None:
+        payload = {"timestamp": datetime.now(UTC).isoformat(), "step": step, **data}
+        try:
+            with psycopg.connect(self._dsn, autocommit=True) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "insert into traces (timestamp, step, payload) values (now(), %s, %s::jsonb)",
+                        (step, json.dumps(payload, ensure_ascii=False)),
+                    )
+        except Exception:
+            # Tracing failures must be non-fatal.
+            pass
 
 
 def daily_trace_path(base: Path | None = None) -> Path:

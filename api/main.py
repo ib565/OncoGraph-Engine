@@ -24,7 +24,13 @@ from pipeline import (
     QueryEngineResult,
     RuleBasedValidator,
 )
-from pipeline.trace import CompositeTraceSink, JsonlTraceSink, StdoutTraceSink, daily_trace_path
+from pipeline.trace import (
+    CompositeTraceSink,
+    JsonlTraceSink,
+    PostgresTraceSink,
+    StdoutTraceSink,
+    daily_trace_path,
+)
 from pipeline.types import PipelineError
 
 load_dotenv()
@@ -68,7 +74,12 @@ def build_engine() -> QueryEngine:
         config=config,
     )
 
+    # Compose trace sinks: JSONL (local debug) + optional Postgres + optional stdout
     trace_sink = JsonlTraceSink(daily_trace_path(Path("logs") / "traces"))
+
+    pg_dsn = os.getenv("TRACE_DATABASE_URL") or os.getenv("DATABASE_URL")
+    if pg_dsn:
+        trace_sink = CompositeTraceSink(trace_sink, PostgresTraceSink(pg_dsn))
 
     trace_stdout_flag = os.getenv("TRACE_STDOUT", "0").strip().lower()
     if trace_stdout_flag in {"1", "true", "yes"}:
