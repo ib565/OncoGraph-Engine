@@ -79,3 +79,16 @@ class TraceSink(Protocol):
         self, step: str, data: dict[str, object]
     ) -> None:  # pragma: no cover - interface only
         ...
+
+
+def with_context_trace(trace: TraceSink | None, context: dict[str, object]) -> TraceSink | None:
+    """Utility: if a trace sink is provided, wrap it to inject a static context.
+
+    Returns the wrapped sink, or None if trace is None.
+    """
+    if trace is None:
+        return None
+    # Local import to avoid a circular import at module load time
+    from .trace import ContextTraceSink  # noqa: WPS433
+
+    return ContextTraceSink(trace, context)

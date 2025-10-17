@@ -51,6 +51,19 @@ class CompositeTraceSink:
         self._secondary.record(step, data)
 
 
+class ContextTraceSink:
+    """Injects a fixed context payload into every trace event."""
+
+    def __init__(self, sink: TraceSink, context: dict[str, object]) -> None:
+        self._sink = sink
+        # Shallow copy to avoid accidental external mutation
+        self._context = dict(context)
+
+    def record(self, step: str, data: dict[str, object]) -> None:
+        merged = {**self._context, **data}
+        self._sink.record(step, merged)
+
+
 class PostgresTraceSink:
     """Persist trace events to a Postgres table as JSONB rows.
 
@@ -69,9 +82,20 @@ class PostgresTraceSink:
 
     def record(self, step: str, data: dict[str, object]) -> None:
         payload = {"timestamp": datetime.now(UTC).isoformat(), "step": step, **data}
+        run_id = data.get("run_id")
         try:
             with psycopg.connect(self._dsn, autocommit=True) as conn:
                 with conn.cursor() as cur:
+                    if isinstance(run_id, str) and run_id:
+                        try:
+                            cur.execute(
+                                "insert into traces (run_id, timestamp, step, payload) values (%s, now(), %s, %s::jsonb)",
+                                (run_id, step, json.dumps(payload, ensure_ascii=False)),
+                            )
+                            return
+                        except Exception:
+                            # Fall back if run_id column doesn't exist yet
+                            pass
                     cur.execute(
                         "insert into traces (timestamp, step, payload) values (now(), %s, %s::jsonb)",
                         (step, json.dumps(payload, ensure_ascii=False)),

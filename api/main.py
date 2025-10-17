@@ -31,7 +31,7 @@ from pipeline.trace import (
     StdoutTraceSink,
     daily_trace_path,
 )
-from pipeline.types import PipelineError
+from pipeline.types import PipelineError, with_context_trace
 
 load_dotenv()
 
@@ -81,7 +81,7 @@ def build_engine() -> QueryEngine:
     if pg_dsn:
         trace_sink = CompositeTraceSink(trace_sink, PostgresTraceSink(pg_dsn))
 
-    trace_stdout_flag = os.getenv("TRACE_STDOUT", "0").strip().lower()
+    trace_stdout_flag = os.getenv("TRACE_STDOUT", "1").strip().lower()
     if trace_stdout_flag in {"1", "true", "yes"}:
         trace_sink = CompositeTraceSink(trace_sink, StdoutTraceSink())
 
@@ -122,12 +122,18 @@ def healthz() -> dict[str, str]:
 def query(body: QueryRequest, engine: Annotated[QueryEngine, Depends(get_engine)]) -> QueryResponse:
     started = datetime.now(UTC).isoformat()
     started_perf = __import__("time").perf_counter()
+    run_id = os.getenv("TRACE_RUN_ID_OVERRIDE") or __import__("uuid").uuid4().hex
+
+    # Wrap trace with run_id so all events share a common identifier
+    traced_engine = engine
+    if engine.trace is not None:
+        traced_engine = engine.with_trace(with_context_trace(engine.trace, {"run_id": run_id}))
 
     try:
-        result: QueryEngineResult = engine.run(body.question.strip())
+        result: QueryEngineResult = traced_engine.run(body.question.strip())
     except PipelineError as exc:
-        if engine.trace is not None:
-            engine.trace.record(
+        if traced_engine.trace is not None:
+            traced_engine.trace.record(
                 "error",
                 {
                     "started_at": started,
@@ -141,8 +147,8 @@ def query(body: QueryRequest, engine: Annotated[QueryEngine, Depends(get_engine)
             status_code=400, detail={"message": str(exc), "step": exc.step}
         ) from exc
     except Exception as exc:  # pragma: no cover - defensive guard
-        if engine.trace is not None:
-            engine.trace.record(
+        if traced_engine.trace is not None:
+            traced_engine.trace.record(
                 "error",
                 {
                     "started_at": started,
@@ -154,8 +160,8 @@ def query(body: QueryRequest, engine: Annotated[QueryEngine, Depends(get_engine)
             )
         raise HTTPException(status_code=500, detail={"message": str(exc)}) from exc
 
-    if engine.trace is not None:
-        engine.trace.record(
+    if traced_engine.trace is not None:
+        traced_engine.trace.record(
             "run",
             {
                 "started_at": started,

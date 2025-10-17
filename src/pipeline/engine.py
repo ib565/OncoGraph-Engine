@@ -142,3 +142,19 @@ class QueryEngine:
             raise PipelineError(f"Summarization failed: {exc}", step="summarize") from exc
 
         return QueryEngineResult(answer=answer, cypher=cypher, rows=rows)
+
+    def with_trace(self, trace: TraceSink | None) -> QueryEngine:
+        """Return a shallow-copied engine instance with a different trace sink.
+
+        This is useful for per-request tracing (e.g., injecting a run_id) while
+        reusing the same underlying components.
+        """
+        return QueryEngine(
+            config=self.config,
+            expander=self.expander,
+            generator=self.generator,
+            validator=self.validator,
+            executor=self.executor,
+            summarizer=self.summarizer,
+            trace=trace,
+        )
