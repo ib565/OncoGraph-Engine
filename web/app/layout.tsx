@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "OncoGraph Demo",
-  description: "Ask oncology biomarker questions backed by Neo4j",
+  title: "OncoGraph",
+  description: "Answers oncology questions using knowledge graph backed citations.",
 };
 
 export default function RootLayout({
