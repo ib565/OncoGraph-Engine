@@ -1,0 +1,23 @@
+{
+  "name": "oncograph-demo-ui",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "cytoscape": "^3.33.1",
+    "cytoscape-cose-bilkent": "^4.1.0",
+    "next": "14.2.10",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "20.17.5",
+    "@types/react": "18.3.10",
+    "@types/react-dom": "18.3.1",
+    "typescript": "5.6.3"
+  }
+}

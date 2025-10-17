@@ -229,3 +229,66 @@ This system is designed to answer a range of questions by translating them into 
 
 **Design philosophy:** *Implement first, perfect later.*  
 Get a reliable, small system working end‑to‑end before adding automation or scale.
+
+---
+
+## FastAPI Demo API (Render)
+
+Deploy the pipeline as a web service. Key steps:
+
+1. Ensure `.env` (or Render env) includes:
+   - `GOOGLE_API_KEY`
+   - `GEMINI_MODEL` / `GEMINI_TEMPERATURE` (optional overrides)
+   - `NEO4J_URI` (Aura use `neo4j+s://...`)
+   - `NEO4J_USER`
+   - `NEO4J_PASSWORD`
+   - `CORS_ORIGINS=https://<your-vercel-app>.vercel.app`
+2. Install deps: `pip install -r requirements.txt`
+3. Start locally: `uvicorn api.main:app --reload`
+4. Render configuration:
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `uvicorn api.main:app --host 0.0.0.0 --port $PORT`
+
+Routes:
+
+- `GET /healthz` – health check.
+- `POST /query` – body `{ "question": "..." }` → returns `{ answer, cypher, rows }`.
+
+---
+
+## Next.js Demo UI (Vercel)
+
+The `web/` directory contains a minimal App Router front end.
+
+Local development:
+
+```powershell
+cd web
+npm install
+set NEXT_PUBLIC_API_URL=http://localhost:8000
+npm run dev
+```
+
+Vercel deployment:
+
+1. Create a new Vercel project pointing to `web/`.
+2. Build command (default): `npm run build`.
+3. Install command (default): `npm install`.
+4. Output directory: `.next`.
+5. Env variables:
+   - `NEXT_PUBLIC_API_URL=https://<your-render-service>.onrender.com`
+
+The single-page UI collects a question, calls `/query`, and displays the answer with collapsible Cypher and rows.
+
+## Neo4j Aura Seeding
+
+Use the existing CSVs to populate Aura Free:
+
+```powershell
+set NEO4J_URI=neo4j+s://<your-instance>.databases.neo4j.io
+set NEO4J_USER=neo4j
+set NEO4J_PASSWORD=<password>
+python -m src.graph.builder
+```
+
+Re-run when seed CSVs change.

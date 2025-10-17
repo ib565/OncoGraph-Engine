@@ -31,6 +31,18 @@ SCHEMA_SNIPPET = dedent(
       (Therapy)-[:TARGETS {source}]->(Gene)
       (Biomarker)-[:AFFECTS_RESPONSE_TO {effect, disease_name, disease_id?, pmids, source, notes?}]->(Therapy)
     - Array properties: pmids, tags
+    Canonical row return contract:
+    RETURN
+      CASE WHEN biomarker:Variant THEN coalesce(biomarker.name, biomarker.hgvs_p) END AS variant_name,
+      CASE WHEN biomarker:Gene THEN biomarker.symbol ELSE gene.symbol END         AS gene_symbol,
+      therapy.name                                                                AS therapy_name,
+      rel.effect                                                                  AS effect,
+      rel.disease_name                                                            AS disease_name,
+      coalesce(rel.pmids, [])                                                     AS pmids
+    LIMIT …
+
+    When writing Cypher, ensure the aliases 
+    variant_name, gene_symbol, therapy_name, effect, disease_name, pmids are always returned (use CASE/COALESCE so absent values become NULL or []).
 
     Query patterns (use when applicable):
     - Gene-or-Variant biomarker for generic "<gene> mutations" (prefer this simpler OR form):
@@ -83,6 +95,7 @@ CYPHER_PROMPT_TEMPLATE = dedent(
     - If the question names a gene without a specific variant, include biomarker matching for the Gene OR any Variant VARIANT_OF that Gene (prefer the OR form shown in the schema patterns; avoid placing WHERE immediately after UNWIND).
     - For therapy classes (e.g., "anti-EGFR"), allow matching via tags OR via TARGETS to the corresponding Gene.
     - Prefer case-insensitive comparisons for disease names and tags; the validator will normalize simple equality.
+    - The RETURN clause MUST project exactly these aliases in order: variant_name, gene_symbol, therapy_name, effect, disease_name, pmids. Use CASE expressions and COALESCE so the columns exist even when values are missing (pmids must always be an array, default to []).
 
     Instruction text:
     {instructions}
