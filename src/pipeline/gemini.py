@@ -42,7 +42,8 @@ SCHEMA_SNIPPET = dedent(
     LIMIT …
 
     When writing Cypher, ensure the aliases 
-    variant_name, gene_symbol, therapy_name, effect, disease_name, pmids are always returned (use CASE/COALESCE so absent values become NULL or []).
+    variant_name, gene_symbol, therapy_name, effect, disease_name, pmids are always returned
+    (use CASE/COALESCE so absent values become NULL or []).
 
     Query patterns (use when applicable):
     - Gene-or-Variant biomarker for generic "<gene> mutations" (prefer this simpler OR form):

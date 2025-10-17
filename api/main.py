@@ -3,22 +3,15 @@
 from __future__ import annotations
 
 import os
+import sys
 from functools import lru_cache
 from pathlib import Path
-import sys
+from typing import Annotated
 
+from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from dotenv import load_dotenv
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SRC_DIR = PROJECT_ROOT / "src"
-
-if str(SRC_DIR) not in sys.path:
-    sys.path.insert(0, str(SRC_DIR))
-
-load_dotenv()
 
 from pipeline import (
     GeminiConfig,
@@ -32,6 +25,14 @@ from pipeline import (
     RuleBasedValidator,
 )
 from pipeline.types import PipelineError
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SRC_DIR = PROJECT_ROOT / "src"
+
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+load_dotenv()
 
 
 class QueryRequest(BaseModel):
@@ -105,7 +106,7 @@ def healthz() -> dict[str, str]:
 
 
 @app.post("/query", response_model=QueryResponse)
-def query(body: QueryRequest, engine: QueryEngine = Depends(get_engine)) -> QueryResponse:
+def query(body: QueryRequest, engine: Annotated[QueryEngine, Depends(get_engine)]) -> QueryResponse:
     try:
         result: QueryEngineResult = engine.run(body.question.strip())
     except PipelineError as exc:
