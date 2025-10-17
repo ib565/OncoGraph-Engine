@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import os
-import sys
 from functools import lru_cache
-from pathlib import Path
 from typing import Annotated
 
 from dotenv import load_dotenv
@@ -25,12 +23,6 @@ from pipeline import (
     RuleBasedValidator,
 )
 from pipeline.types import PipelineError
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SRC_DIR = PROJECT_ROOT / "src"
-
-if str(SRC_DIR) not in sys.path:
-    sys.path.insert(0, str(SRC_DIR))
 
 load_dotenv()
 

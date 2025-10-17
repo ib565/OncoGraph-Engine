@@ -33,11 +33,16 @@ with:
 
 ```powershell
 python -m venv venv
-venv\Scripts\python.exe -m pip install --upgrade pip
-venv\Scripts\python.exe -m pip install -r requirements.txt
+venv\Scripts\activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+### 2. Register the package so imports work without touching sys.path
+```powershell
+python -m pip install -e .
 ```
 
-### 2. Configure environment variables
+### 3. Configure environment variables
 
 Create a `.env` file (or export variables) with:
 
@@ -50,7 +55,7 @@ NEO4J_USER=neo4j
 NEO4J_PASSWORD=your_password
 ```
 
-### 3. Seed Neo4j
+### 4. Seed Neo4j
 
 Run `python -m src.graph.builder` once to ingest the CSV data into Neo4j.
 
