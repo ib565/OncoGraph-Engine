@@ -5,7 +5,8 @@ OncoGraph Agent is a sophisticated Q&A system that answers complex questions abo
 ## Example Query and Answer
 ```
 Question: Do KRAS G12C mutations affect response to Sotorasib in Lung Cancer?
-Answer: Yes, KRAS G12C mutations are associated with sensitivity to Sotorasib in Lung Cancer. This indicates that patients with KRAS G12C-mutated lung cancer may respond favorably to Sotorasib treatment (PMID: 33857313).
+Answer: Yes, KRAS G12C mutations are associated with sensitivity to Sotorasib in Lung Cancer. 
+This indicates that patients with KRAS G12C-mutated lung cancer may respond favorably to Sotorasib treatment (PMID: 33857313).
 ```
 
 ## Key Features
