@@ -86,6 +86,7 @@ The test suite provides coverage for key components of the pipeline:
 - `tests/test_executor.py` – Neo4j executor configuration and list normalization.
 - `tests/test_gemini.py` – Gemini instruction, Cypher, and summary adapters via stubs.
 - `tests/test_pipeline_integration.py` – end-to-end orchestration with deterministic responses.
+- `tests/test_query_engine_smoke.py` – smoke test for the query engine.
 - `tests/test_cli.py` – CLI output with stubbed engine.
 
 ## Future Extensions
