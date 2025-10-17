@@ -110,6 +110,7 @@ def healthz() -> dict[str, str]:
 @app.post("/query", response_model=QueryResponse)
 def query(body: QueryRequest, engine: Annotated[QueryEngine, Depends(get_engine)]) -> QueryResponse:
     started = datetime.now(UTC).isoformat()
+    started_perf = __import__("time").perf_counter()
 
     try:
         result: QueryEngineResult = engine.run(body.question.strip())
@@ -122,6 +123,7 @@ def query(body: QueryRequest, engine: Annotated[QueryEngine, Depends(get_engine)
                     "question": body.question.strip(),
                     "error": str(exc),
                     "error_step": exc.step or "unknown",
+                    "duration_ms": int((__import__("time").perf_counter() - started_perf) * 1000),
                 },
             )
         raise HTTPException(
@@ -136,6 +138,7 @@ def query(body: QueryRequest, engine: Annotated[QueryEngine, Depends(get_engine)
                     "question": body.question.strip(),
                     "error": str(exc),
                     "error_step": "unknown",
+                    "duration_ms": int((__import__("time").perf_counter() - started_perf) * 1000),
                 },
             )
         raise HTTPException(status_code=500, detail={"message": str(exc)}) from exc
@@ -149,6 +152,7 @@ def query(body: QueryRequest, engine: Annotated[QueryEngine, Depends(get_engine)
                 "cypher": result.cypher,
                 "row_count": len(result.rows),
                 "answer": result.answer,
+                "duration_ms": int((__import__("time").perf_counter() - started_perf) * 1000),
             },
         )
 

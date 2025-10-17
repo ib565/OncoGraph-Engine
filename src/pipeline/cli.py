@@ -84,6 +84,7 @@ def main(argv: list[str] | None = None) -> int:
 
     question_text = " ".join(args.question).strip()
     started = datetime.now(UTC).isoformat()
+    started_perf = __import__("time").perf_counter()
 
     try:
         result = engine.run(question_text)
@@ -107,6 +108,7 @@ def main(argv: list[str] | None = None) -> int:
                     "error": str(exc),
                     "error_step": step or "unknown",
                     "traceback": traceback.format_exc() if args.debug else None,
+                    "duration_ms": int((__import__("time").perf_counter() - started_perf) * 1000),
                 },
             )
         return 1
@@ -125,6 +127,7 @@ def main(argv: list[str] | None = None) -> int:
                 "cypher": result.cypher,
                 "row_count": len(result.rows),
                 "answer": result.answer,
+                "duration_ms": int((__import__("time").perf_counter() - started_perf) * 1000),
             },
         )
 

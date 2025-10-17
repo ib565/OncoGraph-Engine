@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from time import perf_counter
 
 from .types import (
     CypherExecutor,
@@ -41,57 +42,102 @@ class QueryEngine:
         """Execute the pipeline in sequence and return the final answer."""
 
         self._trace("question", {"question": question})
+        run_started = perf_counter()
 
         try:
+            step_started = perf_counter()
             instructions = self.expander.expand_instructions(question)
-            self._trace("expand_instructions", {"question": question, "instructions": instructions})
+            duration_ms = int((perf_counter() - step_started) * 1000)
+            self._trace(
+                "expand_instructions",
+                {"question": question, "instructions": instructions, "duration_ms": duration_ms},
+            )
         except Exception as exc:  # pragma: no cover - defensive
-            self._trace("error", {"step": "expand_instructions", "error": str(exc)})
+            duration_ms = int((perf_counter() - step_started) * 1000)
+            self._trace(
+                "error",
+                {"step": "expand_instructions", "error": str(exc), "duration_ms": duration_ms},
+            )
             raise PipelineError(
                 f"Instruction expansion failed: {exc}", step="expand_instructions"
             ) from exc
 
         try:
+            step_started = perf_counter()
             cypher_draft = self.generator.generate_cypher(instructions)
-            self._trace("generate_cypher", {"cypher_draft": cypher_draft})
+            duration_ms = int((perf_counter() - step_started) * 1000)
+            self._trace(
+                "generate_cypher", {"cypher_draft": cypher_draft, "duration_ms": duration_ms}
+            )
         except Exception as exc:
-            self._trace("error", {"step": "generate_cypher", "error": str(exc)})
+            duration_ms = int((perf_counter() - step_started) * 1000)
+            self._trace(
+                "error", {"step": "generate_cypher", "error": str(exc), "duration_ms": duration_ms}
+            )
             raise PipelineError(f"Cypher generation failed: {exc}", step="generate_cypher") from exc
 
         try:
+            step_started = perf_counter()
             cypher = self.validator.validate_cypher(cypher_draft)
-            self._trace("validate_cypher", {"cypher": cypher})
+            duration_ms = int((perf_counter() - step_started) * 1000)
+            self._trace("validate_cypher", {"cypher": cypher, "duration_ms": duration_ms})
         except Exception as exc:
             self._trace(
                 "error",
-                {"step": "validate_cypher", "error": str(exc), "cypher_draft": cypher_draft},
+                {
+                    "step": "validate_cypher",
+                    "error": str(exc),
+                    "cypher_draft": cypher_draft,
+                    "duration_ms": int((perf_counter() - step_started) * 1000),
+                },
             )
             raise PipelineError(f"Cypher validation failed: {exc}", step="validate_cypher") from exc
 
         try:
+            step_started = perf_counter()
             rows = self.executor.execute_read(cypher)
             rows_preview = rows[:3]
+            duration_ms = int((perf_counter() - step_started) * 1000)
             self._trace(
                 "execute_read",
-                {"row_count": len(rows), "rows_preview": rows_preview},
+                {"row_count": len(rows), "rows_preview": rows_preview, "duration_ms": duration_ms},
             )
         except Exception as exc:
             self._trace(
                 "error",
-                {"step": "execute_read", "error": str(exc), "cypher": cypher},
+                {
+                    "step": "execute_read",
+                    "error": str(exc),
+                    "cypher": cypher,
+                    "duration_ms": int((perf_counter() - step_started) * 1000),
+                },
             )
             raise PipelineError(f"Cypher execution failed: {exc}", step="execute_read") from exc
 
         try:
+            step_started = perf_counter()
             answer = self.summarizer.summarize(question, rows)
+            step_duration_ms = int((perf_counter() - step_started) * 1000)
+            total_duration_ms = int((perf_counter() - run_started) * 1000)
             self._trace(
                 "summarize",
-                {"answer_len": len(answer), "answer": answer},
+                {
+                    "answer_len": len(answer),
+                    "answer": answer,
+                    "duration_ms": step_duration_ms,
+                    "total_duration_ms": total_duration_ms,
+                },
             )
         except Exception as exc:
             self._trace(
                 "error",
-                {"step": "summarize", "error": str(exc), "row_count": len(rows)},
+                {
+                    "step": "summarize",
+                    "error": str(exc),
+                    "row_count": len(rows),
+                    "duration_ms": int((perf_counter() - step_started) * 1000),
+                    "total_duration_ms": int((perf_counter() - run_started) * 1000),
+                },
             )
             raise PipelineError(f"Summarization failed: {exc}", step="summarize") from exc
 
