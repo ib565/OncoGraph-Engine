@@ -1,0 +1,56 @@
+"""Lightweight helpers for pipeline tracing."""
+
+from __future__ import annotations
+
+import json
+from datetime import UTC, datetime
+from pathlib import Path
+
+from .types import TraceSink
+
+
+class JsonlTraceSink:
+    """Append trace events to a JSONL file."""
+
+    def __init__(self, path: Path) -> None:
+        self._path = path
+
+    def record(self, step: str, data: dict[str, object]) -> None:
+        payload = {"timestamp": datetime.now(UTC).isoformat(), "step": step, **data}
+        try:
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+            with self._path.open("a", encoding="utf-8") as handle:
+                json.dump(payload, handle, ensure_ascii=False)
+                handle.write("\n")
+        except Exception:
+            # Tracing should never crash the pipeline.
+            pass
+
+
+class StdoutTraceSink:
+    """Print trace events to stdout."""
+
+    def record(self, step: str, data: dict[str, object]) -> None:
+        payload = {"timestamp": datetime.now(UTC).isoformat(), "step": step, **data}
+        try:
+            print(f"TRACE {step}: {json.dumps(payload, ensure_ascii=False)}")
+        except Exception:
+            pass
+
+
+class CompositeTraceSink:
+    """Forward trace events to two sinks."""
+
+    def __init__(self, primary: TraceSink, secondary: TraceSink) -> None:
+        self._primary = primary
+        self._secondary = secondary
+
+    def record(self, step: str, data: dict[str, object]) -> None:
+        self._primary.record(step, data)
+        self._secondary.record(step, data)
+
+
+def daily_trace_path(base: Path | None = None) -> Path:
+    directory = (base or Path("logs") / "traces").resolve()
+    filename = datetime.now(UTC).strftime("%Y%m%d.jsonl")
+    return directory / filename

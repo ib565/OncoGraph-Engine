@@ -21,15 +21,7 @@ from . import (
     QueryEngine,
     RuleBasedValidator,
 )
-
-
-class JsonlTraceSink:
-    def __init__(self, path: Path) -> None:
-        self._path = path
-
-    def record(self, step: str, data: dict[str, object]) -> None:  # pragma: no cover - simple IO
-        payload = {"timestamp": datetime.now(UTC).isoformat(), "step": step, **data}
-        _log_trace(self._path, payload)
+from .trace import CompositeTraceSink, JsonlTraceSink, StdoutTraceSink, daily_trace_path
 
 
 def _build_engine() -> QueryEngine:
@@ -59,7 +51,7 @@ def _build_engine() -> QueryEngine:
 
     summarizer = GeminiSummarizer(config=gemini_config)
 
-    trace_path = Path("logs/traces/") / (datetime.now(UTC).strftime("%Y%m%d") + ".jsonl")
+    trace_path = daily_trace_path(Path("logs") / "traces")
 
     return QueryEngine(
         config=pipeline_config,
@@ -70,13 +62,6 @@ def _build_engine() -> QueryEngine:
         summarizer=summarizer,
         trace=JsonlTraceSink(trace_path),
     )
-
-
-def _log_trace(output_path: Path, payload: dict[str, object]) -> None:
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    with output_path.open("a", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False)
-        f.write("\n")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -92,23 +77,10 @@ def main(argv: list[str] | None = None) -> int:
     engine = _build_engine()
 
     if args.trace:
-        from .types import TraceSink
-
-        class StdoutTrace(TraceSink):
-            def record(self, step: str, data: dict[str, object]) -> None:
-                print(f"TRACE {step}: {json.dumps(data, ensure_ascii=False)}")
-
         if engine.trace is None:
-            engine.trace = StdoutTrace()
+            engine.trace = StdoutTraceSink()
         else:
-            original_trace = engine.trace
-
-            class CompositeTrace(TraceSink):
-                def record(self, step: str, data: dict[str, object]) -> None:
-                    original_trace.record(step, data)
-                    StdoutTrace().record(step, data)
-
-            engine.trace = CompositeTrace()
+            engine.trace = CompositeTraceSink(engine.trace, StdoutTraceSink())
 
     question_text = " ".join(args.question).strip()
     started = datetime.now(UTC).isoformat()
@@ -126,13 +98,11 @@ def main(argv: list[str] | None = None) -> int:
             import traceback
 
             traceback.print_exc()
-        if not args.no_log:
-            trace_path = Path("logs/traces/") / (datetime.now(UTC).strftime("%Y%m%d") + ".jsonl")
-            _log_trace(
-                trace_path,
+        if not args.no_log and engine.trace is not None:
+            engine.trace.record(
+                "error",
                 {
-                    "timestamp": started,
-                    "step": "error",
+                    "started_at": started,
                     "question": question_text,
                     "error": str(exc),
                     "error_step": step or "unknown",
@@ -146,13 +116,11 @@ def main(argv: list[str] | None = None) -> int:
     print(json.dumps(result.rows, indent=2))
     print("\nAnswer:\n" + result.answer)
 
-    if not args.no_log:
-        trace_path = Path("logs/traces/") / (datetime.now(UTC).strftime("%Y%m%d") + ".jsonl")
-        _log_trace(
-            trace_path,
+    if not args.no_log and engine.trace is not None:
+        engine.trace.record(
+            "run",
             {
-                "timestamp": started,
-                "step": "run",
+                "started_at": started,
                 "question": question_text,
                 "cypher": result.cypher,
                 "row_count": len(result.rows),

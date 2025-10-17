@@ -92,6 +92,7 @@ Successful runs echo the final Cypher, result rows (JSON), and the summarised an
 - Each pipeline step records inputs/outputs, including a preview of the first three result rows.
 - Error entries capture `error_step`, the error message, and—when `--debug` is supplied—the traceback.
 - `--trace` mirrors trace events to stdout for live debugging.
+- API server: set environment variable `TRACE_STDOUT=1` if you also want the FastAPI/uvicorn path to stream trace events to stdout.
 
 Example trace entry:
 

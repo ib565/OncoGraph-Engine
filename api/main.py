@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import os
+from datetime import UTC, datetime
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated
 
 from dotenv import load_dotenv
@@ -22,6 +24,7 @@ from pipeline import (
     QueryEngineResult,
     RuleBasedValidator,
 )
+from pipeline.trace import CompositeTraceSink, JsonlTraceSink, StdoutTraceSink, daily_trace_path
 from pipeline.types import PipelineError
 
 load_dotenv()
@@ -65,6 +68,12 @@ def build_engine() -> QueryEngine:
         config=config,
     )
 
+    trace_sink = JsonlTraceSink(daily_trace_path(Path("logs") / "traces"))
+
+    trace_stdout_flag = os.getenv("TRACE_STDOUT", "0").strip().lower()
+    if trace_stdout_flag in {"1", "true", "yes"}:
+        trace_sink = CompositeTraceSink(trace_sink, StdoutTraceSink())
+
     return QueryEngine(
         config=config,
         expander=GeminiInstructionExpander(config=gemini_config),
@@ -72,6 +81,7 @@ def build_engine() -> QueryEngine:
         validator=RuleBasedValidator(config=config),
         executor=executor,
         summarizer=GeminiSummarizer(config=gemini_config),
+        trace=trace_sink,
     )
 
 
@@ -99,13 +109,47 @@ def healthz() -> dict[str, str]:
 
 @app.post("/query", response_model=QueryResponse)
 def query(body: QueryRequest, engine: Annotated[QueryEngine, Depends(get_engine)]) -> QueryResponse:
+    started = datetime.now(UTC).isoformat()
+
     try:
         result: QueryEngineResult = engine.run(body.question.strip())
     except PipelineError as exc:
+        if engine.trace is not None:
+            engine.trace.record(
+                "error",
+                {
+                    "started_at": started,
+                    "question": body.question.strip(),
+                    "error": str(exc),
+                    "error_step": exc.step or "unknown",
+                },
+            )
         raise HTTPException(
             status_code=400, detail={"message": str(exc), "step": exc.step}
         ) from exc
     except Exception as exc:  # pragma: no cover - defensive guard
+        if engine.trace is not None:
+            engine.trace.record(
+                "error",
+                {
+                    "started_at": started,
+                    "question": body.question.strip(),
+                    "error": str(exc),
+                    "error_step": "unknown",
+                },
+            )
         raise HTTPException(status_code=500, detail={"message": str(exc)}) from exc
+
+    if engine.trace is not None:
+        engine.trace.record(
+            "run",
+            {
+                "started_at": started,
+                "question": body.question.strip(),
+                "cypher": result.cypher,
+                "row_count": len(result.rows),
+                "answer": result.answer,
+            },
+        )
 
     return QueryResponse(answer=result.answer, cypher=result.cypher, rows=result.rows)
