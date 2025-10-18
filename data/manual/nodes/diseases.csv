@@ -1,4 +1,7 @@
 name,doid,synonyms
 Colorectal Cancer,DOID:9256,"CRC"
 Melanoma,DOID:1909,
-Lung Cancer,DOID:1324,"NSCLC"
+Lung Cancer,DOID:1324,
+Breast Cancer,DOID:1612,
+Pancreatic Cancer,DOID:1793,
+Prostate Cancer,DOID:10283,"PCa"

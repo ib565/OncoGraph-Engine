@@ -9,6 +9,15 @@ Answer: Yes, KRAS G12C mutations are associated with sensitivity to Sotorasib in
 This indicates that patients with KRAS G12C-mutated lung cancer may respond favorably to Sotorasib treatment (PMID: 33857313).
 ```
 
+### More Example Questions
+
+- What biomarkers predict resistance to anti-EGFR therapies in Colorectal Cancer?
+- Find me the PubMed citations related to Sotorasib and KRAS G12C.
+- Do KRAS G12C mutations affect response to Sotorasib in Lung Cancer?
+- What is the predicted response of EGFR L858R to Gefitinib in Lung Cancer?
+- Does EGFR T790M confer resistance to Gefitinib, and which therapy may overcome it in Lung Cancer?
+- Which therapies target EGFR?
+
 ## Key Features
 
 - **Natural Language to Cypher:** Translates complex biomedical questions into precise Cypher queries for the Neo4j graph database.

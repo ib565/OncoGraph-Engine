@@ -3,3 +3,6 @@ Cetuximab,Antibody,"anti-EGFR",CHEMBL1123,Erbitux
 Vemurafenib,TKI,"BRAF Inhibitor",CHEMBL521889,Zelboraf
 Gefitinib,TKI,"EGFR Inhibitor",CHEMBL939,Iressa
 Sotorasib,TKI,"KRAS G12C Inhibitor",CHEMBL4297670,Lumakras
+Osimertinib,TKI,"EGFR Inhibitor",CHEMBL3352973,Tagrisso
+Trastuzumab,Antibody,"anti-ERBB2",CHEMBL1286,Herceptin
+Alectinib,TKI,"ALK Inhibitor",CHEMBL2363065,Alecensa
