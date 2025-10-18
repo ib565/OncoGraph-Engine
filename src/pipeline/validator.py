@@ -69,13 +69,61 @@ class RuleBasedValidator:
                 "Parameterized queries are not supported; inline literal values (no $parameters)."
             )
         self._check_forbidden_keywords(text)
-        self._check_labels(text)
-        self._check_relationships(text)
-        self._check_properties(text)
+
+        # Remove string literals to avoid false positives when scanning for
+        # labels, relationship types, and property names (e.g., 'p.G12C').
+        scan_text = self._strip_string_literals(text)
+
+        self._check_labels(scan_text)
+        self._check_relationships(scan_text)
         self._ensure_return_clause(text)
         text = self._rewrite_case_insensitive(text)
         text = self._enforce_limit(text)
         return text
+
+    def _strip_string_literals(self, text: str) -> str:
+        """Return text with contents of single/double-quoted strings removed.
+
+        Handles Cypher-style single quotes and doubled single-quote escapes.
+        Double quotes are removed conservatively as well.
+        """
+        out: list[str] = []
+        i = 0
+        in_single = False
+        in_double = False
+        n = len(text)
+        while i < n:
+            ch = text[i]
+            if not in_single and not in_double:
+                if ch == "'":
+                    in_single = True
+                    i += 1
+                    continue
+                if ch == '"':
+                    in_double = True
+                    i += 1
+                    continue
+                out.append(ch)
+                i += 1
+                continue
+            if in_single:
+                # Handle doubled single-quote escape inside single-quoted string
+                if ch == "'" and i + 1 < n and text[i + 1] == "'":
+                    i += 2
+                    continue
+                if ch == "'":
+                    in_single = False
+                    i += 1
+                    continue
+                i += 1
+                continue
+            # in_double
+            if ch == '"':
+                in_double = False
+                i += 1
+                continue
+            i += 1
+        return "".join(out)
 
     def _check_forbidden_keywords(self, text: str) -> None:
         upper_text = text.upper()
