@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import MiniGraph from "./components/MiniGraph";
 
 type QueryResponse = {
@@ -21,6 +21,29 @@ export default function HomePage() {
   const [result, setResult] = useState<QueryResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null);
+  const sseRef = useRef<EventSource | null>(null);
+  const [dotCount, setDotCount] = useState(0);
+
+  useEffect(() => {
+    if (!isLoading || !progress) {
+      setDotCount(0);
+      return;
+    }
+
+    const id = window.setInterval(() => {
+      setDotCount((count) => (count + 1) % 4);
+    }, 400);
+
+    return () => {
+      window.clearInterval(id);
+      setDotCount(0);
+    };
+  }, [isLoading, progress]);
+
+  const animatedProgress = progress
+    ? `${progress}${dotCount === 0 ? "" : ".".repeat(dotCount)}`
+    : null;
 
   async function runQuery(input: string) {
     const trimmed = input.trim();
@@ -40,32 +63,112 @@ export default function HomePage() {
     setIsLoading(true);
     setError(null);
     setResult(null);
+    setProgress(null);
 
+    // Try SSE first for progress streaming
+    const url = `${API_URL}/query/stream?question=${encodeURIComponent(trimmed)}`;
     try {
-      const response = await fetch(`${API_URL}/query`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ question: trimmed }),
+      const es = new EventSource(url, { withCredentials: false });
+      sseRef.current = es;
+
+      const close = () => {
+        if (sseRef.current) {
+          sseRef.current.close();
+          sseRef.current = null;
+        }
+      };
+
+      es.addEventListener("progress", (evt: MessageEvent) => {
+        try {
+          const data = JSON.parse(evt.data) as { message?: string };
+          if (data?.message) {
+            setProgress(data.message);
+            setDotCount(0);
+          }
+        } catch {
+          // ignore malformed
+        }
       });
 
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        const detail = payload?.detail;
-        if (detail?.message) {
-          throw new Error(detail.message);
+      es.addEventListener("result", (evt: MessageEvent) => {
+        try {
+          const data = JSON.parse(evt.data) as QueryResponse;
+          setResult(data);
+        } catch {
+          setError("Malformed result from server");
+        } finally {
+          setProgress(null);
+          close();
+          setIsLoading(false);
         }
-        throw new Error(`Request failed with status ${response.status}`);
-      }
+      });
 
-      const data = (await response.json()) as QueryResponse;
-      setResult(data);
+      es.addEventListener("error", (evt: MessageEvent) => {
+        try {
+          const data = JSON.parse((evt as MessageEvent).data) as { message?: string };
+          setError(data?.message || "Request failed");
+        } catch {
+          setError("Request failed");
+        } finally {
+          setProgress(null);
+          close();
+          setIsLoading(false);
+        }
+      });
+
+      // If the connection errors immediately (e.g., CORS/proxy), fall back to POST
+      es.onerror = () => {
+        // Avoid infinite loop if already closed due to a server-sent error event
+        if (sseRef.current) {
+          close();
+          void (async () => {
+            try {
+              const response = await fetch(`${API_URL}/query`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ question: trimmed }),
+              });
+              if (!response.ok) {
+                const payload = await response.json().catch(() => ({}));
+                const detail = (payload as any)?.detail;
+                if (detail?.message) throw new Error(detail.message);
+                throw new Error(`Request failed with status ${response.status}`);
+              }
+              const data = (await response.json()) as QueryResponse;
+              setResult(data);
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err);
+              setError(message);
+            } finally {
+              setProgress(null);
+              setIsLoading(false);
+            }
+          })();
+        }
+      };
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setError(message);
-    } finally {
-      setIsLoading(false);
+      // As a safety net, fall back to POST if constructing EventSource throws
+      try {
+        const response = await fetch(`${API_URL}/query`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question: trimmed }),
+        });
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          const detail = (payload as any)?.detail;
+          if (detail?.message) throw new Error(detail.message);
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+        const data = (await response.json()) as QueryResponse;
+        setResult(data);
+      } catch (fallbackErr) {
+        const message = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
+        setError(message);
+      } finally {
+        setProgress(null);
+        setIsLoading(false);
+      }
     }
   }
 
@@ -97,7 +200,7 @@ export default function HomePage() {
             className="primary-button"
             disabled={isLoading || !question.trim()}
           >
-            {isLoading ? "Running…" : "Ask"}
+            {isLoading ? "Running..." : "Ask"}
           </button>
         </form>
 
@@ -124,6 +227,12 @@ export default function HomePage() {
       {error && (
         <div className="alert" role="alert">
           {error}
+        </div>
+      )}
+
+      {isLoading && progress && !error && (
+        <div className="status-message" role="status" aria-live="polite">
+          {animatedProgress ?? progress}
         </div>
       )}
 

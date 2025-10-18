@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 import os
+import threading
 from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
+from queue import Empty
 from typing import Annotated
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from pipeline import (
@@ -28,6 +33,7 @@ from pipeline.trace import (
     CompositeTraceSink,
     JsonlTraceSink,
     PostgresTraceSink,
+    QueueTraceSink,
     StdoutTraceSink,
     daily_trace_path,
 )
@@ -174,3 +180,110 @@ def query(body: QueryRequest, engine: Annotated[QueryEngine, Depends(get_engine)
         )
 
     return QueryResponse(answer=result.answer, cypher=result.cypher, rows=result.rows)
+
+
+@app.get("/query/stream")
+def query_stream(
+    question: str, engine: Annotated[QueryEngine, Depends(get_engine)]
+) -> StreamingResponse:
+    """Server-Sent Events: stream progress updates and final result.
+
+    Events emitted:
+      - event: progress, data: {"message": str}
+      - event: result,   data: {"answer": str, "cypher": str, "rows": list[dict]}
+      - event: error,    data: {"message": str, "step": str | None}
+    """
+
+    run_id = os.getenv("TRACE_RUN_ID_OVERRIDE") or __import__("uuid").uuid4().hex
+
+    # Bridge pipeline trace events into a queue for streaming
+    queue_sink = QueueTraceSink()
+
+    traced_engine = engine
+    if engine.trace is not None:
+        # Inject run_id context and mirror to the queue sink
+        contextual = with_context_trace(engine.trace, {"run_id": run_id})
+        composite = CompositeTraceSink(contextual, queue_sink)
+        traced_engine = engine.with_trace(composite)
+    else:
+        traced_engine = engine.with_trace(queue_sink)
+
+    # Placeholders to capture the outcome from a background thread
+    outcome: dict[str, object] = {"done": False}
+    done_event = threading.Event()
+
+    def worker() -> None:
+        try:
+            result: QueryEngineResult = traced_engine.run(question.strip())
+            outcome["result"] = result
+        except PipelineError as exc:
+            outcome["error"] = {"message": str(exc), "step": exc.step}
+        except Exception as exc:  # pragma: no cover - defensive
+            outcome["error"] = {"message": str(exc), "step": "unknown"}
+        finally:
+            outcome["done"] = True
+            done_event.set()
+
+    threading.Thread(target=worker, name=f"query-runner-{run_id}", daemon=True).start()
+
+    async def event_stream():  # type: ignore[no-untyped-def]
+        # Immediately tell the UI we started
+        yield f"event: progress\ndata: {json.dumps({'message': 'Expanding the Query'})}\n\n"
+
+        loop = asyncio.get_event_loop()
+        last_emitted: set[str] = set()
+
+        def next_payload_blocking() -> dict[str, object] | None:
+            try:
+                # Use a short timeout to allow periodic checks for completion
+                return queue_sink.queue.get(timeout=0.25)
+            except Empty:
+                return None
+
+        def map_step_to_message(step: str) -> str | None:
+            if step == "expand_instructions" and "generating" not in last_emitted:
+                last_emitted.add("generating")
+                return "Generating Cypher"
+            if step == "generate_cypher" and "validating" not in last_emitted:
+                last_emitted.add("validating")
+                return "Validating and Executing Cypher"
+            if step == "execute_read" and "summarizing" not in last_emitted:
+                last_emitted.add("summarizing")
+                return "Summarizing Results"
+            return None
+
+        while not done_event.is_set() or not queue_sink.queue.empty():
+            payload = await loop.run_in_executor(None, next_payload_blocking)
+            if not payload:
+                # heartbeat to keep connection alive
+                yield ": keep-alive\n\n"
+                continue
+
+            step = str(payload.get("step", ""))
+            if step == "error":
+                error_message = str(payload.get("error", ""))
+                error_step = str(payload.get("step", "unknown"))
+                error_payload = {"message": error_message, "step": error_step}
+                yield f"event: error\ndata: {json.dumps(error_payload)}\n\n"
+                # Do not break; wait for thread outcome to finish
+                continue
+
+            message = map_step_to_message(step)
+            if message:
+                yield f"event: progress\ndata: {json.dumps({'message': message})}\n\n"
+
+        # Emit the final result or error
+        if "result" in outcome:
+            res: QueryEngineResult = outcome["result"]  # type: ignore[assignment]
+            data = {"answer": res.answer, "cypher": res.cypher, "rows": res.rows}
+            yield f"event: result\ndata: {json.dumps(data)}\n\n"
+        elif "error" in outcome:
+            err = outcome["error"]  # type: ignore[assignment]
+            yield f"event: error\ndata: {json.dumps(err)}\n\n"
+
+    headers = {
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no",  # hint for some proxies (e.g., nginx)
+    }
+    return StreamingResponse(event_stream(), media_type="text/event-stream", headers=headers)

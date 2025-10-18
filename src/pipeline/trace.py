@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from pathlib import Path
+from queue import Queue
+
 import psycopg
 
 from .types import TraceSink
@@ -109,3 +111,28 @@ def daily_trace_path(base: Path | None = None) -> Path:
     directory = (base or Path("logs") / "traces").resolve()
     filename = datetime.now(UTC).strftime("%Y%m%d.jsonl")
     return directory / filename
+
+
+class QueueTraceSink:
+    """Push trace events into a thread-safe queue.
+
+    This is used by the API layer to stream step updates via SSE without
+    interfering with existing sinks (JSONL, Postgres, stdout). The queue
+    items are simple dictionaries combining the step name and payload.
+    """
+
+    def __init__(self, queue: Queue | None = None) -> None:
+        # A queue of dicts like {"step": str, ...payload}
+        self._queue: Queue = queue or Queue()
+
+    @property
+    def queue(self) -> Queue:
+        return self._queue
+
+    def record(self, step: str, data: dict[str, object]) -> None:
+        # Avoid raising from tracing
+        try:
+            payload: dict[str, object] = {"step": step, **data}
+            self._queue.put(payload)
+        except Exception:
+            pass
