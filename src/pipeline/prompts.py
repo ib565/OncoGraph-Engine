@@ -2,103 +2,91 @@ from textwrap import dedent
 
 SCHEMA_SNIPPET = dedent(
     """
-    Graph schema:
-    - Node labels:
-      Gene(symbol, hgnc_id, synonyms),
+    Graph schema (condensed):
+    - Labels: Gene(symbol, hgnc_id, synonyms),
       Variant(name, hgvs_p, consequence, synonyms),
       Therapy(name, modality, tags, chembl_id, synonyms),
       Disease(name, doid, synonyms)
-    - Helper label: Biomarker is applied to Gene and Variant nodes
+    - Helper label: Biomarker (applied to Gene and Variant)
     - Relationships:
       (Variant)-[:VARIANT_OF]->(Gene)
       (Therapy)-[:TARGETS {source}]->(Gene)
-      (Biomarker)-[:AFFECTS_RESPONSE_TO {
-        effect, disease_name, disease_id?, pmids, source, notes?
-      }]->(Therapy)
+      (Biomarker)-[:AFFECTS_RESPONSE_TO {effect, disease_name, disease_id?,
+        pmids, source, notes?}]->(Therapy)
     - Array properties: pmids, tags
-    - Do NOT use Cypher parameters (no $variables). Inline single-quoted
-      literal values derived from the user's question/instructions.
-    Canonical row return contract:
+    - No parameters: inline single-quoted literals only
+      (no $variables)
+
+    Canonical return contract (aliases and order required):
     RETURN
-      CASE WHEN biomarker:Variant
-           THEN coalesce(biomarker.name, biomarker.hgvs_p)
+      CASE WHEN biomarker:Variant THEN coalesce(biomarker.name, biomarker.hgvs_p)
       END AS variant_name,
-      CASE WHEN biomarker:Gene
-           THEN biomarker.symbol ELSE gene.symbol
+      CASE WHEN biomarker:Gene THEN biomarker.symbol ELSE gene.symbol
       END AS gene_symbol,
-      therapy.name                 AS therapy_name,
-      rel.effect                   AS effect,
-      rel.disease_name             AS disease_name,
-      coalesce(rel.pmids, [])      AS pmids
+      therapy.name AS therapy_name,
+      rel.effect AS effect,
+      rel.disease_name AS disease_name,
+      coalesce(rel.pmids, []) AS pmids
     LIMIT …
 
-    When writing Cypher, ensure the aliases
-    variant_name, gene_symbol, therapy_name, effect, disease_name, pmids
-    are always returned
-    (use CASE/COALESCE so absent values become NULL or []).
+    Canonical example (adapt values as needed):
+      MATCH (b:Biomarker)-[rel:AFFECTS_RESPONSE_TO]->(t:Therapy)
+      WHERE (
+        any(tag IN t.tags WHERE toLower(tag) CONTAINS toLower('anti-EGFR'))
+        OR (t)-[:TARGETS]->(:Gene {symbol: 'EGFR'})
+      )
+      AND rel.effect = 'resistance'
+      AND toLower(rel.disease_name) = toLower('colorectal cancer')
+      OPTIONAL MATCH (b)-[:VARIANT_OF]->(g:Gene)
+      RETURN
+        CASE WHEN b:Variant THEN coalesce(b.name, b.hgvs_p) END AS variant_name,
+        CASE WHEN b:Gene THEN b.symbol ELSE g.symbol END AS gene_symbol,
+        t.name AS therapy_name,
+        rel.effect AS effect,
+        rel.disease_name AS disease_name,
+        coalesce(rel.pmids, []) AS pmids
+      LIMIT 10
 
-    Query patterns (use when applicable):
-    - Gene matching can use symbol OR synonyms (case-insensitive equality):
-      MATCH (g:Gene)
-      WHERE toLower(g.symbol) = toLower('KRAS')
-         OR any(s IN g.synonyms WHERE toLower(s) = toLower('KRAS'))
-    - Gene-or-Variant biomarker for generic "<gene> mutations"
-      (prefer this simpler OR form):
-      MATCH (b:Biomarker)-[r:AFFECTS_RESPONSE_TO]->(t:Therapy)
-      WHERE (b:Gene AND toLower(b.symbol) = toLower('KRAS'))
-         OR ((b:Variant)-[:VARIANT_OF]->(:Gene {symbol: 'KRAS'}))
-      // If you still need to expand nodes, use this UNWIND form
-      // (note the list-comprehension filter):
-      MATCH (g:Gene {symbol: 'KRAS'})
-      OPTIONAL MATCH (v:Variant)-[:VARIANT_OF]->(g)
-      WITH g, v
-      UNWIND [x IN [g, v] WHERE x IS NOT NULL] AS biomarker_node
-      MATCH (biomarker_node:Biomarker)-[r:AFFECTS_RESPONSE_TO]->(t:Therapy)
-    - Specific variant provided (e.g., "KRAS G12C", "BRAF V600E"):
-      // Prefer exact full Variant.name when available, and always enforce
-      // the gene via VARIANT_OF.
-      MATCH (g:Gene {symbol: 'KRAS'})
-      MATCH (v:Variant)-[:VARIANT_OF]->(g)
-      WHERE toLower(v.name) = toLower('KRAS G12C')
-         OR toLower(v.name) CONTAINS toLower('G12C')
-         OR toLower(v.hgvs_p) = toLower('p.G12C')
-         OR any(s IN v.synonyms WHERE toLower(s) CONTAINS toLower('G12C'))
-      // Never match a bare amino-acid token like "G12C" using equality on
-      // v.name or v.hgvs_p without the gene constraint; use the
-      // VARIANT_OF guard + contains/hgvs/synonyms instead.
-    - Therapy class by tags OR TARGETS (case-insensitive for tags):
-      MATCH (t:Therapy)
-      WHERE any(tag IN t.tags WHERE toLower(tag) CONTAINS toLower('anti-EGFR'))
-         OR (t)-[:TARGETS]->(:Gene {symbol: 'EGFR'})
-    - Disease comparisons should be case-insensitive equality; validator will normalize if needed.
-    """
+    Canonical rules:
+    - Gene-only: match biomarker as the Gene OR any Variant VARIANT_OF that Gene
+      (prefer single MATCH + OR; avoid WHERE immediately after UNWIND).
+    - Specific variant:
+      - Always require VARIANT_OF to the named gene.
+      - If a full variant name is given (e.g., "KRAS G12C"), prefer exact equality on Variant.name.
+      - If only an amino‑acid token is given (e.g., "G12C"), use a guarded OR across:
+        toLower(Variant.name) CONTAINS toLower('<TOKEN>') OR
+        toLower(Variant.hgvs_p) = toLower('p.<TOKEN>') OR
+        toLower(Variant.hgvs_p) CONTAINS toLower('<TOKEN>') OR
+        any(s IN Variant.synonyms WHERE toLower(s) CONTAINS toLower('<TOKEN>').
+      - Avoid comparing Variant.hgvs_p to a bare token without the 'p.' prefix.
+    - Gene synonyms: allow equality on symbol OR equality on any synonyms (case-insensitive).
+    - Therapy class: match via tags (case-insensitive contains) OR via TARGETS to the gene.
+    - Disease filters: for umbrella terms (e.g., "lung cancer"), prefer case-insensitive
+      CONTAINS on rel.disease_name; use equality only when the question names an exact disease.
+    - Filter scoping: place WHERE filters that constrain (b)-[rel:AFFECTS_RESPONSE_TO]->(t)
+      immediately after introducing those bindings. Do not attach such filters to OPTIONAL MATCH.
+    - Do not assume the biomarker equals the therapy’s target gene unless explicitly named as the biomarker.
+    """  # noqa: E501
 ).strip()
 
 INSTRUCTION_PROMPT_TEMPLATE = dedent(
     """
-    You are an oncology knowledge graph assistant. 
-    You provide clear instructions to guide the downstream Cypher generator
-    in forming a valid Cypher query.
+    You are an oncology knowledge graph assistant.
+    Produce concise guidance for a Cypher generator following the schema and
+    canonical rules below.
     {schema}
 
-    Task: Rewrite the user's question as 3-6 short bullet points that reference
-    the schema labels, relationships, and property names. Keep the guidance
-    tumor-agnostic unless a disease is explicitly named. Do not produce Cypher
-    or JSON—only plain-text bullet points starting with "- ".
+    Task: Rewrite the user's question as 3–6 short bullet points that
+    reference the schema labels, relationships, and property names. Keep guidance
+    tumor‑agnostic unless a disease is explicitly named. Output only bullets
+    starting with "- "; no Cypher and no JSON.
 
-    Guidance:
-    - If the question mentions "<gene> mutations" without a specific variant,
-      match the biomarker as the Gene OR any Variant VARIANT_OF that Gene.
-    - If a specific variant is named (e.g., "KRAS G12C", "BRAF V600E"),
-      constrain to the gene via VARIANT_OF and prefer exact full Variant.name
-      matching when possible; otherwise, combine the gene constraint with
-      case-insensitive matching across Variant.name, Variant.hgvs_p, and
-      Variant.synonyms for the amino-acid change (e.g., "G12C").
-    - Never match a bare amino-acid token (e.g., "G12C") using equality on
-      Variant.name or Variant.hgvs_p without the gene constraint; use the
-      robust pattern above.
-    - For therapy classes like "anti-EGFR", match by tags OR by TARGETS to the target Gene.
-    - Treat disease matching as case-insensitive equality.
+    Important: If only an amino‑acid token (e.g., "G12C") appears in the
+    question, do NOT write equality on Variant.name or Variant.hgvs_p to that
+    bare token. Instead, reference the guarded token‑handling pattern from the
+    canonical rules (VARIANT_OF + name CONTAINS + hgvs_p 'p.<TOKEN>' or CONTAINS
+    + synonyms CONTAINS). If a full variant name (e.g., "KRAS G12C") appears,
+    prefer exact equality on Variant.name together with the VARIANT_OF guard.
 
     User question: {question}
     """
@@ -111,23 +99,22 @@ CYPHER_PROMPT_TEMPLATE = dedent(
     {schema}
 
     Follow these requirements:
-    - Use the provided instruction text exactly once to decide filters, MATCH
-      clauses, and RETURN columns.
-    - Produce a single Cypher query with no commentary or markdown fences.
-    - Ensure the query includes a RETURN clause with readable column aliases
-      and a LIMIT.
-    - If the question names a gene without a specific variant, include
-      biomarker matching for the Gene OR any Variant VARIANT_OF that Gene
-      (prefer the OR form shown in the schema patterns; avoid placing WHERE
-      immediately after UNWIND).
-    - For therapy classes (e.g., "anti-EGFR"), allow matching via tags OR via
-      TARGETS to the corresponding Gene.
-    - Do NOT use Cypher parameters (no $variables). Inline single-quoted
-      literal values taken from the instruction text.
-    - The RETURN clause MUST project exactly these aliases in order:
+    - Use the instruction text exactly once to decide filters, MATCH clauses,
+      and RETURN columns.
+    - Produce a single Cypher query only (no commentary or fences).
+    - Include a RETURN clause and a LIMIT.
+    - Follow the canonical rules above (gene‑or‑variant, VARIANT_OF for variants,
+      therapy class via tags or TARGETS, case-insensitive disease equality,
+      filter scoping, and no parameters). For amino‑acid tokens (e.g., "G12C"),
+      do NOT use equality on Variant.name or Variant.hgvs_p to the bare token.
+      Use the guarded token‑handling pattern (name CONTAINS + hgvs_p 'p.<TOKEN>'
+      or CONTAINS + synonyms CONTAINS) together with VARIANT_OF.
+    - Do NOT use parameters (no $variables); inline single-quoted literals from
+      the instruction text.
+    - The RETURN clause MUST project these aliases in order:
       variant_name, gene_symbol, therapy_name, effect, disease_name, pmids.
-      Use CASE expressions and COALESCE so the columns exist even when values
-      are missing (pmids must always be an array, default to []).
+      Use CASE and COALESCE so columns always exist (pmids must be an array,
+      default []).
 
     Instruction text:
     {instructions}
