@@ -16,6 +16,8 @@ SCHEMA_SNIPPET = dedent(
         effect, disease_name, disease_id?, pmids, source, notes?
       }]->(Therapy)
     - Array properties: pmids, tags
+    - Do NOT use Cypher parameters (no $variables). Inline single-quoted
+      literal values derived from the user's question/instructions.
     Canonical row return contract:
     RETURN
       CASE WHEN biomarker:Variant
@@ -38,16 +40,16 @@ SCHEMA_SNIPPET = dedent(
     Query patterns (use when applicable):
     - Gene matching can use symbol OR synonyms (case-insensitive equality):
       MATCH (g:Gene)
-      WHERE toLower(g.symbol) = toLower($GENE)
-         OR any(s IN g.synonyms WHERE toLower(s) = toLower($GENE))
+      WHERE toLower(g.symbol) = toLower('KRAS')
+         OR any(s IN g.synonyms WHERE toLower(s) = toLower('KRAS'))
     - Gene-or-Variant biomarker for generic "<gene> mutations"
       (prefer this simpler OR form):
       MATCH (b:Biomarker)-[r:AFFECTS_RESPONSE_TO]->(t:Therapy)
-      WHERE (b:Gene AND b.symbol = $GENE)
-         OR (b:Variant)-[:VARIANT_OF]->(:Gene {symbol: $GENE})
+      WHERE (b:Gene AND toLower(b.symbol) = toLower('KRAS'))
+         OR ((b:Variant)-[:VARIANT_OF]->(:Gene {symbol: 'KRAS'}))
       // If you still need to expand nodes, use this UNWIND form
       // (note the list-comprehension filter):
-      MATCH (g:Gene {symbol: $GENE})
+      MATCH (g:Gene {symbol: 'KRAS'})
       OPTIONAL MATCH (v:Variant)-[:VARIANT_OF]->(g)
       WITH g, v
       UNWIND [x IN [g, v] WHERE x IS NOT NULL] AS biomarker_node
@@ -55,19 +57,19 @@ SCHEMA_SNIPPET = dedent(
     - Specific variant provided (e.g., "KRAS G12C", "BRAF V600E"):
       // Prefer exact full Variant.name when available, and always enforce
       // the gene via VARIANT_OF.
-      MATCH (g:Gene {symbol: $GENE})
+      MATCH (g:Gene {symbol: 'KRAS'})
       MATCH (v:Variant)-[:VARIANT_OF]->(g)
-      WHERE toLower(v.name) = toLower($VARIANT_NAME)
-         OR toLower(v.name) CONTAINS toLower($AA_SHORT)
-         OR toLower(v.hgvs_p) = toLower($HGVS_P)
-         OR any(s IN v.synonyms WHERE toLower(s) CONTAINS toLower($AA_SHORT))
+      WHERE toLower(v.name) = toLower('KRAS G12C')
+         OR toLower(v.name) CONTAINS toLower('G12C')
+         OR toLower(v.hgvs_p) = toLower('p.G12C')
+         OR any(s IN v.synonyms WHERE toLower(s) CONTAINS toLower('G12C'))
       // Never match a bare amino-acid token like "G12C" using equality on
       // v.name or v.hgvs_p without the gene constraint; use the
       // VARIANT_OF guard + contains/hgvs/synonyms instead.
     - Therapy class by tags OR TARGETS (case-insensitive for tags):
       MATCH (t:Therapy)
-      WHERE any(tag IN t.tags WHERE toLower(tag) CONTAINS toLower($THERAPY_CLASS))
-         OR (t)-[:TARGETS]->(:Gene {symbol: $TARGET_GENE})
+      WHERE any(tag IN t.tags WHERE toLower(tag) CONTAINS toLower('anti-EGFR'))
+         OR (t)-[:TARGETS]->(:Gene {symbol: 'EGFR'})
     - Disease comparisons should be case-insensitive equality; validator will normalize if needed.
     """
 ).strip()
@@ -120,6 +122,8 @@ CYPHER_PROMPT_TEMPLATE = dedent(
       immediately after UNWIND).
     - For therapy classes (e.g., "anti-EGFR"), allow matching via tags OR via
       TARGETS to the corresponding Gene.
+    - Do NOT use Cypher parameters (no $variables). Inline single-quoted
+      literal values taken from the instruction text.
     - The RETURN clause MUST project exactly these aliases in order:
       variant_name, gene_symbol, therapy_name, effect, disease_name, pmids.
       Use CASE expressions and COALESCE so the columns exist even when values

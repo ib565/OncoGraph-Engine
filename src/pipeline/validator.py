@@ -62,6 +62,12 @@ class RuleBasedValidator:
 
     def validate_cypher(self, cypher: str) -> str:
         text = cypher.strip()
+        # Disallow parameterized queries (e.g., $GENE). The executor does not
+        # provide parameters; require literal inlined strings instead.
+        if re.search(r"\$[A-Za-z_][A-Za-z0-9_]*", text):
+            raise PipelineError(
+                "Parameterized queries are not supported; inline literal values (no $parameters)."
+            )
         self._check_forbidden_keywords(text)
         self._check_labels(text)
         self._check_relationships(text)
