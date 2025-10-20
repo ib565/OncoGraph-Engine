@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from pipeline.engine import QueryEngine
-from pipeline.types import PipelineConfig, PipelineError, QueryEngineResult
+from pipeline.types import PipelineConfig, PipelineError
 
 
 class StubExpander:
