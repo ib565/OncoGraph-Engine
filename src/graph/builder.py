@@ -7,7 +7,8 @@ from neo4j import GraphDatabase
 
 load_dotenv()
 
-DATA_DIR = "data/manual"
+# Allow overriding the CSV root directory via environment variable for generated datasets
+DATA_DIR = os.getenv("DATA_DIR", "data/manual")
 
 ALLOWED_BIOMARKER_TYPES = {"Gene", "Variant"}
 

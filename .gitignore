@@ -1,3 +1,6 @@
+# Generated CIViC outputs (large, changeful)
+data/civic/**
+
 venv/
 .env
 __pycache__/
