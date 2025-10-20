@@ -506,7 +506,7 @@ def run_civic_ingest(
                         "disease_name": disease_name,
                         "pmids": ";".join(sorted(set(ev.pmids))) if ev.pmids else "",
                         "source": "civic",
-                        "notes": ev.evidence_statement or "",
+                        "notes": "",
                     }
                 )
 
