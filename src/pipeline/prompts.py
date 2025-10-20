@@ -36,7 +36,7 @@ SCHEMA_SNIPPET = dedent(
         OR (t)-[:TARGETS]->(:Gene {symbol: 'EGFR'})
       )
       AND rel.effect = 'resistance'
-      AND toLower(rel.disease_name) = toLower('colorectal cancer')
+      AND toLower(rel.disease_name) CONTAINS toLower('colorectal')
       OPTIONAL MATCH (b)-[:VARIANT_OF]->(g:Gene)
       RETURN
         CASE WHEN b:Variant THEN coalesce(b.name, b.hgvs_p) END AS variant_name,
@@ -62,8 +62,14 @@ SCHEMA_SNIPPET = dedent(
         CONTAINS toLower('<TOKEN>') together with VARIANT_OF to the gene.
     - Gene synonyms: allow equality on symbol OR equality on any synonyms (case-insensitive).
     - Therapy class: match via tags (case-insensitive contains) OR via TARGETS to the gene.
-    - Disease filters: for umbrella terms (e.g., "lung cancer"), prefer case-insensitive
-      CONTAINS on rel.disease_name; use equality only when the question names an exact disease.
+    - Therapy name: when a specific therapy is named, prefer case-insensitive equality on
+      t.name; allow fallbacks to synonyms equality (case-insensitive) or toLower(t.name)
+      CONTAINS when needed.
+    - Disease filters: for umbrella terms (e.g., "lung cancer"), prefer a single minimal
+      anchor token match on rel.disease_name (case-insensitive), e.g.,
+      toLower(rel.disease_name) CONTAINS toLower('lung'). Avoid requiring additional tokens
+      like 'cancer'/'carcinoma' to maximize recall. Use case-insensitive equality only when
+      the question names a specific disease entity.
     - Filter scoping: place WHERE filters that constrain (b)-[rel:AFFECTS_RESPONSE_TO]->(t)
       immediately after introducing those bindings. Do not attach such filters to OPTIONAL MATCH.
     - Do not assume the biomarker equals the therapy’s target gene unless explicitly named as the biomarker.
@@ -88,6 +94,12 @@ INSTRUCTION_PROMPT_TEMPLATE = dedent(
     canonical rules (VARIANT_OF + name CONTAINS + hgvs_p 'p.<TOKEN>' or CONTAINS
     + synonyms CONTAINS). If a full variant name (e.g., "KRAS G12C") appears,
     prefer exact equality on Variant.name together with the VARIANT_OF guard.
+
+    - When the question uses an umbrella disease term (e.g., "lung cancer"), include a
+      bullet instructing minimal anchor filtering: require only 'lung' (case‑insensitive)
+      to appear in rel.disease_name. Do not require 'cancer'/'carcinoma' to maximize recall.
+    - When a therapy is explicitly named, include a bullet to match Therapy by
+      case‑insensitive name equality and allow synonyms/CONTAINS as fallbacks.
 
     User question: {question}
     """
@@ -118,6 +130,15 @@ CYPHER_PROMPT_TEMPLATE = dedent(
       variant_name, gene_symbol, therapy_name, effect, disease_name, pmids.
       Use CASE and COALESCE so columns always exist (pmids must be an array,
       default []).
+    - Prefer case-insensitive equality for exact entity names (Variant.name,
+      Therapy.name, Gene.symbol). Include robust fallbacks where appropriate:
+        • Variant: equality on full name; OR name CONTAINS token; OR hgvs_p equality
+          to 'p.<TOKEN>'; OR synonyms CONTAINS token; always guard with VARIANT_OF
+          to the gene when variant-specific.
+        • Therapy: equality on t.name; OR synonyms equality; OR toLower(t.name) CONTAINS.
+        • Disease (umbrella terms): minimal anchor filtering as described above
+          (e.g., toLower(rel.disease_name) CONTAINS toLower('lung')); otherwise use
+          case-insensitive equality for specific diseases.
 
     Instruction text:
     {instructions}
