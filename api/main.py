@@ -56,9 +56,21 @@ class QueryResponse(BaseModel):
 def build_engine() -> QueryEngine:
     config = PipelineConfig()
 
-    gemini_config = GeminiConfig(
-        model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
-        temperature=float(os.getenv("GEMINI_TEMPERATURE", "0.1")),
+    gemini_instruction_expander_config = GeminiConfig(
+        model=os.getenv("GEMINI_INSTRUCTION_EXPANDER_MODEL", "gemini-2.5-flash"),
+        temperature=float(os.getenv("GEMINI_INSTRUCTION_EXPANDER_TEMPERATURE", "0.1")),
+        api_key=os.getenv("GOOGLE_API_KEY"),
+    )
+
+    gemini_cypher_generator_config = GeminiConfig(
+        model=os.getenv("GEMINI_CYPHER_GENERATOR_MODEL", "gemini-2.5-flash"),
+        temperature=float(os.getenv("GEMINI_CYPHER_GENERATOR_TEMPERATURE", "0.1")),
+        api_key=os.getenv("GOOGLE_API_KEY"),
+    )
+
+    gemini_summarizer_config = GeminiConfig(
+        model=os.getenv("GEMINI_SUMMARIZER_MODEL", "gemini-2.5-flash"),
+        temperature=float(os.getenv("GEMINI_SUMMARIZER_TEMPERATURE", "0.1")),
         api_key=os.getenv("GOOGLE_API_KEY"),
     )
 
@@ -93,11 +105,11 @@ def build_engine() -> QueryEngine:
 
     return QueryEngine(
         config=config,
-        expander=GeminiInstructionExpander(config=gemini_config),
-        generator=GeminiCypherGenerator(config=gemini_config),
+        expander=GeminiInstructionExpander(config=gemini_instruction_expander_config),
+        generator=GeminiCypherGenerator(config=gemini_cypher_generator_config),
         validator=RuleBasedValidator(config=config),
         executor=executor,
-        summarizer=GeminiSummarizer(config=gemini_config),
+        summarizer=GeminiSummarizer(config=gemini_summarizer_config),
         trace=trace_sink,
     )
 
