@@ -179,10 +179,83 @@ main.page {
   margin-bottom: 1rem;
 }
 
-.answer-text {
-  line-height: 1.7;
+.answer-content {
   font-size: 1.05rem;
-  margin: 0;
+  line-height: 1.7;
+  color: #111827;
+}
+
+.answer-content > :first-child {
+  margin-top: 0;
+}
+
+.answer-content > :last-child {
+  margin-bottom: 0;
+}
+
+.answer-content p {
+  margin: 0 0 1rem;
+}
+
+.answer-content ul,
+.answer-content ol {
+  padding-left: 1.5rem;
+  margin: 0 0 1rem;
+}
+
+.answer-content li + li {
+  margin-top: 0.35rem;
+}
+
+.answer-content a {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.answer-content code {
+  background: rgba(15, 23, 42, 0.08);
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.35rem;
+  font-size: 0.95em;
+}
+
+.answer-content pre code {
+  display: block;
+  padding: 1rem;
+  border-radius: 0.85rem;
+  background: #0f172a;
+  color: #f8fafc;
+  overflow-x: auto;
+}
+
+.answer-content blockquote {
+  border-left: 4px solid rgba(37, 99, 235, 0.35);
+  padding-left: 1rem;
+  margin: 0 0 1rem;
+  color: #374151;
+}
+
+.answer-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.95rem;
+}
+
+.answer-content th,
+.answer-content td {
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+.answer-content th {
+  background: rgba(59, 130, 246, 0.08);
+  font-weight: 600;
+}
+
+.answer-content tbody tr:nth-child(even) {
+  background: rgba(15, 23, 42, 0.025);
 }
 
 .details {

@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import MiniGraph from "./components/MiniGraph";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 type QueryResponse = {
   answer: string;
@@ -239,7 +241,9 @@ export default function HomePage() {
       {result && (
         <section className="card result-card">
           <h2 className="section-title">Answer</h2>
-          <p className="answer-text">{result.answer}</p>
+          <div className="answer-content">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.answer}</ReactMarkdown>
+          </div>
 
           <details className="details">
             <summary>Cypher query</summary>
