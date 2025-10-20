@@ -25,12 +25,12 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 from collections import Counter, defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-import re
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -40,9 +40,22 @@ CURATED_TARGETS: set[tuple[str, str]] = {
     ("Vemurafenib", "BRAF"),
     ("Gefitinib", "EGFR"),
     ("Osimertinib", "EGFR"),
+    ("Afatinib", "EGFR"),
+    ("Dacomitinib", "EGFR"),
+    ("Dabrafenib", "BRAF"),
+    ("Encorafenib", "BRAF"),
     ("Sotorasib", "KRAS"),
     ("Trastuzumab", "ERBB2"),
+    ("Margetuximab", "ERBB2"),
     ("Alectinib", "ALK"),
+    ("Crizotinib", "ALK"),
+    ("Ceritinib", "ALK"),
+    ("Brigatinib", "ALK"),
+    ("Entrectinib", "ALK"),
+    ("Imatinib", "ABL1"),
+    ("Dasatinib", "ABL1"),
+    ("Gilteritinib", "FLT3"),
+    ("Ivosidenib", "IDH1"),
 }
 
 # Known non-target denylist to avoid accidental inference
@@ -237,7 +250,7 @@ def _to_evidence_items(raw_items: list[dict]) -> list[CivicEvidence]:
                 if first_token and first_token.upper() == first_token:
                     gene_symbol = first_token
 
-        # Variant: CIViC often provides display_name and hgvs
+        # Variant: CIViC often provides display_name and hgvs (we may not have hgvs)
         variant_name_raw = None
         variant_hgvs_p = None
         if isinstance(obj.get("variant"), dict):
@@ -247,6 +260,9 @@ def _to_evidence_items(raw_items: list[dict]) -> list[CivicEvidence]:
             variant_hgvs_p = _safe_get(obj, ["variant", "hgvs_expressions", "p_dot"]) or _safe_get(
                 obj, ["variant", "hgvs_expressions", "protein"]
             )
+        # v2: if no variant dict, fall back to molecular profile name
+        if not variant_name_raw and isinstance(obj.get("molecular_profile"), dict):
+            variant_name_raw = _safe_get(obj, ["molecular_profile", "name"])  # type: ignore[arg-type]
 
         # Disease (take first if list provided)
         disease_name = None
@@ -254,12 +270,21 @@ def _to_evidence_items(raw_items: list[dict]) -> list[CivicEvidence]:
         disease = obj.get("disease")
         if isinstance(disease, dict):
             disease_name = _safe_get(disease, ["name"]) or _safe_get(disease, ["display_name"])  # type: ignore[arg-type]
-            disease_doid = _safe_get(disease, ["doid"])
+            # Normalize DOID: keep numeric part only
+            raw_doid = _safe_get(disease, ["doid"])
+            if isinstance(raw_doid, str) and raw_doid.upper().startswith("DOID:"):
+                disease_doid = raw_doid.split(":", 1)[1]
+            else:
+                disease_doid = raw_doid
         elif isinstance(disease, list) and disease:
             first = disease[0]
             if isinstance(first, dict):
                 disease_name = _safe_get(first, ["name"]) or _safe_get(first, ["display_name"])  # type: ignore[arg-type]
-                disease_doid = _safe_get(first, ["doid"])  # type: ignore[arg-type]
+                raw_doid = _safe_get(first, ["doid"])  # type: ignore[arg-type]
+                if isinstance(raw_doid, str) and raw_doid.upper().startswith("DOID:"):
+                    disease_doid = raw_doid.split(":", 1)[1]
+                else:
+                    disease_doid = raw_doid
 
         # Drugs/therapies
         therapies: list[str] = []
@@ -424,8 +449,8 @@ def run_civic_ingest(
             gene_symbols.add(ev.gene_symbol)
 
         variant_name_norm, variant_token = _normalize_variant_name(ev.gene_symbol, ev.variant_name)
-        # Treat as a variant if we have a token with a digit (e.g., L858R, V600E)
-        is_variant_like = bool(variant_token and any(ch.isdigit() for ch in variant_token))
+        # Treat as a variant when we have a name and a gene symbol (include umbrella states)
+        is_variant_like = bool(variant_name_norm)
         if variant_name_norm and ev.gene_symbol and is_variant_like:
             variant_rows.setdefault(
                 variant_name_norm,
@@ -436,7 +461,11 @@ def run_civic_ingest(
                     "synonyms": None,
                 },
             )
-            variant_of_pairs.add((variant_name_norm, ev.gene_symbol))
+            # Multi-edge for fusions (e.g., BCR::ABL1) → split to base genes
+            base_genes = [g.strip() for g in str(ev.gene_symbol).split("::") if g.strip()]
+            for base_gene in base_genes:
+                variant_of_pairs.add((variant_name_norm, base_gene))
+                gene_symbols.add(base_gene)
 
         disease_name = ev.disease_name
         if disease_name:
