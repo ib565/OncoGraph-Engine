@@ -1,4 +1,6 @@
 import os
+from collections.abc import Callable, Iterable
+from math import ceil
 from typing import Any
 
 import pandas as pd
@@ -9,8 +11,16 @@ load_dotenv()
 
 # Allow overriding the CSV root directory via environment variable for generated datasets
 DATA_DIR = os.getenv("DATA_DIR", "data/manual")
+# Batch size for UNWIND-based bulk writes. Tune between ~100-5000 depending on memory & DB.
+BATCH_SIZE = int(os.getenv("NEO4J_BATCH_SIZE", "500"))
 
 ALLOWED_BIOMARKER_TYPES = {"Gene", "Variant"}
+
+
+def chunked(records: list[dict], size: int) -> Iterable[list[dict]]:
+    """Yield successive chunks from records with length `size` (last chunk may be smaller)."""
+    for i in range(0, len(records), size):
+        yield records[i : i + size]
 
 
 class OncoGraphBuilder:
@@ -29,27 +39,29 @@ class OncoGraphBuilder:
         self.create_constraints()
 
         print("\nStep 2: Ingesting nodes...")
-        self.ingest_csv_data(os.path.join(DATA_DIR, "nodes/genes.csv"), self._create_gene_node)
+        # Note: switched to batch versions for performance (UNWIND)
+        self.ingest_csv_data(os.path.join(DATA_DIR, "nodes/genes.csv"), self._create_genes_batch)
         self.ingest_csv_data(
-            os.path.join(DATA_DIR, "nodes/variants.csv"), self._create_variant_node
+            os.path.join(DATA_DIR, "nodes/variants.csv"), self._create_variants_batch
         )
         self.ingest_csv_data(
-            os.path.join(DATA_DIR, "nodes/therapies.csv"), self._create_therapy_node
+            os.path.join(DATA_DIR, "nodes/therapies.csv"), self._create_therapies_batch
         )
         self.ingest_csv_data(
-            os.path.join(DATA_DIR, "nodes/diseases.csv"), self._create_disease_node
+            os.path.join(DATA_DIR, "nodes/diseases.csv"), self._create_diseases_batch
         )
 
         print("\nStep 3: Ingesting relationships...")
         self.ingest_csv_data(
-            os.path.join(DATA_DIR, "relationships/variant_of.csv"), self._create_variant_of_rel
+            os.path.join(DATA_DIR, "relationships/variant_of.csv"), self._create_variant_of_batch
         )
         self.ingest_csv_data(
-            os.path.join(DATA_DIR, "relationships/targets.csv"), self._create_targets_rel
+            os.path.join(DATA_DIR, "relationships/targets.csv"), self._create_targets_batch
         )
+        # affects_response requires special handling because biomarker_type controls the node label/property
         self.ingest_csv_data(
             os.path.join(DATA_DIR, "relationships/affects_response.csv"),
-            self._create_affects_response_rel,
+            self._create_affects_response_batch,
         )
 
     def create_constraints(self):
@@ -63,13 +75,52 @@ class OncoGraphBuilder:
             for query in queries:
                 session.run(query)
 
-    def ingest_csv_data(self, file_path, creation_func):
+    def ingest_csv_data(self, file_path: str, creation_func: Callable):
+        """
+        Read CSV, clean rows, and send to DB in batches using the provided creation_func.
+
+        creation_func is expected to be a function of the form (tx, rows: List[dict]) -> None.
+        """
         print(f"  -> Processing {file_path}")
         df = pd.read_csv(file_path)
+        records = [self._clean_row(r) for r in df.to_dict(orient="records")]
+        total = len(records)
+        if total == 0:
+            print("    (no rows)")
+            return
+
+        # For affects_response we need to validate biomarker_type values ahead of time
+        if creation_func is self._create_affects_response_batch:
+            invalid_rows = [
+                r
+                for r in records
+                if (
+                    r.get("biomarker_type") not in ALLOWED_BIOMARKER_TYPES
+                    and r.get("biomarker_type") is not None
+                )
+            ]
+            if invalid_rows:
+                # preserve original behavior: raise ValueError if an unsupported biomarker_type is encountered
+                # include a helpful message and stop ingestion for this file.
+                bad = invalid_rows[0].get("biomarker_type")
+                raise ValueError(f"Unsupported biomarker_type '{bad}' in affects_response.csv")
+
         with self._driver.session() as session:
-            for _, row in df.iterrows():
-                cleaned_row = self._clean_row(row.to_dict())
-                session.execute_write(creation_func, cleaned_row)
+            num_batches = ceil(total / BATCH_SIZE)
+            for idx, batch in enumerate(chunked(records, BATCH_SIZE), start=1):
+                print(f"    sending batch {idx}/{num_batches} (size={len(batch)})")
+                # Special-case affects_response: split by biomarker_type so Cypher can use concrete labels
+                if creation_func is self._create_affects_response_batch:
+                    gene_rows = [r for r in batch if r.get("biomarker_type") == "Gene"]
+                    variant_rows = [r for r in batch if r.get("biomarker_type") == "Variant"]
+                    if gene_rows:
+                        session.execute_write(self._create_affects_response_batch_gene, gene_rows)
+                    if variant_rows:
+                        session.execute_write(
+                            self._create_affects_response_batch_variant, variant_rows
+                        )
+                else:
+                    session.execute_write(creation_func, batch)
 
     @staticmethod
     def _clean_row(row: dict[str, Any]) -> dict[str, Any]:
@@ -98,99 +149,141 @@ class OncoGraphBuilder:
 
         return cleaned
 
-    # --- Node Creation Methods ---
+    # --- Batch Node Creation Methods (UNWIND rows) ---
     @staticmethod
-    def _create_gene_node(tx, row):
-        tx.run(
-            "MERGE (g:Gene {symbol: $symbol}) SET g.hgnc_id = $hgnc_id, g.synonyms = $synonyms",
-            row,
-        )
-
-    @staticmethod
-    def _create_variant_node(tx, row):
+    def _create_genes_batch(tx, rows: list[dict[str, Any]]):
         tx.run(
             """
-            MERGE (v:Variant {name: $name})
-            SET v.hgvs_p = $hgvs_p, 
-                v.consequence = $consequence, 
-                v.synonyms = $synonyms
+            UNWIND $rows AS r
+            MERGE (g:Gene {symbol: r.symbol})
+            SET g.hgnc_id = r.hgnc_id,
+                g.synonyms = r.synonyms
             """,
-            row,
+            {"rows": rows},
         )
 
     @staticmethod
-    def _create_therapy_node(tx, row):
+    def _create_variants_batch(tx, rows: list[dict[str, Any]]):
         tx.run(
             """
-            MERGE (t:Therapy {name: $name})
-            SET t.modality = $modality, 
-                t.tags = $tags, 
-                t.chembl_id = $chembl_id, 
-                t.synonyms = $synonyms
+            UNWIND $rows AS r
+            MERGE (v:Variant {name: r.name})
+            SET v.hgvs_p = r.hgvs_p,
+                v.consequence = r.consequence,
+                v.synonyms = r.synonyms
             """,
-            row,
+            {"rows": rows},
         )
 
     @staticmethod
-    def _create_disease_node(tx, row):
-        tx.run(
-            "MERGE (d:Disease {name: $name}) SET d.doid = $doid, d.synonyms = $synonyms",
-            row,
-        )
-
-    # --- Relationship Creation Methods ---
-    @staticmethod
-    def _create_variant_of_rel(tx, row):
+    def _create_therapies_batch(tx, rows: list[dict[str, Any]]):
         tx.run(
             """
-            MATCH (v:Variant {name: $variant_name})
-            MATCH (g:Gene {symbol: $gene_symbol})
+            UNWIND $rows AS r
+            MERGE (t:Therapy {name: r.name})
+            SET t.modality = r.modality,
+                t.tags = r.tags,
+                t.chembl_id = r.chembl_id,
+                t.synonyms = r.synonyms
+            """,
+            {"rows": rows},
+        )
+
+    @staticmethod
+    def _create_diseases_batch(tx, rows: list[dict[str, Any]]):
+        tx.run(
+            """
+            UNWIND $rows AS r
+            MERGE (d:Disease {name: r.name})
+            SET d.doid = r.doid,
+                d.synonyms = r.synonyms
+            """,
+            {"rows": rows},
+        )
+
+    # --- Batch Relationship Creation Methods ---
+    @staticmethod
+    def _create_variant_of_batch(tx, rows: list[dict[str, Any]]):
+        tx.run(
+            """
+            UNWIND $rows AS r
+            MATCH (v:Variant {name: r.variant_name})
+            MATCH (g:Gene {symbol: r.gene_symbol})
             MERGE (v)-[:VARIANT_OF]->(g)
             """,
-            row,
+            {"rows": rows},
         )
 
     @staticmethod
-    def _create_targets_rel(tx, row):
+    def _create_targets_batch(tx, rows: list[dict[str, Any]]):
         tx.run(
-            (
-                "MATCH (t:Therapy {name: $therapy_name}) "
-                "MATCH (g:Gene {symbol: $gene_symbol}) "
-                "MERGE (t)-[r:TARGETS]->(g) "
-                "SET r.source = $source"
-            ),
-            row,
+            """
+            UNWIND $rows AS r
+            MATCH (t:Therapy {name: r.therapy_name})
+            MATCH (g:Gene {symbol: r.gene_symbol})
+            MERGE (t)-[rel:TARGETS]->(g)
+            SET rel.source = r.source
+            """,
+            {"rows": rows},
+        )
+
+    def _create_affects_response_batch(self, tx, rows: list[dict[str, Any]]):
+        """
+        This method is not used directly by ingest_csv_data because we split rows by biomarker_type
+        and call the specialized gene/variant batch methods. Keep as a placeholder in case it's used.
+        """
+        # For safety, do nothing: ingest_csv_data handles the splitting and calls the more specific tx methods.
+        pass
+
+    @staticmethod
+    def _create_affects_response_batch_gene(tx, rows: list[dict[str, Any]]):
+        """
+        Handle rows where biomarker_type == 'Gene'.
+        """
+        tx.run(
+            """
+            UNWIND $rows AS r
+            MATCH (b:Gene {symbol: r.biomarker_name})
+            MATCH (t:Therapy {name: r.therapy_name})
+            SET b:Biomarker
+            MERGE (b)-[rlt:AFFECTS_RESPONSE_TO]->(t)
+            SET rlt.effect = r.effect,
+                rlt.disease_name = r.disease_name,
+                rlt.disease_id = r.disease_id,
+                rlt.pmids = r.pmids,
+                rlt.source = r.source,
+                rlt.notes = r.notes
+            """,
+            {"rows": rows},
         )
 
     @staticmethod
-    def _create_affects_response_rel(tx, row):
-        # Determine the property to match the biomarker on ('symbol' for Gene, 'name' for Variant)
-        biomarker_type = row.get("biomarker_type")
-        if biomarker_type not in ALLOWED_BIOMARKER_TYPES:
-            raise ValueError(
-                f"Unsupported biomarker_type '{biomarker_type}' in affects_response.csv"
-            )
-
-        biomarker_prop = "symbol" if biomarker_type == "Gene" else "name"
-
-        query = f"""
-        MATCH (b:{biomarker_type} {{{biomarker_prop}: $biomarker_name}})
-        MATCH (t:Therapy {{name: $therapy_name}})
-        SET b:Biomarker
-        MERGE (b)-[r:AFFECTS_RESPONSE_TO]->(t)
-        SET r.effect = $effect,
-            r.disease_name = $disease_name,
-            r.disease_id = $disease_id,
-            r.pmids = $pmids,
-            r.source = $source,
-            r.notes = $notes
+    def _create_affects_response_batch_variant(tx, rows: list[dict[str, Any]]):
         """
-        tx.run(query, row)
+        Handle rows where biomarker_type == 'Variant'.
+        """
+        tx.run(
+            """
+            UNWIND $rows AS r
+            MATCH (b:Variant {name: r.biomarker_name})
+            MATCH (t:Therapy {name: r.therapy_name})
+            SET b:Biomarker
+            MERGE (b)-[rlt:AFFECTS_RESPONSE_TO]->(t)
+            SET rlt.effect = r.effect,
+                rlt.disease_name = r.disease_name,
+                rlt.disease_id = r.disease_id,
+                rlt.pmids = r.pmids,
+                rlt.source = r.source,
+                rlt.notes = r.notes
+            """,
+            {"rows": rows},
+        )
 
 
 if __name__ == "__main__":
-
     builder = OncoGraphBuilder()
-    builder.run_ingestion()
-    print("\nDone.")
-    builder.close()
+    try:
+        builder.run_ingestion()
+        print("\nDone.")
+    finally:
+        builder.close()
