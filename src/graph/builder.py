@@ -35,6 +35,9 @@ class OncoGraphBuilder:
 
     def run_ingestion(self):
         """Orchestrates the entire ingestion process."""
+        print("Step 0: Clearing existing graph...")
+        self.clear_graph()
+
         print("Step 1: Creating constraints...")
         self.create_constraints()
 
@@ -74,6 +77,14 @@ class OncoGraphBuilder:
             ]
             for query in queries:
                 session.run(query)
+
+    def clear_graph(self):
+        with self._driver.session() as session:
+            session.execute_write(self._clear_graph_batch)
+
+    @staticmethod
+    def _clear_graph_batch(tx):
+        tx.run("MATCH (n) DETACH DELETE n")
 
     def ingest_csv_data(self, file_path: str, creation_func: Callable):
         """
