@@ -246,9 +246,10 @@ def _to_evidence_items(raw_items: list[dict]) -> list[CivicEvidence]:
             mp_name = _safe_get(obj, ["molecular_profile", "name"])  # type: ignore[arg-type]
             if mp_name:
                 first_token = mp_name.split(" ")[0].strip()
-                # Heuristic: token that is all uppercase letters/numbers is a gene symbol candidate
-                if first_token and first_token.upper() == first_token:
-                    gene_symbol = first_token
+                # For fusions like ETV6::NTRK3, use the left-most base gene token
+                base_token = first_token.split("::")[0].strip()
+                if base_token and base_token.upper() == base_token:
+                    gene_symbol = base_token
 
         # Variant: CIViC often provides display_name and hgvs (we may not have hgvs)
         variant_name_raw = None
@@ -445,7 +446,7 @@ def run_civic_ingest(
     print(f"[civic] Evidence items parsed: {len(evidence_items)}")
     for ev in evidence_items:
         # Ensure basic node presence when possible
-        if ev.gene_symbol:
+        if ev.gene_symbol and "::" not in ev.gene_symbol:
             gene_symbols.add(ev.gene_symbol)
 
         variant_name_norm, variant_token = _normalize_variant_name(ev.gene_symbol, ev.variant_name)
@@ -466,6 +467,11 @@ def run_civic_ingest(
             for base_gene in base_genes:
                 variant_of_pairs.add((variant_name_norm, base_gene))
                 gene_symbols.add(base_gene)
+
+        # Ensure we do not write fusion symbols as standalone gene nodes
+        if ev.gene_symbol and "::" in ev.gene_symbol:
+            for base in [g.strip() for g in ev.gene_symbol.split("::") if g.strip()]:
+                gene_symbols.add(base)
 
         disease_name = ev.disease_name
         if disease_name:
@@ -578,11 +584,13 @@ def run_civic_ingest(
     (out_dir / "relationships").mkdir(parents=True, exist_ok=True)
 
     # Write nodes
+    # Filter out synthetic fusion symbols from genes before writing
+    base_gene_symbols = sorted({s for s in gene_symbols if "::" not in s})
     print(
-        f"[civic] Writing nodes: genes={len(gene_symbols)}, variants={len(variant_rows)},"
+        f"[civic] Writing nodes: genes={len(base_gene_symbols)}, variants={len(variant_rows)},"
         f" therapies={len(therapy_rows)}, diseases={len(disease_rows)}"
     )
-    if not gene_symbols:
+    if not base_gene_symbols:
         print("[civic][warn] No genes derived. Check molecularProfile.name parsing.")
     if not variant_rows:
         print(
@@ -591,12 +599,12 @@ def run_civic_ingest(
     _write_csv(
         date_dir / "nodes" / "genes.csv",
         ["symbol", "hgnc_id", "synonyms"],
-        ((symbol, "", "") for symbol in sorted(gene_symbols)),
+        ((symbol, "", "") for symbol in base_gene_symbols),
     )
     _write_csv(
         out_dir / "nodes" / "genes.csv",
         ["symbol", "hgnc_id", "synonyms"],
-        ((symbol, "", "") for symbol in sorted(gene_symbols)),
+        ((symbol, "", "") for symbol in base_gene_symbols),
     )
 
     _write_csv(
