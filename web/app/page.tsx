@@ -15,7 +15,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 const EXAMPLE_QUERIES: string[] = [
   "What biomarkers predict resistance to anti-EGFR therapies in colorectal cancer?",
   "Do KRAS G12C mutations affect response to Sotorasib in Lung Cancer?",
-  "Find me the PubMed citations related to Sotorasib and KRAS G12C.",
+  "What is the predicted response of EGFR L858R to Gefitinib in Lung Cancer?",
 ];
 
 export default function HomePage() {
