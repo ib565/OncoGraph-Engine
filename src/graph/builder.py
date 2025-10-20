@@ -89,8 +89,14 @@ class OncoGraphBuilder:
             print("    (no rows)")
             return
 
+        # Detect whether we're handling affects_response (bound method identity via __func__)
+        is_affects_response = (
+            getattr(creation_func, "__func__", creation_func)
+            is self._create_affects_response_batch.__func__
+        )
+
         # For affects_response we need to validate biomarker_type values ahead of time
-        if creation_func is self._create_affects_response_batch:
+        if is_affects_response:
             invalid_rows = [
                 r
                 for r in records
@@ -110,7 +116,7 @@ class OncoGraphBuilder:
             for idx, batch in enumerate(chunked(records, BATCH_SIZE), start=1):
                 print(f"    sending batch {idx}/{num_batches} (size={len(batch)})")
                 # Special-case affects_response: split by biomarker_type so Cypher can use concrete labels
-                if creation_func is self._create_affects_response_batch:
+                if is_affects_response:
                     gene_rows = [r for r in batch if r.get("biomarker_type") == "Gene"]
                     variant_rows = [r for r in batch if r.get("biomarker_type") == "Variant"]
                     if gene_rows:
