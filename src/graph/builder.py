@@ -238,8 +238,7 @@ class OncoGraphBuilder:
             UNWIND $rows AS r
             MATCH (t:Therapy {name: r.therapy_name})
             MATCH (g:Gene {symbol: r.gene_symbol})
-            MERGE (t)-[rel:TARGETS]->(g)
-            SET rel.source = r.source
+            MERGE (t)-[rel:TARGETS {source: r.source}]->(g)
             """,
             {"rows": rows},
         )
@@ -263,12 +262,17 @@ class OncoGraphBuilder:
             MATCH (b:Gene {symbol: r.biomarker_name})
             MATCH (t:Therapy {name: r.therapy_name})
             SET b:Biomarker
-            MERGE (b)-[rlt:AFFECTS_RESPONSE_TO]->(t)
-            SET rlt.effect = r.effect,
-                rlt.disease_name = r.disease_name,
-                rlt.disease_id = r.disease_id,
-                rlt.pmids = r.pmids,
-                rlt.source = r.source,
+            MERGE (b)-[rlt:AFFECTS_RESPONSE_TO {
+                effect: r.effect,
+                disease_name: r.disease_name,
+                disease_id: coalesce(r.disease_id, ''),
+                source: r.source
+            }]->(t)
+            WITH rlt, r
+            WITH rlt, coalesce(rlt.pmids, []) + coalesce(r.pmids, []) AS pmids_all, r
+            UNWIND pmids_all AS p
+            WITH rlt, r, collect(DISTINCT p) AS pmids_uniq
+            SET rlt.pmids = pmids_uniq,
                 rlt.notes = r.notes
             """,
             {"rows": rows},
@@ -285,12 +289,17 @@ class OncoGraphBuilder:
             MATCH (b:Variant {name: r.biomarker_name})
             MATCH (t:Therapy {name: r.therapy_name})
             SET b:Biomarker
-            MERGE (b)-[rlt:AFFECTS_RESPONSE_TO]->(t)
-            SET rlt.effect = r.effect,
-                rlt.disease_name = r.disease_name,
-                rlt.disease_id = r.disease_id,
-                rlt.pmids = r.pmids,
-                rlt.source = r.source,
+            MERGE (b)-[rlt:AFFECTS_RESPONSE_TO {
+                effect: r.effect,
+                disease_name: r.disease_name,
+                disease_id: coalesce(r.disease_id, ''),
+                source: r.source
+            }]->(t)
+            WITH rlt, r
+            WITH rlt, coalesce(rlt.pmids, []) + coalesce(r.pmids, []) AS pmids_all, r
+            UNWIND pmids_all AS p
+            WITH rlt, r, collect(DISTINCT p) AS pmids_uniq
+            SET rlt.pmids = pmids_uniq,
                 rlt.notes = r.notes
             """,
             {"rows": rows},
