@@ -52,13 +52,14 @@ SCHEMA_SNIPPET = dedent(
       (prefer single MATCH + OR; avoid WHERE immediately after UNWIND).
     - Specific variant:
       - Always require VARIANT_OF to the named gene.
-      - If a full variant name is given (e.g., "KRAS G12C"), prefer exact equality on Variant.name.
-      - If only an amino‑acid token is given (e.g., "G12C"), use a guarded OR across:
-        toLower(Variant.name) CONTAINS toLower('<TOKEN>') OR
-        toLower(Variant.hgvs_p) = toLower('p.<TOKEN>') OR
-        toLower(Variant.hgvs_p) CONTAINS toLower('<TOKEN>') OR
-        any(s IN Variant.synonyms WHERE toLower(s) CONTAINS toLower('<TOKEN>').
-      - Avoid comparing Variant.hgvs_p to a bare token without the 'p.' prefix.
+      - Prefer equality on Variant.name for full names like 'KRAS G12C' or
+        'BCR::ABL1 Fusion'. Fallback to toLower(Variant.name) CONTAINS toLower('<TOKEN>').
+      - For fusion tokens (e.g., "EML4-ALK", "EML4::ALK"), match either orientation:
+        toLower(Variant.name) CONTAINS toLower('EML4::ALK') OR
+        toLower(Variant.name) CONTAINS toLower('ALK::EML4').
+      - For alteration-class tokens ("Amplification", "Overexpression", "Deletion",
+        "Loss-of-function", "Fusion", "Wildtype"), use toLower(Variant.name)
+        CONTAINS toLower('<TOKEN>') together with VARIANT_OF to the gene.
     - Gene synonyms: allow equality on symbol OR equality on any synonyms (case-insensitive).
     - Therapy class: match via tags (case-insensitive contains) OR via TARGETS to the gene.
     - Disease filters: for umbrella terms (e.g., "lung cancer"), prefer case-insensitive
@@ -105,10 +106,12 @@ CYPHER_PROMPT_TEMPLATE = dedent(
     - Include a RETURN clause and a LIMIT.
     - Follow the canonical rules above (gene‑or‑variant, VARIANT_OF for variants,
       therapy class via tags or TARGETS, case-insensitive disease equality,
-      filter scoping, and no parameters). For amino‑acid tokens (e.g., "G12C"),
-      do NOT use equality on Variant.name or Variant.hgvs_p to the bare token.
-      Use the guarded token‑handling pattern (name CONTAINS + hgvs_p 'p.<TOKEN>'
-      or CONTAINS + synonyms CONTAINS) together with VARIANT_OF.
+      filter scoping, and no parameters).
+    - For tokenized variants (e.g., "G12C") or alteration classes ("Amplification",
+      "Overexpression", "Deletion", "Loss-of-function", "Fusion", "Wildtype"),
+      prefer equality on Variant.name when a full name is known, otherwise use
+      toLower(Variant.name) CONTAINS toLower('<TOKEN>') together with VARIANT_OF.
+    - For fusions ("EML4-ALK", "EML4::ALK"), match both orientations in Variant.name.
     - Do NOT use parameters (no $variables); inline single-quoted literals from
       the instruction text.
     - The RETURN clause MUST project these aliases in order:
