@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from tenacity import retry, retry_if_not_exception_type, stop_after_attempt, wait_exponential
+
 from .prompts import (
     CYPHER_PROMPT_TEMPLATE,
     INSTRUCTION_PROMPT_TEMPLATE,
@@ -91,6 +93,11 @@ class _GeminiBase:
             max_output_tokens=self.config.max_output_tokens,
         )
 
+    @retry(
+        retry=retry_if_not_exception_type(PipelineError),  # Retry except PipelineError
+        stop=stop_after_attempt(3),  # Maximum 3 attempts
+        wait=wait_exponential(multiplier=1, min=1, max=10),  # Exponential backoff
+    )
     def _call_model(self, *, prompt: str) -> str:
         config_payload = self._build_content_config()
         kwargs = {
