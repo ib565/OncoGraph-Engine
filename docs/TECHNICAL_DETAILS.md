@@ -68,6 +68,9 @@ Structured logs are written to `logs/traces/YYYYMMDD.jsonl` for every run. Each 
 -   Use the `--debug` flag to capture full stack traces on errors.
 -   For the API server, set the environment variable `TRACE_STDOUT=1` to stream traces to the console.
 
+In production/deployment, logs are stored to a Supabase postgres table.
+
+
 ### Testing Coverage
 
 The `pytest` suite covers key components of the backend pipeline, including the query validator, Neo4j executor, LLM adapters, and end-to-end integration tests.
