@@ -7,12 +7,16 @@ OncoGraph Agent is a sophisticated Q&A system that answers complex questions abo
 ## Example
 
 **Question:**
-> Do KRAS G12C mutations affect response to Sotorasib in Lung Cancer?
+> Which therapies target KRAS and what are their mechanisms of action?
 
 **Answer:**
-> Yes, KRAS G12C mutations are associated with sensitivity to Sotorasib in Lung Cancer. This indicates that patients with KRAS G12C-mutated lung cancer may respond favorably to Sotorasib treatment (PMID: 31666701).
+> Here are therapies that target KRAS and their mechanisms of action:
+>*   **Adagrasib**: functions as a GTPase KRas inhibitor (PMID: 31658955)
+>*   **Salirasib**: acts as a RAS inhibitor (PMID: 22547163)
+>*   **Sotorasib**: functions as a GTPase KRas inhibitor (PMIDs: 31189530, 31666701, 31820981, 32568546)
 
-![Mini-graph Visualization](docs\Sotorasib_example.png)
+
+![Mini-graph Visualization](docs\example.png)
 
 ### More Example Questions
 
