@@ -1,57 +1,55 @@
 # OncoGraph Agent
 
-OncoGraph Agent is a sophisticated Q&A system that answers complex questions about cancer genomics by leveraging a knowledge graph. It translates natural language queries into cypher queries, extracts precise information, and presents it with citations, providing a reliable tool for researchers and clinicians.
+**[Try the Live Demo Here](https://onco-graph-agent.vercel.app/)**
 
-## Example Query and Answer
-```
-Question: Do KRAS G12C mutations affect response to Sotorasib in Lung Cancer?
-Answer: Yes, KRAS G12C mutations are associated with sensitivity to Sotorasib in Lung Cancer. 
-This indicates that patients with KRAS G12C-mutated lung cancer may respond favorably to Sotorasib treatment (PMID: 33857313).
-```
+OncoGraph Agent is a sophisticated Q&A system that answers complex questions about cancer genomics by leveraging a knowledge graph. It translates natural language queries into Cypher, extracts precise information from the graph, and presents it with citations, providing a reliable tool for researchers and clinicians.
+
+## Example
+
+**Question:**
+> Do KRAS G12C mutations affect response to Sotorasib in Lung Cancer?
+
+**Answer:**
+> Yes, KRAS G12C mutations are associated with sensitivity to Sotorasib in Lung Cancer. This indicates that patients with KRAS G12C-mutated lung cancer may respond favorably to Sotorasib treatment (PMID: 31666701).
+
+![Mini-graph Visualization](docs\Sotorasib_example.png)
 
 ### More Example Questions
 
 - Which therapies target KRAS and what are their mechanisms of action?
 - What biomarkers predict resistance to anti-EGFR therapies in colorectal cancer?
 - Find PubMed citations related to Sotorasib’s mechanism of action on KRAS.
-- Do KRAS G12C mutations affect response to Sotorasib in lung cancer?
 - What is the predicted response of EGFR L858R to Gefitinib in lung cancer?
-- Does EGFR T790M confer resistance to Gefitinib, and which therapy may overcome it in lung cancer?
-- Which therapies target EGFR?
 
 ## Key Features
 
-- **Natural Language to Cypher:** Translates complex biomedical questions into precise Cypher queries for the Neo4j graph database.
-- **Grounded Answers:** Provides concise, accurate answers backed by data from the knowledge graph.
-- **Data Visualization:** Generates a mini-graph visualization for each query to illustrate the relationships between relevant entities (genes, variants, therapies, diseases).
-- **Cited Evidence:** Includes PubMed citations to support the provided answers.
-- **Full-Stack Application:** Features a Python backend with a Q&A pipeline, a FastAPI web server, and a Next.js user interface.
-
-## Data Sources
-- **CIViC:** https://civicdb.org/welcome
-- **OpenTargets:** https://www.opentargets.org/
-
-## Technology Stack
-
-- **Backend:** Python, FastAPI
-- **Database:** Neo4j
-- **LLM Integration:** Gemini
-- **Frontend:** Next.js, React, TypeScript
-- **Deployment:** Vercel (UI), Render (API)
+- **Natural Language to Graph Query:** Translates complex biomedical questions into precise queries for our knowledge graph.
+- **Evidence-Based Answers:** Provides concise, accurate answers grounded in the underlying data.
+- **Interactive Visualization:** Generates a mini-graph for each query to visually explain the relationships between genes, therapies, and diseases.
+- **Verifiable Citations:** Includes PubMed IDs to support its conclusions, linking back to the original research.
 
 ## How It Works
 
-The agent follows a multi-step pipeline to answer questions:
+The agent follows a multi-step pipeline to answer a question:
 
-1.  **Question Analysis:** An LLM analyzes the user's question to identify key entities and relationships.
-2.  **Cypher Generation:** The LLM generates a Cypher query to retrieve relevant information from the Neo4j knowledge graph.
-3.  **Query Validation:** A validator checks the generated Cypher for safety and correctness against the graph schema.
-4.  **Database Execution:** The validated query is executed against the Neo4j database.
-5.  **Summarization:** The results are summarized by an LLM into a natural language answer, complete with citations.
+1.  **Question Analysis:** An LLM identifies the key entities (e.g., genes, drugs) and relationships in the user's question.
+2.  **Cypher Generation:** The LLM generates a Cypher query to retrieve the relevant information from the Neo4j knowledge graph.
+3.  **Query Validation:** The query is checked for safety and correctness against the graph schema.
+4.  **Database Execution:** The validated query is run against the Neo4j database.
+5.  **Summarization:** The results are synthesized by an LLM into a clear, natural language answer, complete with citations.
 
-For a deeper dive into the architecture, schema, and query patterns, see [Technical Details](./docs/TECHNICAL_DETAILS.md).
+## Technology & Data
 
-## Getting Started
+- **Backend:** Python, FastAPI, Gemini
+- **Database:** Neo4j
+- **Frontend:** Next.js, React, TypeScript
+- **Data Sources:** [CIViC](https://civicdb.org/welcome) and [OpenTargets](https://www.opentargets.org/)
+- **Deployment:** Vercel (UI) & Render (API)
+
+---
+
+<details>
+<summary><strong>Local Development & Contribution</strong></summary>
 
 ### Prerequisites
 
@@ -61,7 +59,7 @@ For a deeper dive into the architecture, schema, and query patterns, see [Techni
 
 ### 1. Configure Environment
 
-Create a `.env` file in the root directory with the following variables:
+Create a `.env` file in the project root with the following variables:
 
 ```
 GOOGLE_API_KEY="your_gemini_api_key"
@@ -72,31 +70,31 @@ NEO4J_PASSWORD="your_password"
 
 ### 2. Setup Backend
 
-Create a virtual environment, install dependencies, and register the package:
+Create a virtual environment and install dependencies:
 
-```powershell
+```bash
 # Create and activate virtual environment
 python -m venv venv
 .\venv\Scripts\activate
 
-# Install dependencies
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-python -m pip install -e .
+# Install dependencies and the local package
+pip install --upgrade pip
+pip install -r requirements.txt
+pip install -e .
 ```
 
 ### 3. Seed the Database
 
-Option A) Use the included manual seed dataset (default):
+You can use the small, included dataset or generate a fresh one from the source APIs.
 
-```powershell
+**Option A: Use the included seed data (Recommended for quick start)**
+```bash
 python -m src.graph.builder
 ```
 
-Option B) Generate data from CIViC + OpenTargets and ingest:
-
-```powershell
-# Generate CSVs under data/civic/latest (CIViC evidence + OpenTargets TARGETS)
+**Option B: Generate data from CIViC + OpenTargets**
+```bash
+# Generate CSVs under data/civic/latest
 python -m src.pipeline.civic_ingest --out-dir data/civic/latest --enrich-tags
 
 # Point the builder to the generated dataset and ingest
@@ -104,26 +102,15 @@ $env:DATA_DIR="data/civic/latest"
 python -m src.graph.builder
 ```
 
-## Running the Application
+### 4. Run the Application
 
-### CLI
-
-You can interact with the agent directly through the command-line interface:
-
-```powershell
-python run.py "Do KRAS mutations affect anti-EGFR therapy in colorectal cancer?"
+**Start the Backend API:**
+```bash
+uvicorn api.main:app --reload
 ```
 
-**CLI Flags:**
-- `--trace`: Stream each step of the pipeline to the console.
-- `--debug`: Print full stack traces on errors.
-- `--no-log`: Disable writing logs to a file.
-
-### Web Interface
-
-The project includes a Next.js frontend to interact with the agent through a web browser.
-
-```powershell
+**Run the Web Interface:**
+```bash
 # Navigate to the web directory
 cd web
 
@@ -134,20 +121,17 @@ npm install
 $env:NEXT_PUBLIC_API_URL="http://localhost:8000"
 npm run dev
 ```
-Before running the UI, you need to start the FastAPI server:
-```powershell
-uvicorn api.main:app --reload
-```
 The UI will be available at `http://localhost:3000`.
 
-## Testing
+### 5. Run Tests
 
-To run the full suite of tests for the backend, use pytest:
+To run the backend test suite:
 
-```powershell
+```bash
 python -m pytest
 ```
 
----
+</details>
 
-*For more detailed technical documentation, please see [Technical Details](./docs/TECHNICAL_DETAILS.md).*
+---
+*For a deeper dive into the architecture and schema, see [Technical Details](./docs/TECHNICAL_DETAILS.md).*

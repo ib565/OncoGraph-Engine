@@ -1,135 +1,84 @@
 # Technical Details
 
-This document provides a deeper dive into the technical implementation of the OncoGraph Agent.
-
+This document provides a deeper dive into the technical implementation of the OncoGraph Agent, covering the graph schema, data pipeline, and query engine.
 
 ## Graph Schema
 
+The knowledge graph consists of four primary node types and three relationship types.
+
 ### Node Labels
 
-*   **`Gene`**: A specific gene, identified by its official symbol.
-    *   *Properties*: `symbol` (unique), `hgnc_id`, `synonyms`
-*   **`Variant`**: A specific genetic alteration.
-    *   *Properties*: `name` (unique), `hgvs_p`, `consequence`, `synonyms`
-*   **`Therapy`**: A medical treatment, typically a drug.
-    *   *Properties*: `name` (unique), `modality`, `tags`, `chembl_id`, `synonyms`
-*   **`Disease`**: A specific disease, typically a type of cancer.
-    *   *Properties*: `name` (unique), `doid`, `synonyms`
-*   **`Biomarker`**: A helper label applied to `Gene` and `Variant` nodes to simplify queries.
+- **`Gene`**: A gene, identified by its official symbol.
+  - *Properties*: `symbol` (unique), `hgnc_id`, `synonyms`
+- **`Variant`**: A specific genetic alteration.
+  - *Properties*: `name` (unique), `hgvs_p`, `consequence`, `synonyms`
+- **`Therapy`**: A medical treatment, typically a drug.
+  - *Properties*: `name` (unique), `modality`, `tags`, `chembl_id`, `synonyms`
+- **`Disease`**: A specific disease, typically a type of cancer.
+  - *Properties*: `name` (unique), `doid`, `synonyms`
+- **`Biomarker`**: A helper label applied to `Gene` and `Variant` nodes to simplify queries about biomarkers.
 
 ### Relationship Types
 
-*   **(Variant) -[:VARIANT_OF]-> (Gene)**: Links a variant to its parent gene.
-*   **(Therapy) -[:TARGETS]-> (Gene)**: Indicates a therapy is designed to affect a gene.
-    *   *Properties*: `source`, `moa` (optional), `action_type` (optional),
-        `ref_sources` (optional), `ref_ids` (optional), `ref_urls` (optional)
-*   **(Biomarker) -[:AFFECTS_RESPONSE_TO]-> (Therapy)**: The core predictive fact in the graph.
-    *   *Properties*: `effect`, `disease_name`, `disease_id` (optional), `pmids`, `source`, `notes` (optional)
+- **`(Variant)-[:VARIANT_OF]->(Gene)`**: Links a variant to its parent gene.
+- **`(Therapy)-[:TARGETS]->(Gene)`**: Indicates a therapy is designed to affect a gene.
+  - *Properties*: `source`, `moa`, `action_type`, `ref_sources`, `ref_ids`, `ref_urls`
+- **`(Biomarker)-[:AFFECTS_RESPONSE_TO]->(Therapy)`**: The core predictive relationship in the graph.
+  - *Properties*: `effect` ('Sensitivity', 'Resistance', etc.), `disease_name`, `pmids`, `source`
 
+### Schema Design Notes
 
-### Index & Uniqueness
+- **Indexes**: Unique constraints are enforced on `Gene.symbol`, `Variant.name`, `Therapy.name`, and `Disease.name`.
+- **Simplicity**: For simplicity, evidence details like `effect` and `disease_name` are stored directly on relationships. This is easier for LLMs to query. A future version could move to a more normalized model with dedicated `Evidence` nodes.
 
-- Unique: `Gene.symbol`, `Variant.name`, `Therapy.name`, `Disease.name`  
-- Consider indexes on `AFFECTS_RESPONSE_TO.effect` and `Disease.name` when data grows.
+## Data Pipeline
 
-### Reification of Statements
-The current model stores `effect`, `disease`, and `pmids` directly on edges for simplicity, which is easier for LLMs to handle. A future version may move to reified evidence (e.g., Statement and Publication nodes), and the migration path is straightforward.
+The data pipeline transforms raw data from external APIs into the structured graph described above.
 
-## Data Ingestion (CIViC + OpenTargets)
+1.  **Data Extraction**: The `src/pipeline/civic_ingest.py` script fetches evidence data from the CIViC GraphQL API and enriches it with therapy information (ChEMBL IDs, synonyms, mechanisms of action) from the OpenTargets GraphQL API.
+2.  **CSV Generation**: The script outputs a set of clean CSV files in the `data/` directory, corresponding to the nodes and relationships in our schema (e.g., `nodes/genes.csv`, `relationships/affects_response.csv`).
+3.  **Graph Ingestion**: The `src.graph.builder` module reads these CSV files and uses them to populate the Neo4j database, creating the nodes and relationships.
 
-The `src/pipeline/civic_ingest.py` script generates graph-ready CSVs by:
+This CSV-based approach decouples data extraction from graph ingestion, making the process modular and easy to debug.
 
-1. Fetching CIViC evidence (GraphQL v2 by default) to produce:
-   - `nodes/genes.csv`, `nodes/variants.csv`, `nodes/diseases.csv`
-   - `relationships/variant_of.csv`, `relationships/affects_response.csv`
-2. Resolving therapies via the OpenTargets GraphQL API to:
-   - Fill `Therapy.chembl_id` and add synonyms/trade names
-   - Build `relationships/targets.csv` with `source=opentargets` plus optional `moa`, `action_type`, and reference fields (`ref_sources`, `ref_ids`, `ref_urls`).
+## Query Engine
 
-Usage:
+The query engine is responsible for translating a user's question into a safe, executable Cypher query and then summarizing the results.
 
-```powershell
-# Generate to data/civic/latest and a date-stamped snapshot sibling
-python -m src.pipeline.civic_ingest --out-dir data/civic/latest --enrich-tags
+### LLM Prompting & Query Patterns
 
-# Ingest into Neo4j
-$env:DATA_DIR="data/civic/latest"
-python -m src.graph.builder
-```
+Prompts are engineered to be schema-aware and produce robust queries. Key patterns include:
+-   **Gene vs. Variant Biomarkers**: For a generic question about "KRAS mutations", the LLM generates a query that can match either a `Gene` node or a `Variant` node as the biomarker.
+-   **Therapy Classes**: Queries can find therapies by matching tags (e.g., "anti-EGFR therapy") or by finding drugs that target a specific gene.
+-   **Case-Insensitive Matching**: The validator automatically normalizes `WHERE` clauses on properties like `disease_name` to be case-insensitive, improving robustness.
 
-## CSV-Driven Data
+### Query Validation & Safety
 
-All CSVs live in `data/` under:
+Before execution, every LLM-generated query passes through a strict validation layer:
+-   **Allowlist**: Only read-only clauses (`MATCH`, `WHERE`, `RETURN`) are permitted. All write clauses (`CREATE`, `MERGE`, `DELETE`) are blocked.
+-   **Schema Enforcement**: The validator ensures all node labels, relationship types, and properties in the query exist in the graph schema.
+-   **Result Limiting**: A `LIMIT` clause is enforced on all queries to prevent excessive data retrieval.
 
-*   **`nodes/genes.csv`**: Defines `Gene` entities.
-*   **`nodes/variants.csv`**: Defines `Variant` entities.
-*   **`nodes/therapies.csv`**: Defines `Therapy` entities.
-*   **`nodes/diseases.csv`**: Defines `Disease` entities.
-*   **`relationships/variant_of.csv`**: Creates `VARIANT_OF` relationships.
-*   **`relationships/targets.csv`**: Creates `TARGETS` relationships.
-    *   *Columns*: `therapy_name`, `gene_symbol`, `source`, `moa`, `action_type`,
-        `ref_sources`, `ref_ids`, `ref_urls`
-    *   `source` is `opentargets` for rows derived from OpenTargets GraphQL.
-*   **`relationships/affects_response.csv`**: Creates the core `AFFECTS_RESPONSE_TO` predictive relationships.
+## System Internals
 
+### Logging & Debugging
 
-## Logging & Debugging
+Structured logs are written to `logs/traces/YYYYMMDD.jsonl` for every run. Each pipeline step records its inputs and outputs.
+-   Use the `--trace` flag with the CLI to stream these logs to the console for live debugging.
+-   Use the `--debug` flag to capture full stack traces on errors.
+-   For the API server, set the environment variable `TRACE_STDOUT=1` to stream traces to the console.
 
-- All runs append structured traces to `logs/traces/YYYYMMDD.jsonl`.
-- Each pipeline step records inputs/outputs, including a preview of the first three result rows.
-- Error entries capture `error_step`, the error message, and—when `--debug` is supplied—the traceback.
-- `--trace` mirrors trace events to stdout for live debugging.
-- API server: set environment variable `TRACE_STDOUT=1` if you also want the FastAPI/uvicorn path to stream trace events to stdout.
+### Testing Coverage
 
-Example trace entry:
-
-```json
-{"timestamp": "2025-10-10T17:55:00Z", "step": "generate_cypher", "cypher_draft": "MATCH ..."}
-```
-
-## LLM Prompts & Query Patterns
-
-- Prompts are schema‑grounded and prefer robust patterns:
-  - Gene‑or‑Variant biomarker for generic "<gene> mutations":
-    - Either match `(b:Gene {symbol:$GENE})` OR `(b:Variant)-[:VARIANT_OF]->(:Gene {symbol:$GENE})` when traversing `AFFECTS_RESPONSE_TO`.
-  - Therapy classes via tags OR targets:
-    - `any(tag IN t.tags WHERE toLower(tag) CONTAINS toLower($THERAPY_CLASS))`
-      OR `(t)-[:TARGETS]->(:Gene {symbol:$TARGET_GENE})`.
-  - Disease comparisons are treated as case‑insensitive (the validator normalizes simple equality).
-
-## Deterministic Guards
-
-- Validation allowlist: blocks write clauses; enforces `LIMIT` with max cap.
-- Schema checks: labels/relationships/properties verified against the graph schema.
-- Normalization: validator rewrites `r.disease_name = 'X'` to `toLower(r.disease_name) = toLower('X')`.
-- Neo4j execution: per‑query timeout and fetch size, list normalization for `pmids`/`tags`.
-
-## Testing Coverage
-
-The test suite provides coverage for key components of the pipeline:
-
-- `tests/test_validator.py` – clause allowlist, limit enforcement, schema allowlisting.
-- `tests/test_executor.py` – Neo4j executor configuration and list normalization.
-- `tests/test_gemini.py` – Gemini instruction, Cypher, and summary adapters via stubs.
-- `tests/test_pipeline_integration.py` – end-to-end orchestration with deterministic responses.
-- `tests/test_query_engine_smoke.py` – smoke test for the query engine.
-- `tests/test_cli.py` – CLI output with stubbed engine.
+The `pytest` suite covers key components of the backend pipeline, including the query validator, Neo4j executor, LLM adapters, and end-to-end integration tests.
 
 ## Future Extensions
 
-| Future Add‑on | Purpose |
-|----------------|----------|
-| Publication nodes & Statement reification | Track per‑paper evidence |
-| ClinicalTrial nodes | Link biomarkers, therapies, diseases |
-| Drug synonyms & identifiers | From ChEMBL/DrugCentral |
-| Disease IDs/synonyms | From Disease Ontology (DOID) |
-| Pathway edges | From Reactome |
-| Automated ingestion | Pull CIViC data to auto‑extend CSVs |
+| Feature                             | Purpose                                                     |
+| ----------------------------------- | ----------------------------------------------------------- |
+| Publication & Statement Nodes       | Track per-paper evidence for finer-grained provenance.      |
+| Clinical Trial Nodes                | Link biomarkers, therapies, and diseases to trials.         |
+| Enhanced Drug & Disease Ontologies | Integrate synonyms and identifiers from ChEMBL and DOID.    |
+| Pathway Data                        | Add `(:Gene)-[:PART_OF_PATHWAY]->(:Pathway)` from Reactome. |
+| Automated Ingestion                 | Set up a recurring job to pull the latest data from CIViC.  |
 
-
-## Licensing & Data Provenance
-
-- All seed data is manually curated for testing.  
-- When adding external open data (CIViC, HGNC, DOID, ChEMBL, Reactome), keep
-  provenance notes and source dates.  
-- All mentioned sources are free/open; attribute appropriately when included.
