@@ -2,7 +2,9 @@
 
 **[Try the Live Demo Here](https://onco-graph-agent.vercel.app/)**
 
-OncoGraph Agent is a sophisticated Q&A system that answers complex questions about cancer genomics by leveraging a knowledge graph. It translates natural language queries into Cypher, extracts precise information from the graph, and presents it with citations, providing a reliable tool for researchers and clinicians.
+OncoGraph Agent is a sophisticated Q&A system that answers complex questions about cancer genomics by leveraging a knowledge graph. 
+
+It translates natural language queries into Cypher, extracts precise information from the graph, and presents it with citations, providing a reliable tool for researchers and clinicians.
 
 ## Example
 
