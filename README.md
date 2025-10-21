@@ -11,11 +11,12 @@ This indicates that patients with KRAS G12C-mutated lung cancer may respond favo
 
 ### More Example Questions
 
-- What biomarkers predict resistance to anti-EGFR therapies in Colorectal Cancer?
-- Find me the PubMed citations related to Sotorasib and KRAS G12C.
-- Do KRAS G12C mutations affect response to Sotorasib in Lung Cancer?
-- What is the predicted response of EGFR L858R to Gefitinib in Lung Cancer?
-- Does EGFR T790M confer resistance to Gefitinib, and which therapy may overcome it in Lung Cancer?
+- Which therapies target KRAS and what are their mechanisms of action?
+- What biomarkers predict resistance to anti-EGFR therapies in colorectal cancer?
+- Find PubMed citations related to Sotorasib’s mechanism of action on KRAS.
+- Do KRAS G12C mutations affect response to Sotorasib in lung cancer?
+- What is the predicted response of EGFR L858R to Gefitinib in lung cancer?
+- Does EGFR T790M confer resistance to Gefitinib, and which therapy may overcome it in lung cancer?
 - Which therapies target EGFR?
 
 ## Key Features
@@ -25,6 +26,10 @@ This indicates that patients with KRAS G12C-mutated lung cancer may respond favo
 - **Data Visualization:** Generates a mini-graph visualization for each query to illustrate the relationships between relevant entities (genes, variants, therapies, diseases).
 - **Cited Evidence:** Includes PubMed citations to support the provided answers.
 - **Full-Stack Application:** Features a Python backend with a Q&A pipeline, a FastAPI web server, and a Next.js user interface.
+
+## Data Sources
+- **CIViC:** https://civicdb.org/welcome
+- **OpenTargets:** https://www.opentargets.org/
 
 ## Technology Stack
 
@@ -82,9 +87,20 @@ python -m pip install -e .
 
 ### 3. Seed the Database
 
-Run the graph builder script once to populate Neo4j with the seed data from the `data/manual/` directory:
+Option A) Use the included manual seed dataset (default):
 
 ```powershell
+python -m src.graph.builder
+```
+
+Option B) Generate data from CIViC + OpenTargets and ingest:
+
+```powershell
+# Generate CSVs under data/civic/latest (CIViC evidence + OpenTargets TARGETS)
+python -m src.pipeline.civic_ingest --out-dir data/civic/latest --enrich-tags
+
+# Point the builder to the generated dataset and ingest
+$env:DATA_DIR="data/civic/latest"
 python -m src.graph.builder
 ```
 

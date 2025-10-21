@@ -35,9 +35,31 @@ This document provides a deeper dive into the technical implementation of the On
 ### Reification of Statements
 The current model stores `effect`, `disease`, and `pmids` directly on edges for simplicity, which is easier for LLMs to handle. A future version may move to reified evidence (e.g., Statement and Publication nodes), and the migration path is straightforward.
 
-## CSV-Driven Seed Data
+## Data Ingestion (CIViC + OpenTargets)
 
-All CSVs live in `data/manual/` under:
+The `src/pipeline/civic_ingest.py` script generates graph-ready CSVs by:
+
+1. Fetching CIViC evidence (GraphQL v2 by default) to produce:
+   - `nodes/genes.csv`, `nodes/variants.csv`, `nodes/diseases.csv`
+   - `relationships/variant_of.csv`, `relationships/affects_response.csv`
+2. Resolving therapies via the OpenTargets GraphQL API to:
+   - Fill `Therapy.chembl_id` and add synonyms/trade names
+   - Build `relationships/targets.csv` with `source=opentargets` plus optional `moa`, `action_type`, and reference fields (`ref_sources`, `ref_ids`, `ref_urls`).
+
+Usage:
+
+```powershell
+# Generate to data/civic/latest and a date-stamped snapshot sibling
+python -m src.pipeline.civic_ingest --out-dir data/civic/latest --enrich-tags
+
+# Ingest into Neo4j
+$env:DATA_DIR="data/civic/latest"
+python -m src.graph.builder
+```
+
+## CSV-Driven Data
+
+All CSVs live in `data/` under:
 
 *   **`nodes/genes.csv`**: Defines `Gene` entities.
 *   **`nodes/variants.csv`**: Defines `Variant` entities.
