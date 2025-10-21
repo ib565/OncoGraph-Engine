@@ -10,9 +10,13 @@ Outputs (relative to --out-dir):
   nodes/therapies.csv (name,modality,tags,chembl_id,synonyms)
   nodes/diseases.csv (name,doid,synonyms)
   relationships/variant_of.csv (variant_name,gene_symbol)
-  relationships/affects_response.csv (biomarker_type,biomarker_name,therapy_name,
-                                      effect,disease_name,pmids,source,notes)
-  relationships/targets.csv (therapy_name,gene_symbol,source)
+  relationships/affects_response.csv (
+    biomarker_type,biomarker_name,therapy_name,
+    effect,disease_name,pmids,source,notes
+  )
+  relationships/targets.csv (
+    therapy_name,gene_symbol,source,moa,action_type,ref_sources,ref_ids,ref_urls
+  )
 
 Design notes:
 - Minimal external deps (standard library only) to avoid requirements churn.
@@ -26,13 +30,15 @@ import argparse
 import csv
 import json
 import re
-from collections import Counter, defaultdict
+from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+
+from .opentargets import build_targets_and_enrichments
 
 # Curated seed TARGETS pairs with clear mechanism of action
 CURATED_TARGETS: set[tuple[str, str]] = {
@@ -92,7 +98,8 @@ def _load_civic_json(input_json: str | None, url: str | None) -> list[dict]:
         with open(input_json, encoding="utf-8") as f:
             data = json.load(f)
         print(
-            f"[civic] Local JSON loaded: {len(data) if isinstance(data, list) else 'records' in data}"
+            f"[civic] Local JSON loaded: "
+            f"{len(data) if isinstance(data, list) else 'records' in data}"
         )
         return data if isinstance(data, list) else data.get("records", [])
 
@@ -439,9 +446,7 @@ def run_civic_ingest(
     therapy_rows: dict[str, dict[str, object]] = {}
     affects_rows: list[dict[str, object]] = []
 
-    # For TARGETS inference
-    sensitivity_counts: dict[str, Counter[str]] = defaultdict(Counter)
-    therapy_gene_pmidset: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
+    # TARGETS no longer inferred from CIViC; will be sourced from OpenTargets
 
     print(f"[civic] Evidence items parsed: {len(evidence_items)}")
     for ev in evidence_items:
@@ -510,52 +515,37 @@ def run_civic_ingest(
                     }
                 )
 
-                # Accumulate sensitivity counts for TARGETS inference
-                if effect == "sensitivity":
-                    target_gene = ev.gene_symbol if ev.gene_symbol else None
-                    if variant_name_norm and ev.gene_symbol:
-                        target_gene = ev.gene_symbol
-                    if target_gene:
-                        sensitivity_counts[therapy_name][target_gene] += 1
-                        if ev.pmids:
-                            therapy_gene_pmidset[therapy_name][target_gene].update(ev.pmids)
+                # We no longer use CIViC to infer TARGETS; skip accumulation
 
-    # Determine TARGETS (curated + inferred majority)
-    targets_pairs: dict[tuple[str, str], str] = {}
-    for therapy_name, gene_symbol in CURATED_TARGETS:
-        targets_pairs[(therapy_name, gene_symbol)] = "curated"
+    # Build TARGETS and enrichments from OpenTargets
+    print(f"[civic] Querying OpenTargets for {len(therapy_rows)} therapies…")
+    ot_target_rows, ot_extra_genes, ot_enrich = build_targets_and_enrichments(therapy_rows)
+    print(
+        "[civic] OpenTargets returned "
+        f"{len(ot_target_rows)} TARGETS rows; extra genes={len(ot_extra_genes)}"
+    )
 
-    for therapy_name, gene_counter in sensitivity_counts.items():
-        if not gene_counter:
+    # Apply therapy enrichments and extend genes list
+    for tname, enrich in ot_enrich.items():
+        if tname not in therapy_rows:
             continue
-        total_pmids = 0
-        pmid_counts: dict[str, int] = {}
-        for gene, pmids in therapy_gene_pmidset.get(therapy_name, {}).items():
-            count = len(pmids)
-            pmid_counts[gene] = count
-            total_pmids += count
-
-        # Fallback to item counts if PMID sets are empty
-        if total_pmids == 0:
-            pmid_counts = dict(gene_counter)
-            total_pmids = sum(pmid_counts.values())
-        if total_pmids == 0:
-            continue
-
-        top_gene, top_count = max(pmid_counts.items(), key=lambda kv: kv[1])
-        share = top_count / max(1, total_pmids)
-        if share >= 0.7 and top_count >= 3:
-            if (therapy_name, top_gene) not in CURATED_TARGETS and (
-                therapy_name,
-                top_gene,
-            ) not in NON_TARGET_DENYLIST:
-                targets_pairs[(therapy_name, top_gene)] = "inferred_civic_majority"
+        if enrich.get("chembl_id"):
+            therapy_rows[tname]["chembl_id"] = enrich.get("chembl_id")
+        if enrich.get("synonyms"):
+            existing_syn = therapy_rows[tname].get("synonyms") or []
+            merged = sorted(set(existing_syn) | set(enrich.get("synonyms") or []))
+            therapy_rows[tname]["synonyms"] = ";".join(merged) if merged else None
+    for g in ot_extra_genes:
+        gene_symbols.add(g)
 
     # Tag enrichment based on targets
     if enrich_tags:
         therapy_to_targets: dict[str, set[str]] = defaultdict(set)
-        for (therapy_name, gene_symbol), _src in targets_pairs.items():
-            therapy_to_targets[therapy_name].add(gene_symbol)
+        for r in ot_target_rows:
+            tname = str(r.get("therapy_name") or "").strip()
+            gsym = str(r.get("gene_symbol") or "").strip()
+            if tname and gsym:
+                therapy_to_targets[tname].add(gsym)
         for therapy_name, meta in therapy_rows.items():
             targets = therapy_to_targets.get(therapy_name, set())
             if not targets:
@@ -594,7 +584,8 @@ def run_civic_ingest(
         print("[civic][warn] No genes derived. Check molecularProfile.name parsing.")
     if not variant_rows:
         print(
-            "[civic][warn] No variants derived. Evidence set may be gene-level only, or tokens lacked digits."
+            "[civic][warn] No variants derived. Evidence set may be gene-level only, "
+            "or tokens lacked digits."
         )
     _write_csv(
         date_dir / "nodes" / "genes.csv",
@@ -689,8 +680,10 @@ def run_civic_ingest(
 
     # Write relationships
     print(
-        f"[civic] Writing relationships: variant_of={len(variant_of_pairs)},"
-        f" affects_response={len(affects_rows)}, targets={len(targets_pairs)}"
+        "[civic] Writing relationships: "
+        f"variant_of={len(variant_of_pairs)}, "
+        f"affects_response={len(affects_rows)}, "
+        f"targets={len(ot_target_rows)}"
     )
     _write_csv(
         date_dir / "relationships" / "variant_of.csv",
@@ -745,19 +738,61 @@ def run_civic_ingest(
         _affects_rows_iter(),
     )
 
-    targets_sorted = sorted(targets_pairs.items(), key=lambda kv: (kv[0][0], kv[0][1]))
+    def _targets_rows_iter():
+        for r in ot_target_rows:
+            yield (
+                str(r.get("therapy_name") or ""),
+                str(r.get("gene_symbol") or ""),
+                str(r.get("source") or ""),
+                str(r.get("moa") or ""),
+                str(r.get("action_type") or ""),
+                (
+                    ";".join(r.get("ref_sources") or [])
+                    if isinstance(r.get("ref_sources"), list)
+                    else str(r.get("ref_sources") or "")
+                ),
+                (
+                    ";".join(r.get("ref_ids") or [])
+                    if isinstance(r.get("ref_ids"), list)
+                    else str(r.get("ref_ids") or "")
+                ),
+                (
+                    ";".join(r.get("ref_urls") or [])
+                    if isinstance(r.get("ref_urls"), list)
+                    else str(r.get("ref_urls") or "")
+                ),
+            )
+
     _write_csv(
         date_dir / "relationships" / "targets.csv",
-        ["therapy_name", "gene_symbol", "source"],
-        ((therapy, gene, source) for ((therapy, gene), source) in targets_sorted),
+        [
+            "therapy_name",
+            "gene_symbol",
+            "source",
+            "moa",
+            "action_type",
+            "ref_sources",
+            "ref_ids",
+            "ref_urls",
+        ],
+        _targets_rows_iter(),
     )
     _write_csv(
         out_dir / "relationships" / "targets.csv",
-        ["therapy_name", "gene_symbol", "source"],
-        ((therapy, gene, source) for ((therapy, gene), source) in targets_sorted),
+        [
+            "therapy_name",
+            "gene_symbol",
+            "source",
+            "moa",
+            "action_type",
+            "ref_sources",
+            "ref_ids",
+            "ref_urls",
+        ],
+        _targets_rows_iter(),
     )
 
-    print(f"[civic] Done. Wrote CIViC-derived CSVs to: {date_dir} and {out_dir}")
+    print(f"[civic] Done. Wrote CSVs to: {date_dir} and {out_dir}")
 
 
 def main(argv: list[str] | None = None) -> int:

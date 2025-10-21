@@ -10,7 +10,7 @@ SCHEMA_SNIPPET = dedent(
     - Helper label: Biomarker (applied to Gene and Variant)
     - Relationships:
       (Variant)-[:VARIANT_OF]->(Gene)
-      (Therapy)-[:TARGETS {source}]->(Gene)
+      (Therapy)-[:TARGETS {source, moa?, action_type?, ref_sources?, ref_ids?, ref_urls?}]->(Gene)
       (Biomarker)-[:AFFECTS_RESPONSE_TO {effect, disease_name, disease_id?,
         pmids, source, notes?}]->(Therapy)
     - Array properties: pmids, tags

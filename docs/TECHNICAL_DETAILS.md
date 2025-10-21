@@ -21,7 +21,8 @@ This document provides a deeper dive into the technical implementation of the On
 
 *   **(Variant) -[:VARIANT_OF]-> (Gene)**: Links a variant to its parent gene.
 *   **(Therapy) -[:TARGETS]-> (Gene)**: Indicates a therapy is designed to affect a gene.
-    *   *Properties*: `source`
+    *   *Properties*: `source`, `moa` (optional), `action_type` (optional),
+        `ref_sources` (optional), `ref_ids` (optional), `ref_urls` (optional)
 *   **(Biomarker) -[:AFFECTS_RESPONSE_TO]-> (Therapy)**: The core predictive fact in the graph.
     *   *Properties*: `effect`, `disease_name`, `disease_id` (optional), `pmids`, `source`, `notes` (optional)
 
@@ -44,6 +45,9 @@ All CSVs live in `data/manual/` under:
 *   **`nodes/diseases.csv`**: Defines `Disease` entities.
 *   **`relationships/variant_of.csv`**: Creates `VARIANT_OF` relationships.
 *   **`relationships/targets.csv`**: Creates `TARGETS` relationships.
+    *   *Columns*: `therapy_name`, `gene_symbol`, `source`, `moa`, `action_type`,
+        `ref_sources`, `ref_ids`, `ref_urls`
+    *   `source` is `opentargets` for rows derived from OpenTargets GraphQL.
 *   **`relationships/affects_response.csv`**: Creates the core `AFFECTS_RESPONSE_TO` predictive relationships.
 
 

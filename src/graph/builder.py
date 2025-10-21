@@ -157,7 +157,7 @@ class OncoGraphBuilder:
                 return []
             return [item.strip() for item in str(raw).split(";") if item.strip()]
 
-        for key in ("synonyms", "tags", "pmids"):
+        for key in ("synonyms", "tags", "pmids", "ref_sources", "ref_ids", "ref_urls"):
             if key in row:
                 cleaned[key] = split_semicolon_list(row.get(key))
 
@@ -238,7 +238,13 @@ class OncoGraphBuilder:
             UNWIND $rows AS r
             MATCH (t:Therapy {name: r.therapy_name})
             MATCH (g:Gene {symbol: r.gene_symbol})
-            MERGE (t)-[rel:TARGETS {source: r.source}]->(g)
+            MERGE (t)-[rel:TARGETS]->(g)
+            SET rel.source = r.source,
+                rel.moa = coalesce(r.moa, rel.moa),
+                rel.action_type = coalesce(r.action_type, rel.action_type),
+                rel.ref_sources = coalesce(r.ref_sources, rel.ref_sources),
+                rel.ref_ids = coalesce(r.ref_ids, rel.ref_ids),
+                rel.ref_urls = coalesce(r.ref_urls, rel.ref_urls)
             """,
             {"rows": rows},
         )

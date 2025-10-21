@@ -40,6 +40,11 @@ ALLOWED_PROPERTIES = {
     "pmids",
     "source",
     "notes",
+    "moa",
+    "action_type",
+    "ref_sources",
+    "ref_ids",
+    "ref_urls",
 }
 
 
