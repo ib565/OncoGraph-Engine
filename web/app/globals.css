@@ -210,6 +210,7 @@ main.page {
   border-radius: 0.85rem;
   border: 1px solid rgba(59, 130, 246, 0.28);
   margin-bottom: 1.75rem;
+  margin-top: 1.75rem;
   font-weight: 500;
   display: inline-flex;
   align-items: center;
