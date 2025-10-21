@@ -225,9 +225,9 @@ export default function HomePage() {
   return (
     <main className="page">
       <header className="hero">
-        <h1 className="hero-title">OncoGraph</h1>
+        <h1 className="hero-title">OncoGraph Agent</h1>
         <p className="hero-copy">
-          Answers oncology questions using knowledge graph backed citations.
+          Answers cancer genomics questions using knowledge-graph-backed citations.
         </p>
       </header>
 
@@ -303,6 +303,18 @@ export default function HomePage() {
               <h2 className="section-title">Answer</h2>
               <div className="answer-content">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.answer}</ReactMarkdown>
+              </div>
+            </section>
+
+            <section className="card graph-card">
+              <header className="panel-header">
+                <h3 className="panel-title">Interactive subgraph</h3>
+                <p className="panel-copy">
+                  Inspect entities and relationships driving the synthesized answer. Drag to reposition nodes for clarity.
+                </p>
+              </header>
+              <div className="graph-shell">
+                <MiniGraph rows={result.rows} height={440} />
               </div>
             </section>
 
@@ -441,18 +453,6 @@ export default function HomePage() {
           </div>
 
           <aside className="secondary-column">
-            <section className="card graph-card">
-              <header className="panel-header">
-                <h3 className="panel-title">Interactive subgraph</h3>
-                <p className="panel-copy">
-                  Inspect entities and relationships driving the synthesized answer. Drag to reposition nodes for clarity.
-                </p>
-              </header>
-              <div className="graph-shell">
-                <MiniGraph rows={result.rows} height={440} />
-              </div>
-            </section>
-
             <section className="card cypher-card">
               <header className="panel-header">
                 <h3 className="panel-title">Cypher query</h3>
