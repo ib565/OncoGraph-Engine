@@ -1,7 +1,6 @@
 from unittest.mock import patch
 
 from pipeline.opentargets import (
-    _post_graphql,
     build_targets_and_enrichments,
 )
 
