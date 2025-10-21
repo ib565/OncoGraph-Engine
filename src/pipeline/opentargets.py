@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -31,7 +32,8 @@ def _post_graphql(
             if code in (429, 500, 502, 503, 504) and attempt < 3:
                 sleep_s = 2**attempt
                 print(
-                    f"[opentargets][warn] HTTP {code}; retrying in {sleep_s}s (attempt {attempt}/3)"
+                    f"[opentargets][warn] HTTP {code}; retrying in {sleep_s}s "
+                    f"(attempt {attempt}/3)"
                 )
                 time.sleep(sleep_s)
                 continue
@@ -40,7 +42,8 @@ def _post_graphql(
             if attempt < 3:
                 sleep_s = 2**attempt
                 print(
-                    f"[opentargets][warn] Network error; retrying in {sleep_s}s (attempt {attempt}/3)"
+                    f"[opentargets][warn] Network error; retrying in {sleep_s}s "
+                    f"(attempt {attempt}/3)"
                 )
                 time.sleep(sleep_s)
                 continue
@@ -50,11 +53,17 @@ def _post_graphql(
 def search_drugs_by_name(names: list[str], *, page_size: int = 5) -> dict[str, dict[str, Any]]:
     """Resolve therapy names to OpenTargets drug objects (CHEMBL ID, synonyms, etc.).
 
-    Returns mapping of input name -> { chembl_id, canonical_name, synonyms, trade_names, drug_type }.
+    Returns mapping of input name -> {
+        chembl_id, canonical_name, synonyms, trade_names, drug_type
+    }.
     """
     query = """
         query searchDrug($q: String!, $size: Int!) {
-          search(queryString: $q, entityNames: ["drug"], page: { index: 0, size: $size }) {
+          search(
+            queryString: $q,
+            entityNames: ["drug"],
+            page: { index: 0, size: $size }
+          ) {
             hits {
               id
               name
@@ -192,6 +201,15 @@ def build_targets_and_enrichments(
             return None
         return s.strip()
 
+    def _pmid_from_url(u: str) -> str | None:
+        lower = (u or "").lower()
+        # Common PubMed URL patterns
+        # - europepmc.org/abstract/MED/<pmid>
+        # - ncbi.nlm.nih.gov/pubmed/<pmid>
+        # - pubmed.ncbi.nlm.nih.gov/<pmid>/
+        m = re.search(r"(?:med/|/pubmed/|pubmed\.ncbi\.nlm\.nih\.gov/)(\d+)", lower)
+        return m.group(1) if m else None
+
     for therapy_name in therapy_names:
         resolved = name_to_drug.get(therapy_name)
         if not resolved:
@@ -230,13 +248,20 @@ def build_targets_and_enrichments(
                 src = _norm(r.get("source")) or ""
                 ids = r.get("ids") or []
                 urls = r.get("urls") or []
-                # prefer URLs; if none, pair (source,id)
-                if urls:
-                    for u in urls:
-                        ref_tuples.add((src, "", _norm(u) or ""))
-                else:
-                    for rid in ids:
-                        ref_tuples.add((src, _norm(rid) or "", ""))
+                # Always capture URLs
+                for u in urls:
+                    u_norm = _norm(u) or ""
+                    if u_norm:
+                        ref_tuples.add((src, "", u_norm))
+                        # Infer PubMed ID from URL if possible (helps populate IDs consistently)
+                        pmid = _pmid_from_url(u_norm)
+                        if pmid:
+                            ref_tuples.add(("PubMed" if src == "" else src, pmid, ""))
+                # Also capture explicit (source, id) pairs
+                for rid in ids:
+                    rid_norm = _norm(rid) or ""
+                    if rid_norm:
+                        ref_tuples.add((src, rid_norm, ""))
             for gene in labels:
                 gene_to_moa.setdefault(gene, set())
                 gene_to_action.setdefault(gene, set())
