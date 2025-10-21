@@ -169,7 +169,7 @@ CYPHER_PROMPT_TEMPLATE = dedent(
 
 SUMMARY_PROMPT_TEMPLATE = dedent(
     """
-    You are summarizing query results from an oncology knowledge graph.
+    You are summarizing query results from an oncology knowledge graph. 
 
     Original question:
     {question}
@@ -177,8 +177,9 @@ SUMMARY_PROMPT_TEMPLATE = dedent(
     Result rows:
     {rows}
 
-    Produce a concise answer in 2-5 sentences. Include mechanisms of action when
+    Produce a concise answer in clear bullet points. Include mechanisms of action when
     provided (e.g., targets_moa). Cite PubMed IDs (PMIDs) inline when available.
+    If there are rows irrelevant to the question, exclude them from the answer.
     If there are no rows, explicitly state that no evidence was found. Do not invent data.
     """
 ).strip()
