@@ -21,9 +21,12 @@ SCHEMA_SNIPPET = dedent(
     - AFFECTS queries (predictive evidence): project
       variant_name, gene_symbol, therapy_name, effect, disease_name, pmids.
     - TARGETS queries (mechanism/targeting): project
-      gene_symbol, therapy_name, r.moa AS targets_moa (if available).
+      gene_symbol, therapy_name, r.moa AS targets_moa (if available), and
+      r.ref_sources, r.ref_ids, r.ref_urls. Optionally also derive pmids from
+      reference source/ids.
     - Always include therapy_name and at least one of gene_symbol or variant_name.
-    - For mixed queries, set missing columns to NULL and pmids to [] to keep a stable shape.
+    - For mixed queries, set missing columns to NULL; include pmids only when
+      available (AFFECTS) or derived from references.
 
     Canonical example (AFFECTS; adapt values as needed):
       MATCH (b:Biomarker)-[rel:AFFECTS_RESPONSE_TO]->(t:Therapy)
@@ -60,7 +63,10 @@ SCHEMA_SNIPPET = dedent(
         NULL AS effect,
         NULL AS disease_name,
         pmids,
-        r.moa AS targets_moa
+        r.moa AS targets_moa,
+        coalesce(r.ref_sources, []) AS ref_sources,
+        coalesce(r.ref_ids, []) AS ref_ids,
+        coalesce(r.ref_urls, []) AS ref_urls
       LIMIT 20
 
     Canonical rules:
