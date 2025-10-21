@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import MiniGraph from "./components/MiniGraph";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -18,6 +18,47 @@ const EXAMPLE_QUERIES: string[] = [
   "What is the predicted response of EGFR L858R to Gefitinib in Lung Cancer?",
 ];
 
+const HTTP_URL_REGEX = /^https?:\/\//i;
+
+const formatKeyLabel = (label: string) =>
+  label
+    .replace(/[_\-]+/g, " ")
+    .replace(/\b\w/g, (match) => match.toUpperCase());
+
+const sanitizeArrayValue = (value: unknown[]) =>
+  value
+    .map((item) => (typeof item === "string" ? item.trim() : item))
+    .filter((item) => {
+      if (item === null || item === undefined) return false;
+      if (typeof item === "string") return item.length > 0;
+      return true;
+    });
+
+const isMeaningfulValue = (value: unknown): boolean => {
+  if (value === null || value === undefined) return false;
+  if (Array.isArray(value)) {
+    return sanitizeArrayValue(value).length > 0;
+  }
+  if (typeof value === "string") {
+    return value.trim().length > 0;
+  }
+  if (typeof value === "object") {
+    return Object.keys(value as Record<string, unknown>).length > 0;
+  }
+  return true;
+};
+
+const isHttpUrl = (value: string) => HTTP_URL_REGEX.test(value);
+
+const getUrlLabel = (value: string) => {
+  try {
+    const url = new URL(value);
+    return url.hostname.replace(/^www\./, "");
+  } catch {
+    return value;
+  }
+};
+
 export default function HomePage() {
   const [question, setQuestion] = useState("");
   const [result, setResult] = useState<QueryResponse | null>(null);
@@ -26,6 +67,7 @@ export default function HomePage() {
   const [progress, setProgress] = useState<string | null>(null);
   const sseRef = useRef<EventSource | null>(null);
   const [dotCount, setDotCount] = useState(0);
+  const [lastQuery, setLastQuery] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoading || !progress) {
@@ -56,6 +98,7 @@ export default function HomePage() {
     }
 
     setQuestion(trimmed);
+    setLastQuery(trimmed);
 
     if (!API_URL) {
       setError("NEXT_PUBLIC_API_URL is not configured");
@@ -188,7 +231,14 @@ export default function HomePage() {
         </p>
       </header>
 
-      <section className="card">
+      <section className="card query-card">
+        <div className="card-heading">
+          <h2 className="card-title">Interrogate the knowledge graph</h2>
+          <p className="card-subtitle">
+            Craft a precise oncology question or load an example to uncover graph-backed
+            evidence, interactive context, and traceable references.
+          </p>
+        </div>
         <form className="query-form" onSubmit={handleSubmit}>
           <input
             className="query-input"
@@ -206,24 +256,26 @@ export default function HomePage() {
           </button>
         </form>
 
-        <div className="examples" aria-label="Example queries">
-          <span className="examples-label">Example queries</span>
-          <div className="examples-grid">
-            {EXAMPLE_QUERIES.map((example) => (
-              <button
-                key={example}
-                type="button"
-                className="example-button"
-                onClick={() => {
-                  void runQuery(example);
-                }}
-                disabled={isLoading}
-              >
-                {example}
-              </button>
-            ))}
+        {EXAMPLE_QUERIES.length > 0 && (
+          <div className="examples" aria-label="Example queries">
+            <span className="examples-label">Example queries</span>
+            <div className="examples-grid">
+              {EXAMPLE_QUERIES.map((example) => (
+                <button
+                  key={example}
+                  type="button"
+                  className="example-button"
+                  onClick={() => {
+                    void runQuery(example);
+                  }}
+                  disabled={isLoading}
+                >
+                  {example}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </section>
 
       {error && (
@@ -239,28 +291,178 @@ export default function HomePage() {
       )}
 
       {result && (
-        <section className="card result-card">
-          <h2 className="section-title">Answer</h2>
-          <div className="answer-content">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.answer}</ReactMarkdown>
+        <section className="result-overview">
+          <div className="primary-column">
+            <section className="card answer-card">
+              {lastQuery && (
+                <p className="question-text">
+                  <span className="question-label">Question</span>
+                  {lastQuery}
+                </p>
+              )}
+              <h2 className="section-title">Answer</h2>
+              <div className="answer-content">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.answer}</ReactMarkdown>
+              </div>
+            </section>
+
+            <section className="card rows-card">
+              <header className="panel-header">
+                <h3 className="panel-title">Cypher rows</h3>
+                <p className="panel-copy">
+                  Explore the raw query results with references.
+                </p>
+              </header>
+              {result.rows?.length ? (
+                <div className="rows-scroll" role="list">
+                  {result.rows.map((row, index) => {
+                    const entries = Object.entries(row).filter(([, value]) => isMeaningfulValue(value));
+
+                    if (entries.length === 0) {
+                      return (
+                        <article className="row-card" key={`row-${index}`} role="listitem">
+                          <header className="row-heading">Row {index + 1}</header>
+                          <p className="empty-row">No populated columns.</p>
+                        </article>
+                      );
+                    }
+
+                    return (
+                      <article className="row-card" key={`row-${index}`} role="listitem">
+                        <header className="row-heading">Row {index + 1}</header>
+                        <dl className="row-details">
+                          {entries.map(([key, value]) => {
+                            const label = formatKeyLabel(key);
+
+                            if (Array.isArray(value)) {
+                              const sanitized = sanitizeArrayValue(value);
+                              if (!sanitized.length) {
+                                return null;
+                              }
+
+                              return (
+                                <Fragment key={key}>
+                                  <dt className="row-key">{label}</dt>
+                                  <dd className="row-value">
+                                    <div className="value-pills">
+                                      {sanitized.map((item, pillIndex) => {
+                                        if (typeof item === "string") {
+                                          return isHttpUrl(item) ? (
+                                            <a
+                                              key={`${key}-${pillIndex}`}
+                                              className="value-pill value-pill-link"
+                                              href={item}
+                                              target="_blank"
+                                              rel="noreferrer"
+                                            >
+                                              {getUrlLabel(item)}
+                                            </a>
+                                          ) : (
+                                            <span
+                                              key={`${key}-${pillIndex}`}
+                                              className="value-pill"
+                                            >
+                                              {item}
+                                            </span>
+                                          );
+                                        }
+
+                                        return (
+                                          <span
+                                            key={`${key}-${pillIndex}`}
+                                            className="value-pill"
+                                          >
+                                            {String(item)}
+                                          </span>
+                                        );
+                                      })}
+                                    </div>
+                                  </dd>
+                                </Fragment>
+                              );
+                            }
+
+                            if (typeof value === "string") {
+                              const trimmed = value.trim();
+                              if (!trimmed) {
+                                return null;
+                              }
+
+                              return (
+                                <Fragment key={key}>
+                                  <dt className="row-key">{label}</dt>
+                                  <dd className="row-value">
+                                    {isHttpUrl(trimmed) ? (
+                                      <a
+                                        className="value-link"
+                                        href={trimmed}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                      >
+                                        {getUrlLabel(trimmed)}
+                                      </a>
+                                    ) : (
+                                      <span>{trimmed}</span>
+                                    )}
+                                  </dd>
+                                </Fragment>
+                              );
+                            }
+
+                            if (typeof value === "object" && value !== null) {
+                              return (
+                                <Fragment key={key}>
+                                  <dt className="row-key">{label}</dt>
+                                  <dd className="row-value">
+                                    <pre className="value-json">
+                                      {JSON.stringify(value, null, 2)}
+                                    </pre>
+                                  </dd>
+                                </Fragment>
+                              );
+                            }
+
+                            return (
+                              <Fragment key={key}>
+                                <dt className="row-key">{label}</dt>
+                                <dd className="row-value">{String(value)}</dd>
+                              </Fragment>
+                            );
+                          })}
+                        </dl>
+                      </article>
+                    );
+                  })}
+            </div>
+              ) : (
+                <p className="empty-state">No rows returned from the query.</p>
+              )}
+            </section>
           </div>
 
-          <details className="details">
-            <summary>Cypher query</summary>
-            <pre className="code-block">{result.cypher}</pre>
-          </details>
+          <aside className="secondary-column">
+            <section className="card graph-card">
+              <header className="panel-header">
+                <h3 className="panel-title">Interactive subgraph</h3>
+                <p className="panel-copy">
+                  Inspect entities and relationships driving the synthesized answer. Drag to reposition nodes for clarity.
+                </p>
+              </header>
+              <div className="graph-shell">
+                <MiniGraph rows={result.rows} height={440} />
+              </div>
+            </section>
 
-          <details className="details">
-            <summary>Result rows</summary>
-            <pre className="code-block">{JSON.stringify(result.rows, null, 2)}</pre>
-          </details>
-
-          <details className="details" open>
-            <summary>Mini graph</summary>
-            <div className="graph-container">
-              <MiniGraph rows={result.rows} height={360} />
+            <section className="card cypher-card">
+              <header className="panel-header">
+                <h3 className="panel-title">Cypher query</h3>
+                <p className="panel-copy">Reference the exact graph query executed.</p>
+              </header>
+              <div className="cypher-scroll">
+                <pre className="code-block">{result.cypher}</pre>
             </div>
-          </details>
+            </section>
+          </aside>
         </section>
       )}
     </main>
