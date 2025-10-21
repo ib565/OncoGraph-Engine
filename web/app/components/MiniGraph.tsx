@@ -116,6 +116,13 @@ export function MiniGraph({ rows, height = 320 }: MiniGraphProps) {
         asStringArray(
           getValueCI(row, ["pmids", "PMIDs", "pmid", "PMID", "pmid_list", "pmidlist"]) as unknown
         ) || [];
+      const targetsMoa = normalizeString(
+        getValueCI(row, ["targets_moa", "moa"]) as unknown
+      );
+      const hasTargetsProjection = Object.prototype.hasOwnProperty.call(
+        row as Record<string, unknown>,
+        "targets_moa"
+      );
 
       // Support nested shapes: Biomarker, Therapy, and relationship objects/arrays
       const biomarkerVal = (row as Record<string, unknown>)["Biomarker"] as Record<string, unknown> | undefined;
@@ -183,8 +190,10 @@ export function MiniGraph({ rows, height = 320 }: MiniGraphProps) {
       if (therapyName) {
         const therapyId = `Therapy:${therapyName}`;
         addNode(therapyId, therapyName, "Therapy");
-        if (biomarkerNodeId) {
-          const labelParts = [effect || "AFFECTS_RESPONSE_TO"];
+
+        // Draw predictive edges only when we have an effect value
+        if (biomarkerNodeId && effect) {
+          const labelParts = [effect];
           if (diseaseName) labelParts.push(`(${diseaseName})`);
           const label = labelParts.join(" ");
           const edgeId = `AFFECTS_RESPONSE_TO|${biomarkerNodeId}|${therapyId}|${label}`;
@@ -194,6 +203,16 @@ export function MiniGraph({ rows, height = 320 }: MiniGraphProps) {
             effectCategory,
             disease: diseaseName,
             pmidCount: pmids.length,
+          });
+        } else if (geneSymbol && hasTargetsProjection) {
+          // Draw mechanism/targeting edges when the query projects targets_moa
+          const geneId = `Gene:${geneSymbol}`;
+          addNode(geneId, geneSymbol, "Gene");
+          const label = "TARGETS";
+          const edgeId = `TARGETS|${therapyId}|${geneId}|${label}`;
+          addEdge(edgeId, therapyId, geneId, label, {
+            relationship: "TARGETS",
+            moa: targetsMoa,
           });
         }
       }

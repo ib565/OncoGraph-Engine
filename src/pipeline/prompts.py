@@ -16,20 +16,16 @@ SCHEMA_SNIPPET = dedent(
     - Array properties: pmids, tags
     - No parameters: inline single-quoted literals only
       (no $variables)
+    
+    Preferred return columns (choose minimally sufficient for the question):
+    - AFFECTS queries (predictive evidence): project
+      variant_name, gene_symbol, therapy_name, effect, disease_name, pmids.
+    - TARGETS queries (mechanism/targeting): project
+      gene_symbol, therapy_name, r.moa AS targets_moa (if available).
+    - Always include therapy_name and at least one of gene_symbol or variant_name.
+    - For mixed queries, set missing columns to NULL and pmids to [] to keep a stable shape.
 
-    Canonical return contract (aliases and order required):
-    RETURN
-      CASE WHEN biomarker:Variant THEN coalesce(biomarker.name, biomarker.hgvs_p)
-      END AS variant_name,
-      CASE WHEN biomarker:Gene THEN biomarker.symbol ELSE gene.symbol
-      END AS gene_symbol,
-      therapy.name AS therapy_name,
-      rel.effect AS effect,
-      rel.disease_name AS disease_name,
-      coalesce(rel.pmids, []) AS pmids
-    LIMIT …
-
-    Canonical example (adapt values as needed):
+    Canonical example (AFFECTS; adapt values as needed):
       MATCH (b:Biomarker)-[rel:AFFECTS_RESPONSE_TO]->(t:Therapy)
       WHERE (
         any(tag IN t.tags WHERE toLower(tag) CONTAINS toLower('anti-EGFR'))
@@ -46,6 +42,26 @@ SCHEMA_SNIPPET = dedent(
         rel.disease_name AS disease_name,
         coalesce(rel.pmids, []) AS pmids
       LIMIT 10
+
+    Canonical example (TARGETS; adapt values as needed):
+      MATCH (t:Therapy)-[r:TARGETS]->(g:Gene)
+      WHERE toLower(g.symbol) = toLower('KRAS')
+      WITH t, g, r,
+        CASE
+          WHEN r.ref_sources IS NULL OR r.ref_ids IS NULL THEN []
+          ELSE [i IN range(0, size(r.ref_sources) - 1)
+                WHERE toLower(r.ref_sources[i]) CONTAINS 'pubmed' OR toLower(r.ref_sources[i]) = 'pmid'
+                | r.ref_ids[i]]
+        END AS pmids
+      RETURN
+        NULL AS variant_name,
+        g.symbol AS gene_symbol,
+        t.name AS therapy_name,
+        NULL AS effect,
+        NULL AS disease_name,
+        pmids,
+        r.moa AS targets_moa
+      LIMIT 20
 
     Canonical rules:
     - Gene-only: match biomarker as the Gene OR any Variant VARIANT_OF that Gene
@@ -100,6 +116,9 @@ INSTRUCTION_PROMPT_TEMPLATE = dedent(
       to appear in rel.disease_name. Do not require 'cancer'/'carcinoma' to maximize recall.
     - When a therapy is explicitly named, include a bullet to match Therapy by
       case‑insensitive name equality and allow synonyms/CONTAINS as fallbacks.
+    - When the question asks which therapies target a gene or requests mechanisms of
+      action (MOA), include a bullet to match (t:Therapy)-[r:TARGETS]->(g:Gene) for the
+      gene (consider synonyms) and to project r.moa AS targets_moa.
 
     User question: {question}
     """
@@ -126,10 +145,12 @@ CYPHER_PROMPT_TEMPLATE = dedent(
     - For fusions ("EML4-ALK", "EML4::ALK"), match both orientations in Variant.name.
     - Do NOT use parameters (no $variables); inline single-quoted literals from
       the instruction text.
-    - The RETURN clause MUST project these aliases in order:
-      variant_name, gene_symbol, therapy_name, effect, disease_name, pmids.
-      Use CASE and COALESCE so columns always exist (pmids must be an array,
-      default []).
+    - Return the minimally sufficient set of columns for the question:
+      • For AFFECTS queries, project variant_name, gene_symbol, therapy_name, effect,
+        disease_name, pmids (pmids must be an array; default []).
+      • For TARGETS queries, project gene_symbol, therapy_name, r.moa AS targets_moa.
+      • Always include therapy_name and at least one of variant_name or gene_symbol.
+      • When mixing patterns, set missing columns to NULL (and pmids to []) for stability.
     - Prefer case-insensitive equality for exact entity names (Variant.name,
       Therapy.name, Gene.symbol). Include robust fallbacks where appropriate:
         • Variant: equality on full name; OR name CONTAINS token; OR hgvs_p equality
@@ -156,7 +177,8 @@ SUMMARY_PROMPT_TEMPLATE = dedent(
     Result rows:
     {rows}
 
-    Produce a concise answer in 2-5 sentences. Cite PubMed IDs (PMIDs) inline when available.
+    Produce a concise answer in 2-5 sentences. Include mechanisms of action when
+    provided (e.g., targets_moa). Cite PubMed IDs (PMIDs) inline when available.
     If there are no rows, explicitly state that no evidence was found. Do not invent data.
     """
 ).strip()
