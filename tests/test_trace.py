@@ -9,7 +9,9 @@ from pipeline.trace import JsonlTraceSink, daily_trace_path
 
 def test_daily_trace_path_uses_current_date(tmp_path: Path, monkeypatch) -> None:
     fake_now = datetime(2025, 10, 17)
-    monkeypatch.setattr("pipeline.trace.datetime", type("_DT", (), {"now": staticmethod(lambda tz=None: fake_now)}))
+    monkeypatch.setattr(
+        "pipeline.trace.datetime", type("_DT", (), {"now": staticmethod(lambda tz=None: fake_now)})
+    )
 
     path = daily_trace_path(tmp_path)
 
@@ -29,4 +31,3 @@ def test_jsonl_trace_sink_writes_line(tmp_path: Path) -> None:
     payload = json.loads(contents[0])
     assert payload["step"] == "step"
     assert payload["foo"] == "bar"
-

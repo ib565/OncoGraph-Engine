@@ -47,4 +47,3 @@ def test_query_engine_wraps_generator_failure() -> None:
     error = excinfo.value
     assert error.step == "generate_cypher"
     assert "generator failed" in str(error)
-

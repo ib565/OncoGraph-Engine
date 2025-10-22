@@ -80,4 +80,3 @@ def test_query_unhandled_error_returns_500(app_client: TestClient) -> None:
     assert response.status_code == 500
     payload = response.json()
     assert payload["detail"]["message"] == "boom"
-
