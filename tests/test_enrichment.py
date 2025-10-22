@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from pipeline.enrichment import EnrichmentResult, GeneEnrichmentAnalyzer
+from pipeline.gemini import EnrichmentSummaryResponse, GeminiConfig, GeminiEnrichmentSummarizer
 
 
 class TestEnrichmentResult:
@@ -193,3 +194,110 @@ class TestGeneEnrichmentAnalyzer:
         assert result.invalid_genes == []
         assert isinstance(result.enrichment_results, list)
         assert isinstance(result.plot_data, dict)
+
+
+class TestEnrichmentSummaryResponse:
+    """Test the EnrichmentSummaryResponse Pydantic model."""
+
+    def test_enrichment_summary_response_creation(self):
+        """Test creating an EnrichmentSummaryResponse instance."""
+        response = EnrichmentSummaryResponse(
+            summary="This gene set shows enrichment in DNA repair pathways.",
+            followUpQuestions=[
+                "What therapies target BRCA1 in breast cancer?",
+                "What resistance mechanisms are known for PARP inhibitors?",
+            ],
+        )
+
+        assert response.summary == "This gene set shows enrichment in DNA repair pathways."
+        assert len(response.followUpQuestions) == 2
+        assert "BRCA1" in response.followUpQuestions[0]
+        assert "PARP inhibitors" in response.followUpQuestions[1]
+
+    def test_enrichment_summary_response_validation(self):
+        """Test that validation works correctly."""
+        # Valid response
+        response = EnrichmentSummaryResponse(
+            summary="Test summary", followUpQuestions=["Question 1", "Question 2"]
+        )
+        assert response.summary == "Test summary"
+        assert response.followUpQuestions == ["Question 1", "Question 2"]
+
+        # Empty follow-up questions should be valid
+        response = EnrichmentSummaryResponse(summary="Test summary", followUpQuestions=[])
+        assert response.followUpQuestions == []
+
+
+class TestGeminiEnrichmentSummarizer:
+    """Test the GeminiEnrichmentSummarizer with structured output."""
+
+    def test_initialization_without_dependencies(self):
+        """Test that initialization fails without required dependencies."""
+        with patch("pipeline.gemini.genai", None):
+            with pytest.raises(Exception, match="google-genai package is required"):
+                GeminiEnrichmentSummarizer()
+
+    @patch("pipeline.gemini.genai")
+    @patch("pipeline.gemini.genai_types")
+    def test_summarize_enrichment_structured_output(self, mock_genai_types, mock_genai):
+        """Test that summarize_enrichment returns structured output."""
+        # Mock the Gemini client
+        mock_client = MagicMock()
+        mock_genai.Client.return_value = mock_client
+
+        # Mock the response
+        mock_response = MagicMock()
+        mock_response.text = (
+            '{"summary": "Test summary", "followUpQuestions": ["Question 1", "Question 2"]}'
+        )
+        mock_client.models.generate_content.return_value = mock_response
+
+        # Mock the config types
+        mock_genai_types.GenerateContentConfig.return_value = MagicMock()
+
+        config = GeminiConfig(api_key="test-key")
+        summarizer = GeminiEnrichmentSummarizer(config=config)
+
+        gene_list = ["BRCA1", "BRCA2"]
+        enrichment_results = [
+            {
+                "term": "DNA repair",
+                "library": "GO_Biological_Process_2023",
+                "p_value": 0.001,
+                "adjusted_p_value": 0.01,
+                "gene_count": 5,
+                "genes": ["BRCA1", "BRCA2", "ATM", "CHEK2", "TP53"],
+                "description": "DNA repair pathway",
+            }
+        ]
+
+        result = summarizer.summarize_enrichment(gene_list, enrichment_results)
+
+        assert isinstance(result, EnrichmentSummaryResponse)
+        assert result.summary == "Test summary"
+        assert result.followUpQuestions == ["Question 1", "Question 2"]
+
+    @patch("pipeline.gemini.genai")
+    @patch("pipeline.gemini.genai_types")
+    def test_summarize_enrichment_invalid_json(self, mock_genai_types, mock_genai):
+        """Test error handling for invalid JSON response."""
+        # Mock the Gemini client
+        mock_client = MagicMock()
+        mock_genai.Client.return_value = mock_client
+
+        # Mock invalid JSON response
+        mock_response = MagicMock()
+        mock_response.text = "Invalid JSON response"
+        mock_client.models.generate_content.return_value = mock_response
+
+        # Mock the config types
+        mock_genai_types.GenerateContentConfig.return_value = MagicMock()
+
+        config = GeminiConfig(api_key="test-key")
+        summarizer = GeminiEnrichmentSummarizer(config=config)
+
+        gene_list = ["BRCA1"]
+        enrichment_results = []
+
+        with pytest.raises(Exception, match="Failed to parse structured response"):
+            summarizer.summarize_enrichment(gene_list, enrichment_results)
