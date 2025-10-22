@@ -22,10 +22,16 @@ It translates natural language queries into Cypher, extracts precise information
 
 ### More Example Questions
 
+**Knowledge Graph Queries:**
 - Which therapies target KRAS and what are their mechanisms of action?
 - What biomarkers predict resistance to anti-EGFR therapies in colorectal cancer?
-- Find PubMed citations related to Sotorasib’s mechanism of action on KRAS.
+- Find PubMed citations related to Sotorasib's mechanism of action on KRAS.
 - What is the predicted response of EGFR L858R to Gefitinib in lung cancer?
+
+**Hypothesis Analysis:**
+- Analyze gene list: `BRCA1, BRCA2, TP53, ATM, CHEK2` for DNA repair pathways
+- What biological processes are enriched in: `EGFR, KRAS, BRAF, PIK3CA, PTEN`?
+- Functional analysis of: `MYC, CCND1, CDK4, RB1, TP53` for cell cycle regulation
 
 ## Key Features
 
@@ -33,6 +39,7 @@ It translates natural language queries into Cypher, extracts precise information
 - **Evidence-Based Answers:** Provides concise, accurate answers grounded in the underlying data.
 - **Interactive Visualization:** Generates a mini-graph for each query to visually explain the relationships between genes, therapies, and diseases.
 - **Verifiable Citations:** Includes PubMed IDs to support its conclusions, linking back to the original research.
+- **Hypothesis Analyzer:** Analyze gene lists for functional enrichment and biological themes with AI-powered interpretation and interactive visualizations.
 
 ## How It Works
 
@@ -50,6 +57,7 @@ The agent follows a multi-step pipeline to answer a question:
 - **Database:** Neo4j
 - **Frontend:** Next.js, React, TypeScript
 - **Data Sources:** [CIViC](https://civicdb.org/welcome) and [OpenTargets](https://www.opentargets.org/)
+- **Enrichment Analysis:** MyGene, GSEAPy, Plotly
 - **Deployment:** Vercel (UI) & Render (API)
 
 ---

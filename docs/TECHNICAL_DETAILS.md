@@ -45,6 +45,30 @@ This CSV-based approach decouples data extraction from graph ingestion, making t
 
 The query engine is responsible for translating a user's question into a safe, executable Cypher query and then summarizing the results.
 
+## Hypothesis Analyzer
+
+The Hypothesis Analyzer provides functional enrichment analysis for gene lists, complementing the knowledge graph queries with pathway and biological process analysis.
+
+### Gene Enrichment Pipeline
+
+1. **Gene Normalization:** Input gene symbols are normalized using MyGene to resolve aliases and validate against official gene symbols.
+2. **Enrichment Analysis:** Valid genes are analyzed using GSEAPy's enrichr function against standard databases:
+   - GO_Biological_Process_2023
+   - KEGG_2021_Human  
+   - Reactome_2022
+3. **AI Interpretation:** Gemini generates biological summaries explaining the top enriched pathways and their significance.
+4. **Visualization:** Results are formatted for interactive Plotly dot plots showing statistical significance and gene counts.
+
+### API Endpoints
+
+- **`POST /analyze/genes`**: Accepts comma or newline-separated gene lists and returns structured enrichment results with AI summaries and visualization data.
+
+### Error Handling
+
+- Invalid gene symbols are identified and excluded from analysis with user warnings
+- Graceful fallback when enrichment databases are unavailable
+- Comprehensive error messages for debugging and user feedback
+
 ### LLM Prompting & Query Patterns
 
 Prompts are engineered to be schema-aware and produce robust queries. Key patterns include:
@@ -73,7 +97,13 @@ In production/deployment, logs are stored to a Supabase postgres table.
 
 ### Testing Coverage
 
-The `pytest` suite covers key components of the backend pipeline, including the query validator, Neo4j executor, LLM adapters, and end-to-end integration tests.
+The `pytest` suite covers key components of the backend pipeline, including the query validator, Neo4j executor, LLM adapters, and end-to-end integration tests. The Hypothesis Analyzer includes comprehensive tests for:
+
+- Gene normalization and validation logic
+- Enrichment analysis pipeline
+- API endpoint functionality and error handling
+- AI summarization of enrichment results
+- Plot data generation for visualizations
 
 ## Future Extensions
 
@@ -84,4 +114,6 @@ The `pytest` suite covers key components of the backend pipeline, including the 
 | Enhanced Drug & Disease Ontologies | Integrate synonyms and identifiers from ChEMBL and DOID.    |
 | Pathway Data                        | Add `(:Gene)-[:PART_OF_PATHWAY]->(:Pathway)` from Reactome. |
 | Automated Ingestion                 | Set up a recurring job to pull the latest data from CIViC.  |
+| Advanced Enrichment Analysis        | Support for custom gene sets, additional databases, and comparative analysis. |
+| Interactive Pathway Visualization   | Enhanced pathway diagrams with gene expression overlays.    |
 
