@@ -7,6 +7,7 @@ import pytest
 from pipeline.gemini import (
     GeminiConfig,
     GeminiCypherGenerator,
+    GeminiEnrichmentSummarizer,
     GeminiInstructionExpander,
     GeminiSummarizer,
     _format_rows,
@@ -117,3 +118,68 @@ def test_summarizer_handles_empty_rows():
     result = summarizer.summarize("Question?", [])
 
     assert result == "No evidence found."
+
+
+def test_enrichment_summarizer_formats_results():
+    """Test that enrichment summarizer formats results correctly."""
+    stub_client = StubClient(["The genes show DNA repair enrichment."])
+    summarizer = GeminiEnrichmentSummarizer(client=stub_client)
+
+    gene_list = ["BRCA1", "BRCA2"]
+    enrichment_results = [
+        {
+            "term": "DNA repair",
+            "library": "GO_Biological_Process_2023",
+            "p_value": 0.001,
+            "adjusted_p_value": 0.01,
+            "gene_count": 2,
+            "genes": ["BRCA1", "BRCA2"],
+            "description": "DNA repair pathway",
+        }
+    ]
+
+    result = summarizer.summarize_enrichment(gene_list, enrichment_results)
+
+    assert result == "The genes show DNA repair enrichment."
+    call = stub_client.models.calls[0]
+    assert "BRCA1, BRCA2" in call["contents"][0]
+    assert "DNA repair" in call["contents"][0]
+    assert "GO_Biological_Process_2023" in call["contents"][0]
+
+
+def test_enrichment_summarizer_handles_empty_results():
+    """Test enrichment summarizer with empty results."""
+    stub_client = StubClient(["No significant enrichments found."])
+    summarizer = GeminiEnrichmentSummarizer(client=stub_client)
+
+    result = summarizer.summarize_enrichment(["BRCA1"], [])
+
+    assert result == "No significant enrichments found."
+    call = stub_client.models.calls[0]
+    assert "No significant enrichments found" in call["contents"][0]
+
+
+def test_enrichment_summarizer_limits_results():
+    """Test that enrichment summarizer limits to top 10 results."""
+    stub_client = StubClient(["Summary"])
+    summarizer = GeminiEnrichmentSummarizer(client=stub_client)
+
+    # Create 15 mock results
+    enrichment_results = [
+        {
+            "term": f"Pathway {i}",
+            "library": "GO_Biological_Process_2023",
+            "p_value": 0.001,
+            "adjusted_p_value": 0.01,
+            "gene_count": 2,
+            "genes": ["BRCA1", "BRCA2"],
+            "description": f"Description {i}",
+        }
+        for i in range(15)
+    ]
+
+    summarizer.summarize_enrichment(["BRCA1"], enrichment_results)
+
+    call = stub_client.models.calls[0]
+    # Should only include first 10 results
+    assert call["contents"][0].count("Pathway") == 10
