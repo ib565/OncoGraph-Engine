@@ -298,7 +298,14 @@ export default function HomePage() {
         </section>
       )}
 
-      {activeTab === "analyzer" && <HypothesisAnalyzer />}
+      {activeTab === "analyzer" && (
+        <HypothesisAnalyzer 
+          onNavigateToQuery={(question: string) => {
+            setQuestion(question);
+            setActiveTab("query");
+          }}
+        />
+      )}
 
       {activeTab === "query" && error && (
         <div className="alert" role="alert">

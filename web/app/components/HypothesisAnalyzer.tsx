@@ -3,7 +3,10 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import Plot from "react-plotly.js";
+import dynamic from "next/dynamic";
+
+// Dynamically import Plotly to avoid SSR issues
+const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 
 type EnrichmentResponse = {
   summary: string;
@@ -20,20 +23,76 @@ type EnrichmentResponse = {
     description: string;
   }>;
   plot_data: any;
+  followUpQuestions: string[];
+};
+
+type GeneSetResponse = {
+  genes: string[];
+  description: string;
+};
+
+type PresetOption = {
+  id: string;
+  description: string;
 };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
-const EXAMPLE_GENE_LISTS = [
-  "BRCA1, BRCA2, TP53, ATM, CHEK2",
-  "EGFR, KRAS, BRAF, PIK3CA, PTEN",
-  "MYC, CCND1, CDK4, RB1, TP53"
+
+const PRESET_OPTIONS: PresetOption[] = [
+  { id: "colorectal_therapy_genes", description: "Genes targeted by therapies for Colorectal Cancer" },
+  { id: "lung_therapy_genes", description: "Genes targeted by therapies for Lung Cancer" },
+  { id: "resistance_biomarker_genes", description: "All genes with known resistance biomarkers" },
+  { id: "egfr_pathway_genes", description: "Genes targeted by EGFR pathway therapies" },
+  { id: "top_biomarker_genes", description: "Top biomarker genes across all cancers" },
 ];
 
-export default function HypothesisAnalyzer() {
+type HypothesisAnalyzerProps = {
+  onNavigateToQuery?: (question: string) => void;
+};
+
+export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnalyzerProps = {}) {
   const [genes, setGenes] = useState("");
   const [result, setResult] = useState<EnrichmentResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingPreset, setIsLoadingPreset] = useState(false);
+
+  async function loadPreset(presetId: string) {
+    if (!API_URL) {
+      setError("NEXT_PUBLIC_API_URL is not configured");
+      return;
+    }
+
+    setIsLoadingPreset(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`${API_URL}/graph-gene-sets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preset_id: presetId }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        const detail = (payload as any)?.detail;
+        if (detail?.message) throw new Error(detail.message);
+        throw new Error(`Request failed with status ${response.status}`);
+      }
+
+      const data = (await response.json()) as GeneSetResponse;
+      const geneList = data.genes.join(", ");
+      setGenes(geneList);
+      
+      // Automatically trigger analysis
+      await analyzeGenes(geneList);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+    } finally {
+      setIsLoadingPreset(false);
+    }
+  }
 
   async function analyzeGenes(input: string) {
     const trimmed = input.trim();
@@ -94,44 +153,49 @@ export default function HypothesisAnalyzer() {
       </div>
 
       <form className="query-form" onSubmit={handleSubmit}>
+        <div className="preset-section">
+          <label htmlFor="preset-select" className="preset-label">
+            Load preset gene list:
+          </label>
+          <select
+            id="preset-select"
+            className="preset-select"
+            onChange={(event) => {
+              if (event.target.value) {
+                void loadPreset(event.target.value);
+                event.target.value = ""; // Reset selection
+              }
+            }}
+            disabled={isLoading || isLoadingPreset}
+            value=""
+          >
+            <option value="">Choose a preset...</option>
+            {PRESET_OPTIONS.map((preset) => (
+              <option key={preset.id} value={preset.id}>
+                {preset.description}
+              </option>
+            ))}
+          </select>
+        </div>
+        
         <textarea
           className="query-input"
           value={genes}
           onChange={(event) => setGenes(event.target.value)}
           placeholder="e.g. BRCA1, BRCA2, TP53, ATM, CHEK2"
-          disabled={isLoading}
+          disabled={isLoading || isLoadingPreset}
           rows={4}
           style={{ resize: "vertical", minHeight: "100px" }}
         />
         <button
           type="submit"
           className="primary-button"
-          disabled={isLoading || !genes.trim()}
+          disabled={isLoading || isLoadingPreset || !genes.trim()}
         >
-          {isLoading ? "Analyzing..." : "Analyze Genes"}
+          {isLoading ? "Analyzing..." : isLoadingPreset ? "Loading preset..." : "Analyze Genes"}
         </button>
       </form>
 
-      {EXAMPLE_GENE_LISTS.length > 0 && (
-        <div className="examples" aria-label="Example gene lists">
-          <span className="examples-label">Example gene lists</span>
-          <div className="examples-grid">
-            {EXAMPLE_GENE_LISTS.map((example) => (
-              <button
-                key={example}
-                type="button"
-                className="example-button"
-                onClick={() => {
-                  void analyzeGenes(example);
-                }}
-                disabled={isLoading}
-              >
-                {example}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       {error && (
         <div className="alert" role="alert">
@@ -149,6 +213,32 @@ export default function HypothesisAnalyzer() {
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.summary}</ReactMarkdown>
               </div>
             </section>
+
+            {/* Follow-up Questions */}
+            {result.followUpQuestions && result.followUpQuestions.length > 0 && (
+              <section className="card">
+                <h3 className="section-title">Suggested Next Steps</h3>
+                <p className="section-subtitle">
+                  Explore these questions using the Knowledge Graph Query tab:
+                </p>
+                <div className="followup-questions">
+                  {result.followUpQuestions.map((question, index) => (
+                    <button
+                      key={index}
+                      className="followup-question-button"
+                      onClick={() => {
+                        if (onNavigateToQuery) {
+                          onNavigateToQuery(question);
+                        }
+                      }}
+                      disabled={!onNavigateToQuery}
+                    >
+                      {question}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
 
             {/* Warnings */}
             {result.warnings.length > 0 && (
