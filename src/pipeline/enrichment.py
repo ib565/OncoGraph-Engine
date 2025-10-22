@@ -8,7 +8,6 @@ from typing import Any
 
 import pandas as pd
 import plotly.graph_objects as go
-from plotly.utils import PlotlyJSONEncoder
 
 try:  # pragma: no cover - optional dependencies
     import gseapy as gp

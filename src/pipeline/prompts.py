@@ -192,7 +192,7 @@ SUMMARY_PROMPT_TEMPLATE = dedent(
 
 ENRICHMENT_SUMMARY_PROMPT_TEMPLATE = dedent(
     """
-    You are analyzing gene enrichment results to provide biological insights.
+    You are analyzing gene enrichment results to provide biological insights and suggest follow-up questions.
 
     Gene list analyzed: {gene_list}
 
@@ -210,5 +210,22 @@ ENRICHMENT_SUMMARY_PROMPT_TEMPLATE = dedent(
     3. Clinical or research implications if apparent
 
     If no significant enrichments were found, explain what this might indicate about the gene list.
+
+    Additionally, suggest 1-3 follow-up questions that:
+    - Are answerable using the OncoGraph knowledge graph (genes, variants, therapies, diseases, biomarkers)
+    - Help researchers explore therapeutic implications or resistance mechanisms
+    - Reference specific genes, pathways, or disease contexts from the analysis
+    - Focus on actionable research questions that could be investigated using the knowledge graph
+
+    Examples of good follow-up questions:
+    - "What therapies target [specific gene] in [disease context]?"
+    - "What resistance mechanisms are known for [pathway] inhibitors?"
+    - "Which biomarkers predict response to [therapy class] in [cancer type]?"
+
+    Return your response as JSON with the following structure:
+    {{
+        "summary": "Your detailed biological summary here...",
+        "followUpQuestions": ["Question 1", "Question 2", "Question 3"]
+    }}
     """
 ).strip()

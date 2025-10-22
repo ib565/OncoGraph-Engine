@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pydantic import BaseModel
 from tenacity import retry, retry_if_not_exception_type, stop_after_attempt, wait_exponential
 
 from .prompts import (
@@ -37,6 +38,13 @@ class GeminiConfig:
     max_output_tokens: int | None = None
     top_p: float | None = None
     api_key: str | None = None
+
+
+class EnrichmentSummaryResponse(BaseModel):
+    """Structured response from enrichment summarizer."""
+
+    summary: str
+    followUpQuestions: list[str]
 
 
 def _strip_code_fence(text: str) -> str:
@@ -155,15 +163,15 @@ class GeminiEnrichmentSummarizer(_GeminiBase):
 
     def summarize_enrichment(
         self, gene_list: list[str], enrichment_results: list[dict[str, object]]
-    ) -> str:
-        """Generate biological interpretation of enrichment results.
+    ) -> EnrichmentSummaryResponse:
+        """Generate biological interpretation of enrichment results with follow-up questions.
 
         Args:
             gene_list: List of genes that were analyzed
             enrichment_results: List of enrichment analysis results
 
         Returns:
-            AI-generated summary of biological themes
+            Structured response with summary and follow-up questions
         """
         # Format enrichment results for the prompt
         formatted_results = []
@@ -186,5 +194,36 @@ class GeminiEnrichmentSummarizer(_GeminiBase):
             gene_list=", ".join(gene_list),
             enrichment_results=formatted_enrichment,
         )
-        text = self._call_model(prompt=prompt)
-        return text.strip()
+
+        # Use structured output with Gemini's native JSON mode
+        config_payload = self._build_content_config()
+        if config_payload is not None:
+            # Override the config to include structured output
+            config_payload = genai_types.GenerateContentConfig(
+                temperature=self.config.temperature,
+                top_p=self.config.top_p,
+                max_output_tokens=self.config.max_output_tokens,
+                response_mime_type="application/json",
+                response_schema=EnrichmentSummaryResponse,
+            )
+
+        kwargs = {
+            "model": self.config.model,
+            "contents": [prompt],
+        }
+        if config_payload is not None:
+            kwargs["config"] = config_payload
+
+        response = self._client.models.generate_content(**kwargs)
+        text = getattr(response, "text", None)
+        if not text:
+            raise PipelineError("Gemini response did not include text")
+
+        # Parse the JSON response
+        try:
+            import json
+
+            data = json.loads(text)
+            return EnrichmentSummaryResponse(**data)
+        except (json.JSONDecodeError, ValueError) as e:
+            raise PipelineError(f"Failed to parse structured response: {e}") from e

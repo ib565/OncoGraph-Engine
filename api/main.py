@@ -58,12 +58,22 @@ class GeneListRequest(BaseModel):
     genes: str = Field(..., min_length=1, description="Comma or newline separated gene symbols")
 
 
+class GeneSetRequest(BaseModel):
+    preset_id: str = Field(..., description="Preset gene set identifier")
+
+
+class GeneSetResponse(BaseModel):
+    genes: list[str]
+    description: str
+
+
 class EnrichmentResponse(BaseModel):
     summary: str
     valid_genes: list[str]
     warnings: list[str]
     enrichment_results: list[dict[str, object]]
     plot_data: dict[str, object]
+    followUpQuestions: list[str]
 
 
 @lru_cache(maxsize=1)
@@ -332,6 +342,107 @@ def query_stream(
     return StreamingResponse(event_stream(), media_type="text/event-stream", headers=headers)
 
 
+@app.post("/graph-gene-sets", response_model=GeneSetResponse)
+def get_gene_set(
+    body: GeneSetRequest,
+    engine: Annotated[QueryEngine, Depends(get_engine)],
+) -> GeneSetResponse:
+    """Get a preset gene list from the knowledge graph."""
+
+    # Define preset queries
+    preset_queries = {
+        "colorectal_therapy_genes": {
+            "description": "Genes targeted by therapies for Colorectal Cancer",
+            "cypher": """
+                MATCH (b:Biomarker)-[r:AFFECTS_RESPONSE_TO]->(t:Therapy)
+                WHERE toLower(r.disease_name) CONTAINS 'colorectal'
+                OPTIONAL MATCH (b)-[:VARIANT_OF]->(g:Gene)
+                WITH CASE WHEN b:Gene THEN b.symbol ELSE g.symbol END AS gene_symbol
+                WHERE gene_symbol IS NOT NULL
+                RETURN DISTINCT gene_symbol
+                ORDER BY gene_symbol
+                LIMIT 50
+            """,
+        },
+        "lung_therapy_genes": {
+            "description": "Genes targeted by therapies for Lung Cancer",
+            "cypher": """
+                MATCH (b:Biomarker)-[r:AFFECTS_RESPONSE_TO]->(t:Therapy)
+                WHERE toLower(r.disease_name) CONTAINS 'lung'
+                OPTIONAL MATCH (b)-[:VARIANT_OF]->(g:Gene)
+                WITH CASE WHEN b:Gene THEN b.symbol ELSE g.symbol END AS gene_symbol
+                WHERE gene_symbol IS NOT NULL
+                RETURN DISTINCT gene_symbol
+                ORDER BY gene_symbol
+                LIMIT 50
+            """,
+        },
+        "resistance_biomarker_genes": {
+            "description": "All genes with known resistance biomarkers",
+            "cypher": """
+                MATCH (b:Biomarker)-[r:AFFECTS_RESPONSE_TO]->(t:Therapy)
+                WHERE toLower(r.effect) = 'resistance'
+                OPTIONAL MATCH (b)-[:VARIANT_OF]->(g:Gene)
+                WITH CASE WHEN b:Gene THEN b.symbol ELSE g.symbol END AS gene_symbol
+                WHERE gene_symbol IS NOT NULL
+                RETURN DISTINCT gene_symbol
+                ORDER BY gene_symbol
+                LIMIT 50
+            """,
+        },
+        "egfr_pathway_genes": {
+            "description": "Genes targeted by EGFR pathway therapies",
+            "cypher": """
+                MATCH (t:Therapy)-[r:TARGETS]->(g:Gene)
+                WHERE (t)-[:TARGETS]->(:Gene {symbol: 'EGFR'})
+                   OR any(tag IN t.tags WHERE toLower(tag) CONTAINS 'anti-egfr')
+                   OR any(tag IN t.tags WHERE toLower(tag) CONTAINS 'egfr')
+                RETURN DISTINCT g.symbol AS gene_symbol
+                ORDER BY gene_symbol
+                LIMIT 50
+            """,
+        },
+        "top_biomarker_genes": {
+            "description": "Top biomarker genes across all cancers",
+            "cypher": """
+                MATCH (b:Biomarker)-[r:AFFECTS_RESPONSE_TO]->(t:Therapy)
+                OPTIONAL MATCH (b)-[:VARIANT_OF]->(g:Gene)
+                WITH CASE WHEN b:Gene THEN b.symbol ELSE g.symbol END AS gene_symbol,
+                     count(r) AS biomarker_count
+                WHERE gene_symbol IS NOT NULL
+                RETURN gene_symbol, biomarker_count
+                ORDER BY biomarker_count DESC, gene_symbol
+                LIMIT 50
+            """,
+        },
+    }
+
+    if body.preset_id not in preset_queries:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown preset_id: {body.preset_id}. Available presets: {list(preset_queries.keys())}",
+        )
+
+    preset = preset_queries[body.preset_id]
+
+    try:
+        # Execute the Cypher query
+        rows = engine.executor.execute_read(preset["cypher"].strip())
+
+        # Extract gene symbols from results
+        genes = []
+        for row in rows:
+            if "gene_symbol" in row and row["gene_symbol"]:
+                genes.append(str(row["gene_symbol"]))
+
+        return GeneSetResponse(genes=genes, description=preset["description"])
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to fetch gene set: {str(exc)}"
+        ) from exc
+
+
 @app.post("/analyze/genes", response_model=EnrichmentResponse)
 def analyze_genes(
     body: GeneListRequest,
@@ -351,8 +462,10 @@ def analyze_genes(
         # Run enrichment analysis
         result = analyzer.analyze(gene_symbols)
 
-        # Generate AI summary
-        summary = summarizer.summarize_enrichment(result.valid_genes, result.enrichment_results)
+        # Generate AI summary with follow-up questions
+        summary_response = summarizer.summarize_enrichment(
+            result.valid_genes, result.enrichment_results
+        )
 
         # Create warnings for invalid genes
         warnings = []
@@ -365,11 +478,12 @@ def analyze_genes(
             warnings.append("No valid gene symbols found for analysis")
 
         return EnrichmentResponse(
-            summary=summary,
+            summary=summary_response.summary,
             valid_genes=result.valid_genes,
             warnings=warnings,
             enrichment_results=result.enrichment_results,
             plot_data=result.plot_data,
+            followUpQuestions=summary_response.followUpQuestions,
         )
 
     except HTTPException:
