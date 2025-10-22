@@ -189,3 +189,26 @@ SUMMARY_PROMPT_TEMPLATE = dedent(
     If there are no rows, explicitly state that no evidence was found. Do not invent data.
     """
 ).strip()
+
+ENRICHMENT_SUMMARY_PROMPT_TEMPLATE = dedent(
+    """
+    You are analyzing gene enrichment results to provide biological insights.
+
+    Gene list analyzed: {gene_list}
+
+    Enrichment results:
+    {enrichment_results}
+
+    Provide a clear, concise summary of the top biological themes revealed by this gene list.
+    Focus on the most significant pathways and processes (top 3-5 terms by statistical significance).
+    Explain what these enriched terms suggest about the biological function or disease relevance
+    of the gene set. Use plain language accessible to researchers and clinicians.
+
+    Format your response as:
+    1. A brief overview of what the analysis reveals
+    2. Key biological themes (bullet points for top pathways/processes)
+    3. Clinical or research implications if apparent
+
+    If no significant enrichments were found, explain what this might indicate about the gene list.
+    """
+).strip()

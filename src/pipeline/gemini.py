@@ -8,6 +8,7 @@ from tenacity import retry, retry_if_not_exception_type, stop_after_attempt, wai
 
 from .prompts import (
     CYPHER_PROMPT_TEMPLATE,
+    ENRICHMENT_SUMMARY_PROMPT_TEMPLATE,
     INSTRUCTION_PROMPT_TEMPLATE,
     SCHEMA_SNIPPET,
     SUMMARY_PROMPT_TEMPLATE,
@@ -144,6 +145,46 @@ class GeminiSummarizer(_GeminiBase, Summarizer):
         prompt = SUMMARY_PROMPT_TEMPLATE.format(
             question=question.strip(),
             rows=formatted_rows,
+        )
+        text = self._call_model(prompt=prompt)
+        return text.strip()
+
+
+class GeminiEnrichmentSummarizer(_GeminiBase):
+    """Gemini-backed summarizer for gene enrichment analysis results."""
+
+    def summarize_enrichment(
+        self, gene_list: list[str], enrichment_results: list[dict[str, object]]
+    ) -> str:
+        """Generate biological interpretation of enrichment results.
+
+        Args:
+            gene_list: List of genes that were analyzed
+            enrichment_results: List of enrichment analysis results
+
+        Returns:
+            AI-generated summary of biological themes
+        """
+        # Format enrichment results for the prompt
+        formatted_results = []
+        for i, result in enumerate(enrichment_results[:10], 1):  # Top 10 results
+            formatted_results.append(
+                f"{i}. {result['term']} ({result['library']})\n"
+                f"   P-value: {result['p_value']:.2e}, "
+                f"Adjusted P-value: {result['adjusted_p_value']:.2e}\n"
+                f"   Gene count: {result['gene_count']}\n"
+                f"   Genes: {', '.join(result['genes'][:5])}{'...' if len(result['genes']) > 5 else ''}"
+            )
+
+        formatted_enrichment = (
+            "\n".join(formatted_results)
+            if formatted_results
+            else "No significant enrichments found"
+        )
+
+        prompt = ENRICHMENT_SUMMARY_PROMPT_TEMPLATE.format(
+            gene_list=", ".join(gene_list),
+            enrichment_results=formatted_enrichment,
         )
         text = self._call_model(prompt=prompt)
         return text.strip()

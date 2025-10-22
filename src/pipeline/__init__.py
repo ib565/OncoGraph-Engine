@@ -5,6 +5,7 @@ from .executor import Neo4jExecutor
 from .gemini import (
     GeminiConfig,
     GeminiCypherGenerator,
+    GeminiEnrichmentSummarizer,
     GeminiInstructionExpander,
     GeminiSummarizer,
 )
@@ -14,6 +15,7 @@ from .validator import RuleBasedValidator
 __all__ = [
     "GeminiConfig",
     "GeminiCypherGenerator",
+    "GeminiEnrichmentSummarizer",
     "GeminiInstructionExpander",
     "GeminiSummarizer",
     "Neo4jExecutor",

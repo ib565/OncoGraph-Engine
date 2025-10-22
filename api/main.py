@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 from pipeline import (
     GeminiConfig,
     GeminiCypherGenerator,
+    GeminiEnrichmentSummarizer,
     GeminiInstructionExpander,
     GeminiSummarizer,
     Neo4jExecutor,
@@ -29,6 +30,7 @@ from pipeline import (
     QueryEngineResult,
     RuleBasedValidator,
 )
+from pipeline.enrichment import GeneEnrichmentAnalyzer
 from pipeline.trace import (
     CompositeTraceSink,
     JsonlTraceSink,
@@ -50,6 +52,18 @@ class QueryResponse(BaseModel):
     answer: str
     cypher: str
     rows: list[dict[str, object]]
+
+
+class GeneListRequest(BaseModel):
+    genes: str = Field(..., min_length=1, description="Comma or newline separated gene symbols")
+
+
+class EnrichmentResponse(BaseModel):
+    summary: str
+    valid_genes: list[str]
+    warnings: list[str]
+    enrichment_results: list[dict[str, object]]
+    plot_data: dict[str, object]
 
 
 @lru_cache(maxsize=1)
@@ -116,6 +130,23 @@ def build_engine() -> QueryEngine:
 
 def get_engine() -> QueryEngine:
     return build_engine()
+
+
+@lru_cache(maxsize=1)
+def get_enrichment_analyzer() -> GeneEnrichmentAnalyzer:
+    """Get cached enrichment analyzer instance."""
+    return GeneEnrichmentAnalyzer()
+
+
+@lru_cache(maxsize=1)
+def get_enrichment_summarizer() -> GeminiEnrichmentSummarizer:
+    """Get cached enrichment summarizer instance."""
+    config = GeminiConfig(
+        model=os.getenv("GEMINI_SUMMARIZER_MODEL", "gemini-2.5-flash"),
+        temperature=float(os.getenv("GEMINI_SUMMARIZER_TEMPERATURE", "0.1")),
+        api_key=os.getenv("GOOGLE_API_KEY"),
+    )
+    return GeminiEnrichmentSummarizer(config=config)
 
 
 app = FastAPI(title="OncoGraph API", version="0.1.0")
@@ -299,3 +330,49 @@ def query_stream(
         "X-Accel-Buffering": "no",  # hint for some proxies (e.g., nginx)
     }
     return StreamingResponse(event_stream(), media_type="text/event-stream", headers=headers)
+
+
+@app.post("/analyze/genes", response_model=EnrichmentResponse)
+def analyze_genes(
+    body: GeneListRequest,
+    analyzer: Annotated[GeneEnrichmentAnalyzer, Depends(get_enrichment_analyzer)],
+    summarizer: Annotated[GeminiEnrichmentSummarizer, Depends(get_enrichment_summarizer)],
+) -> EnrichmentResponse:
+    """Analyze gene list for functional enrichment and generate AI summary."""
+    try:
+        # Parse gene list (comma or newline separated)
+        gene_symbols = []
+        for line in body.genes.split("\n"):
+            gene_symbols.extend([gene.strip() for gene in line.split(",") if gene.strip()])
+
+        if not gene_symbols:
+            raise HTTPException(status_code=400, detail="No valid gene symbols provided")
+
+        # Run enrichment analysis
+        result = analyzer.analyze(gene_symbols)
+
+        # Generate AI summary
+        summary = summarizer.summarize_enrichment(result.valid_genes, result.enrichment_results)
+
+        # Create warnings for invalid genes
+        warnings = []
+        if result.invalid_genes:
+            warnings.append(
+                f"Invalid gene symbols (excluded from analysis): {', '.join(result.invalid_genes)}"
+            )
+
+        if not result.valid_genes:
+            warnings.append("No valid gene symbols found for analysis")
+
+        return EnrichmentResponse(
+            summary=summary,
+            valid_genes=result.valid_genes,
+            warnings=warnings,
+            enrichment_results=result.enrichment_results,
+            plot_data=result.plot_data,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Gene analysis failed: {str(exc)}") from exc
