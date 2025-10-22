@@ -48,6 +48,36 @@ main.page {
   margin: 0 auto;
   max-width: 720px;
   color: #334155;
+}
+
+/* Tab Navigation */
+.tab-navigation {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.tab-button {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.tab-button:hover {
+  color: #334155;
+  background: rgba(148, 163, 184, 0.1);
+}
+
+.tab-button.active {
+  color: #1d4ed8;
+  border-bottom-color: #1d4ed8;
+  background: rgba(37, 99, 235, 0.05);
   font-size: 1.08rem;
   line-height: 1.7;
 }

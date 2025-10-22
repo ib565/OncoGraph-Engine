@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import MiniGraph from "./components/MiniGraph";
+import HypothesisAnalyzer from "./components/HypothesisAnalyzer";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -68,6 +69,7 @@ export default function HomePage() {
   const sseRef = useRef<EventSource | null>(null);
   const [dotCount, setDotCount] = useState(0);
   const [lastQuery, setLastQuery] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"query" | "analyzer">("query");
 
   useEffect(() => {
     if (!isLoading || !progress) {
@@ -231,7 +233,24 @@ export default function HomePage() {
         </p>
       </header>
 
-      <section className="card query-card">
+      {/* Tab Navigation */}
+      <div className="tab-navigation">
+        <button
+          className={`tab-button ${activeTab === "query" ? "active" : ""}`}
+          onClick={() => setActiveTab("query")}
+        >
+          Knowledge Graph Query
+        </button>
+        <button
+          className={`tab-button ${activeTab === "analyzer" ? "active" : ""}`}
+          onClick={() => setActiveTab("analyzer")}
+        >
+          Hypothesis Analyzer
+        </button>
+      </div>
+
+      {activeTab === "query" && (
+        <section className="card query-card">
         <div className="card-heading">
           <h2 className="card-title">Interrogate the knowledge graph</h2>
           <p className="card-subtitle">
@@ -276,21 +295,24 @@ export default function HomePage() {
             </div>
           </div>
         )}
-      </section>
+        </section>
+      )}
 
-      {error && (
+      {activeTab === "analyzer" && <HypothesisAnalyzer />}
+
+      {activeTab === "query" && error && (
         <div className="alert" role="alert">
           {error}
         </div>
       )}
 
-      {isLoading && progress && !error && (
+      {activeTab === "query" && isLoading && progress && !error && (
         <div className="status-message" role="status" aria-live="polite">
           {animatedProgress ?? progress}
         </div>
       )}
 
-      {result && (
+      {activeTab === "query" && result && (
         <section className="result-overview">
           <div className="primary-column">
             <section className="card answer-card">

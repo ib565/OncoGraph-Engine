@@ -11,9 +11,11 @@
     "cytoscape": "^3.33.1",
     "cytoscape-cose-bilkent": "^4.1.0",
     "next": "14.2.10",
+    "plotly.js": "^2.35.2",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-markdown": "^10.1.0",
+    "react-plotly.js": "^2.6.0",
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
