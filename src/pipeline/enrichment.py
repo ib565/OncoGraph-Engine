@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass
 from typing import Any
 
@@ -264,7 +265,11 @@ class GeneEnrichmentAnalyzer:
         for result in enrichment_results:
             terms.append(result["term"])
             libraries.append(result["library"])
-            p_values.append(-1 * result["adjusted_p_value"])  # Negative log for visualization
+            # Use -log10(adjusted_p_value) with epsilon clipping to avoid log(0)
+            adj_pval = result["adjusted_p_value"]
+            epsilon = 1e-300  # Very small epsilon to avoid log(0)
+            clipped_pval = max(adj_pval, epsilon)
+            p_values.append(-math.log10(clipped_pval))
             gene_counts.append(result["gene_count"])
             descriptions.append(result["description"])
 
@@ -301,7 +306,7 @@ class GeneEnrichmentAnalyzer:
                     + "Adjusted P-value: %{customdata:.2e}<br>"
                     + "Gene Count: %{marker.size}<br>"
                     + "<extra></extra>",
-                    customdata=[10**p for p in [p for i, p in enumerate(p_values) if mask[i]]],
+                    customdata=[result["adjusted_p_value"] for i, result in enumerate(enrichment_results) if mask[i]],
                     name=lib.replace("_", " "),
                     showlegend=True,
                 )
