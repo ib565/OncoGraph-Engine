@@ -655,9 +655,6 @@ def analyze_genes_stream(
             f"event: progress\ndata: "
             f"{json.dumps({'message': 'Normalizing genes and running enrichment analysis'})}\n\n"
         )
-
-        loop = asyncio.get_event_loop()
-
         # Poll for completion and emit results as they become available
         while not done_event.is_set():
             # Check if we have partial results to emit
