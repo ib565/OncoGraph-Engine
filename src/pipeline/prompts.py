@@ -44,7 +44,7 @@ SCHEMA_SNIPPET = dedent(
         rel.effect AS effect,
         rel.disease_name AS disease_name,
         coalesce(rel.pmids, []) AS pmids
-      LIMIT 10
+      LIMIT 100
 
     Canonical example (TARGETS; adapt values as needed):
       MATCH (t:Therapy)-[r:TARGETS]->(g:Gene)
@@ -67,7 +67,7 @@ SCHEMA_SNIPPET = dedent(
         coalesce(r.ref_sources, []) AS ref_sources,
         coalesce(r.ref_ids, []) AS ref_ids,
         coalesce(r.ref_urls, []) AS ref_urls
-      LIMIT 20
+      LIMIT 100
 
     Canonical rules:
     - Gene-only: match biomarker as the Gene OR any Variant VARIANT_OF that Gene
