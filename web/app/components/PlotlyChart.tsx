@@ -30,7 +30,7 @@ const Plot = dynamic(() => import("react-plotly.js"), {
       </div>
     </div>
   )
-});
+}) as any;
 
 // Add CSS for spinner animation
 const spinnerStyle = `
@@ -54,16 +54,7 @@ export default function PlotlyChart({ data, layout, onClick }: PlotlyChartProps)
     setIsClient(true);
   }, []);
 
-  // Add spinner styles to head
-  useEffect(() => {
-    const style = document.createElement('style');
-    style.textContent = spinnerStyle;
-    document.head.appendChild(style);
-    return () => {
-      document.head.removeChild(style);
-    };
-  }, []);
-
+  // Don't render anything on server side
   if (!isClient) {
     return (
       <div style={{ 
@@ -90,6 +81,16 @@ export default function PlotlyChart({ data, layout, onClick }: PlotlyChartProps)
       </div>
     );
   }
+
+  // Add spinner styles to head
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = spinnerStyle;
+    document.head.appendChild(style);
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
 
   if (hasError) {
     return (
@@ -138,7 +139,7 @@ export default function PlotlyChart({ data, layout, onClick }: PlotlyChartProps)
           modeBarButtonsToRemove: ["pan2d", "lasso2d", "select2d"],
         }}
         onClick={onClick}
-        onError={(error) => {
+        onError={(error: any) => {
           console.error("Plotly error:", error);
           setHasError(true);
         }}

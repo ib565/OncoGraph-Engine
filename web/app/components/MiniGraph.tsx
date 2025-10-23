@@ -228,6 +228,9 @@ export function MiniGraph({ rows, height = 320 }: MiniGraphProps) {
     let cancelled = false;
 
     async function init() {
+      // Ensure we're on the client side
+      if (typeof window === 'undefined') return;
+      
       const cytoscapeMod: CytoscapeModule = await import("cytoscape");
       const cytoscape = (cytoscapeMod as any).default ?? (cytoscapeMod as any);
       let layoutName: "cose-bilkent" | "grid" = "grid";
@@ -340,10 +343,10 @@ export function MiniGraph({ rows, height = 320 }: MiniGraphProps) {
   }, [elements]);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || typeof window === "undefined") return;
     const el = containerRef.current;
     let observer: ResizeObserver | null = null;
-    if (typeof window !== "undefined" && "ResizeObserver" in window) {
+    if ("ResizeObserver" in window) {
       observer = new ResizeObserver(() => {
         if (!cyRef.current) return;
         const rect = el.getBoundingClientRect();

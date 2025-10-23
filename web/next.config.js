@@ -10,6 +10,16 @@ const nextConfig = {
         tls: false,
       };
     }
+    
+    // Handle dynamic imports better
+    config.module.rules.push({
+      test: /\.m?js$/,
+      type: "javascript/auto",
+      resolve: {
+        fullySpecified: false,
+      },
+    });
+    
     return config;
   },
   // Optimize chunks for better loading
@@ -19,6 +29,10 @@ const nextConfig = {
   // Ensure proper chunk loading
   generateEtags: false,
   poweredByHeader: false,
+  // Disable static optimization for pages with dynamic content
+  trailingSlash: false,
+  // Better handling of dynamic imports
+  swcMinify: true,
 };
 
 module.exports = nextConfig;
