@@ -212,19 +212,21 @@ body {
 }
 
 .query-input {
-  padding: 8px 12px;
+  padding: 12px;
   background: var(--bg-raised);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   color: var(--text-1);
   font-size: 13px;
   font-family: inherit;
+  transition: all 0.2s ease;
+  line-height: 1.4;
 }
 
 .query-input:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
+  box-shadow: 0 0 0 2px rgba(35, 179, 211, 0.2);
 }
 
 .primary-button {
@@ -288,7 +290,7 @@ body {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .layout-row:last-child {
@@ -447,6 +449,48 @@ body {
   margin: 8px 0;
 }
 
+/* Preset section */
+.preset-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+.preset-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+  margin: 0;
+}
+
+.preset-select {
+  padding: 10px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-1);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.preset-select:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--bg-raised);
+}
+
+.preset-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(35, 179, 211, 0.2);
+}
+
+.preset-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Examples */
 .examples {
   flex: 1;
@@ -538,7 +582,7 @@ body {
 }
 
 .followup-question-button {
-  padding: 6px 12px;
+  padding: 10px 14px;
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -546,12 +590,17 @@ body {
   font-size: 12px;
   text-align: left;
   cursor: pointer;
-  transition: all 0.1s;
+  transition: all 0.2s ease;
+  line-height: 1.4;
+  margin-bottom: 8px;
 }
 
 .followup-question-button:hover:not(:disabled) {
   background: var(--bg-raised);
   color: var(--text-1);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .followup-question-button:disabled {
@@ -659,6 +708,13 @@ body {
 /* Cypher scroll */
 .cypher-scroll {
   height: 300px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* Enrichment scroll */
+.enrichment-scroll {
+  height: 400px;
   overflow-y: auto;
   min-height: 0;
 }

@@ -287,49 +287,70 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
           </p>
         </div>
 
-      <form className="query-form" onSubmit={handleSubmit}>
-        <div className="preset-section">
-          <label htmlFor="preset-select" className="preset-label">
-            Load preset gene list:
-          </label>
-          <select
-            id="preset-select"
-            className="preset-select"
-            onChange={(event) => {
-              if (event.target.value) {
-                void loadPreset(event.target.value);
-                event.target.value = ""; // Reset selection
-              }
-            }}
-            disabled={isLoading || isLoadingPreset}
-            value=""
-          >
-            <option value="">Choose a preset...</option>
-            {PRESET_OPTIONS.map((preset) => (
-              <option key={preset.id} value={preset.id}>
-                {preset.description}
-              </option>
-            ))}
-          </select>
+      {/* Row 1: Preset Selection | Gene Input */}
+      <div className="layout-row">
+        <div className="layout-column preset-column">
+          <div className="card">
+            <header className="panel-header">
+              <h3 className="panel-title">Preset Gene Lists</h3>
+            </header>
+            <div className="card-content">
+              <div className="preset-section">
+                <label htmlFor="preset-select" className="preset-label">
+                  Load preset gene list:
+                </label>
+                <select
+                  id="preset-select"
+                  className="preset-select"
+                  onChange={(event) => {
+                    if (event.target.value) {
+                      void loadPreset(event.target.value);
+                      event.target.value = ""; // Reset selection
+                    }
+                  }}
+                  disabled={isLoading || isLoadingPreset}
+                  value=""
+                >
+                  <option value="">Choose a preset...</option>
+                  {PRESET_OPTIONS.map((preset) => (
+                    <option key={preset.id} value={preset.id}>
+                      {preset.description}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
         </div>
         
-        <textarea
-          className="query-input"
-          value={genes}
-          onChange={(event) => setGenes(event.target.value)}
-          placeholder="e.g. BRCA1, BRCA2, TP53, ATM, CHEK2"
-          disabled={isLoading || isLoadingPreset}
-          rows={4}
-          style={{ resize: "vertical", minHeight: "100px" }}
-        />
-        <button
-          type="submit"
-          className="primary-button"
-          disabled={isLoading || isLoadingPreset || !genes.trim()}
-        >
-          {isLoading ? "Analyzing..." : isLoadingPreset ? "Loading preset..." : "Analyze Genes"}
-        </button>
-      </form>
+        <div className="layout-column gene-input-column">
+          <div className="card">
+            <header className="panel-header">
+              <h3 className="panel-title">Gene Input</h3>
+            </header>
+            <div className="card-content">
+              <form className="query-form" onSubmit={handleSubmit}>
+                <textarea
+                  className="query-input"
+                  value={genes}
+                  onChange={(event) => setGenes(event.target.value)}
+                  placeholder="e.g. BRCA1, BRCA2, TP53, ATM, CHEK2"
+                  disabled={isLoading || isLoadingPreset}
+                  rows={4}
+                  style={{ resize: "vertical", minHeight: "100px" }}
+                />
+                <button
+                  type="submit"
+                  className="primary-button"
+                  disabled={isLoading || isLoadingPreset || !genes.trim()}
+                >
+                  {isLoading ? "Analyzing..." : isLoadingPreset ? "Loading preset..." : "Analyze Genes"}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
 
 
       {error && (
@@ -339,178 +360,219 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
       )}
 
       {(result || partialResult) && (
-        <div className="result-overview">
-          <div className="primary-column">
-            {/* AI Summary */}
-            <section className="card answer-card">
-              <h3 className="section-title">Biological Summary</h3>
-              <div className="answer-content">
-                {summaryResult ? (
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{summaryResult.summary}</ReactMarkdown>
-                ) : isSummaryLoading ? (
-                  <div className="loading-container">
-                    <div className="spinner"></div>
-                    <p>Generating AI summary...</p>
-                  </div>
-                ) : (
-                  <p>Summary will appear here once analysis is complete.</p>
-                )}
-              </div>
-            </section>
-
-            {/* Follow-up Questions */}
-            <section className="card">
-              <h3 className="section-title">Suggested Next Steps</h3>
-              <p className="section-subtitle">
-                Explore these questions using the Knowledge Graph Query tab:
-              </p>
-              {summaryResult && summaryResult.followUpQuestions && summaryResult.followUpQuestions.length > 0 ? (
-                <div className="followup-questions">
-                  {summaryResult.followUpQuestions.map((question, index) => (
-                    <button
-                      key={index}
-                      className="followup-question-button"
-                      onClick={() => {
-                        if (onNavigateToQuery) {
-                          onNavigateToQuery(question);
-                        } else {
-                          // Navigate to Graph Q&A with the question
-                          window.location.href = `/?q=${encodeURIComponent(question)}`;
-                        }
-                      }}
-                      disabled={false}
-                    >
-                      {question}
-                    </button>
-                  ))}
-                </div>
-              ) : isSummaryLoading ? (
-                <div className="loading-container">
-                  <div className="spinner"></div>
-                  <p>Generating follow-up questions...</p>
-                </div>
-              ) : (
-                <p>Follow-up questions will appear here once analysis is complete.</p>
-              )}
-            </section>
-
-            {/* Warnings */}
-            {((partialResult && partialResult.warnings.length > 0) || (result && result.warnings.length > 0)) && (
-              <section className="card">
-                <h3 className="section-title">Warnings</h3>
-                <div className="alert" role="alert">
-                  {(partialResult?.warnings || result?.warnings || []).map((warning, index) => (
-                    <div key={index}>{warning}</div>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* Dot Plot Visualization */}
-            {((partialResult && partialResult.plot_data && Object.keys(partialResult.plot_data).length > 0) || 
-              (result && result.plot_data && Object.keys(result.plot_data).length > 0)) && (
-              <section className="card graph-card">
+        <>
+          {/* AI Summary - Full Width */}
+          <div className="layout-row">
+            <div className="layout-column full-width">
+              <div className="card answer-card">
                 <header className="panel-header">
-                  <h3 className="panel-title">Enrichment Dot Plot</h3>
+                  <h3 className="panel-title">Biological Summary</h3>
+                </header>
+                <div className="card-content">
+                  <div className="answer-content">
+                    {summaryResult ? (
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{summaryResult.summary}</ReactMarkdown>
+                    ) : isSummaryLoading ? (
+                      <div className="loading-container">
+                        <div className="spinner"></div>
+                        <p>Generating AI summary...</p>
+                      </div>
+                    ) : (
+                      <p>Summary will appear here once analysis is complete.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Follow-up Questions - Full Width */}
+          <div className="layout-row">
+            <div className="layout-column full-width">
+              <div className="card">
+                <header className="panel-header">
+                  <h3 className="panel-title">Suggested Next Steps</h3>
                   <p className="panel-copy">
-                    Interactive visualization of enriched pathways and processes.
-                    Larger dots indicate more genes in the pathway.
+                    Explore these questions using the Knowledge Graph Query tab:
                   </p>
                 </header>
-                <div className="graph-shell">
-                  <Plot
-                    data={(partialResult?.plot_data?.data || result?.plot_data?.data) || []}
-                    layout={(partialResult?.plot_data?.layout || result?.plot_data?.layout) || {}}
-                    style={{ width: "100%", height: "600px" }}
-                    config={{
-                      displayModeBar: true,
-                      displaylogo: false,
-                      modeBarButtonsToRemove: ["pan2d", "lasso2d", "select2d"],
-                    }}
-                  />
+                <div className="card-content">
+                  {summaryResult && summaryResult.followUpQuestions && summaryResult.followUpQuestions.length > 0 ? (
+                    <div className="followup-questions">
+                      {summaryResult.followUpQuestions.map((question, index) => (
+                        <button
+                          key={index}
+                          className="followup-question-button"
+                          onClick={() => {
+                            if (onNavigateToQuery) {
+                              onNavigateToQuery(question);
+                            } else {
+                              // Navigate to Graph Q&A with the question
+                              window.location.href = `/?q=${encodeURIComponent(question)}`;
+                            }
+                          }}
+                          disabled={false}
+                        >
+                          {question}
+                        </button>
+                      ))}
+                    </div>
+                  ) : isSummaryLoading ? (
+                    <div className="loading-container">
+                      <div className="spinner"></div>
+                      <p>Generating follow-up questions...</p>
+                    </div>
+                  ) : (
+                    <p>Follow-up questions will appear here once analysis is complete.</p>
+                  )}
                 </div>
-              </section>
-            )}
+              </div>
+            </div>
+          </div>
 
-            {/* Enrichment Results Table */}
+          {/* Dot Plot Visualization - Full Width */}
+          {((partialResult && partialResult.plot_data && Object.keys(partialResult.plot_data).length > 0) || 
+            (result && result.plot_data && Object.keys(result.plot_data).length > 0)) && (
+            <div className="layout-row">
+              <div className="layout-column full-width">
+                <div className="card graph-card">
+                  <header className="panel-header">
+                    <h3 className="panel-title">Enrichment Dot Plot</h3>
+                    <p className="panel-copy">
+                      Interactive visualization of enriched pathways and processes.
+                      Larger dots indicate more genes in the pathway.
+                    </p>
+                  </header>
+                  <div className="card-content">
+                    <div className="graph-shell">
+                      <Plot
+                        data={(partialResult?.plot_data?.data || result?.plot_data?.data) || []}
+                        layout={(partialResult?.plot_data?.layout || result?.plot_data?.layout) || {}}
+                        style={{ width: "100%", height: "600px" }}
+                        config={{
+                          displayModeBar: true,
+                          displaylogo: false,
+                          modeBarButtonsToRemove: ["pan2d", "lasso2d", "select2d"],
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Enrichment Results and Analyzed Genes - Split Row */}
+          <div className="layout-row">
+            {/* Enrichment Results Column */}
             {((partialResult && partialResult.enrichment_results.length > 0) || 
               (result && result.enrichment_results.length > 0)) && (
-              <section className="card rows-card">
-                <header className="panel-header">
-                  <h3 className="panel-title">Enrichment Results</h3>
-                  <p className="panel-copy">
-                    Detailed results from functional enrichment analysis.
-                    Results are sorted by statistical significance.
-                  </p>
-                </header>
-                <div className="rows-scroll" role="list">
-                  {(partialResult?.enrichment_results || result?.enrichment_results || []).map((item, index) => (
-                    <article className="row-card" key={`enrichment-${index}`} role="listitem">
-                      <header className="row-heading">
-                        {item.term} ({item.library})
-                      </header>
-                      <dl className="row-details">
-                        <div className="row-item">
-                          <dt className="row-key">P-value</dt>
-                          <dd className="row-value">{item.p_value.toExponential(2)}</dd>
-                        </div>
-                        <div className="row-item">
-                          <dt className="row-key">Adjusted P-value</dt>
-                          <dd className="row-value">{item.adjusted_p_value.toExponential(2)}</dd>
-                        </div>
-                        <div className="row-item">
-                          <dt className="row-key">Gene Count</dt>
-                          <dd className="row-value">{item.gene_count}</dd>
-                        </div>
-                        {item.odds_ratio && (
-                          <div className="row-item">
-                            <dt className="row-key">Odds Ratio</dt>
-                            <dd className="row-value">{item.odds_ratio.toFixed(2)}</dd>
-                          </div>
-                        )}
-                        <div className="row-item">
-                          <dt className="row-key">Genes</dt>
-                          <dd className="row-value">
-                            <div className="value-pills">
-                              {item.genes.slice(0, 10).map((gene, geneIndex) => (
-                                <span key={`${index}-${geneIndex}`} className="value-pill">
-                                  {gene}
-                                </span>
-                              ))}
-                              {item.genes.length > 10 && (
-                                <span className="value-pill">
-                                  +{item.genes.length - 10} more
-                                </span>
-                              )}
+              <div className="layout-column enrichment-column">
+                <div className="card rows-card">
+                  <header className="panel-header">
+                    <h3 className="panel-title">Enrichment Results</h3>
+                    <p className="panel-copy">
+                      Detailed results from functional enrichment analysis.
+                      Results are sorted by statistical significance.
+                    </p>
+                  </header>
+                  <div className="card-content">
+                    <div className="enrichment-scroll" role="list">
+                      {(partialResult?.enrichment_results || result?.enrichment_results || []).map((item, index) => (
+                        <article className="row-card" key={`enrichment-${index}`} role="listitem">
+                          <header className="row-heading">
+                            {item.term} ({item.library})
+                          </header>
+                          <dl className="row-details">
+                            <div className="row-item">
+                              <dt className="row-key">P-value</dt>
+                              <dd className="row-value">{item.p_value.toExponential(2)}</dd>
                             </div>
-                          </dd>
-                        </div>
-                        {item.description && (
-                          <div className="row-item">
-                            <dt className="row-key">Description</dt>
-                            <dd className="row-value">{item.description}</dd>
-                          </div>
-                        )}
-                      </dl>
-                    </article>
-                  ))}
+                            <div className="row-item">
+                              <dt className="row-key">Adjusted P-value</dt>
+                              <dd className="row-value">{item.adjusted_p_value.toExponential(2)}</dd>
+                            </div>
+                            <div className="row-item">
+                              <dt className="row-key">Gene Count</dt>
+                              <dd className="row-value">{item.gene_count}</dd>
+                            </div>
+                            {item.odds_ratio && (
+                              <div className="row-item">
+                                <dt className="row-key">Odds Ratio</dt>
+                                <dd className="row-value">{item.odds_ratio.toFixed(2)}</dd>
+                              </div>
+                            )}
+                            <div className="row-item">
+                              <dt className="row-key">Genes</dt>
+                              <dd className="row-value">
+                                <div className="value-pills">
+                                  {item.genes.slice(0, 10).map((gene, geneIndex) => (
+                                    <span key={`${index}-${geneIndex}`} className="value-pill">
+                                      {gene}
+                                    </span>
+                                  ))}
+                                  {item.genes.length > 10 && (
+                                    <span className="value-pill">
+                                      +{item.genes.length - 10} more
+                                    </span>
+                                  )}
+                                </div>
+                              </dd>
+                            </div>
+                            {item.description && (
+                              <div className="row-item">
+                                <dt className="row-key">Description</dt>
+                                <dd className="row-value">{item.description}</dd>
+                              </div>
+                            )}
+                          </dl>
+                        </article>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-              </section>
+              </div>
             )}
 
-            {/* Valid Genes Summary */}
-            <section className="card">
-              <h3 className="section-title">Analyzed Genes</h3>
-              <div className="value-pills">
-                {(partialResult?.valid_genes || result?.valid_genes || []).map((gene, index) => (
-                  <span key={index} className="value-pill">
-                    {gene}
-                  </span>
-                ))}
+            {/* Analyzed Genes Column */}
+            <div className="layout-column genes-column">
+              <div className="card">
+                <header className="panel-header">
+                  <h3 className="panel-title">Analyzed Genes</h3>
+                </header>
+                <div className="card-content">
+                  <div className="value-pills">
+                    {(partialResult?.valid_genes || result?.valid_genes || []).map((gene, index) => (
+                      <span key={index} className="value-pill">
+                        {gene}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </section>
+            </div>
           </div>
-        </div>
+
+          {/* Warnings - Full Width */}
+          {((partialResult && partialResult.warnings.length > 0) || (result && result.warnings.length > 0)) && (
+            <div className="layout-row">
+              <div className="layout-column full-width">
+                <div className="card">
+                  <header className="panel-header">
+                    <h3 className="panel-title">Warnings</h3>
+                  </header>
+                  <div className="card-content">
+                    <div className="alert" role="alert">
+                      {(partialResult?.warnings || result?.warnings || []).map((warning, index) => (
+                        <div key={index}>{warning}</div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
       </div>
     </div>
