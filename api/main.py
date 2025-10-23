@@ -521,7 +521,7 @@ def analyze_genes(
         # Generate AI summary with follow-up questions
         step_started = __import__("time").perf_counter()
         summary_response = summarizer.summarize_enrichment(
-            result.valid_genes, result.enrichment_results
+            result.valid_genes, result.enrichment_results, top_n=7
         )
         summary_duration = int((__import__("time").perf_counter() - step_started) * 1000)
 

@@ -162,7 +162,7 @@ class GeminiEnrichmentSummarizer(_GeminiBase):
     """Gemini-backed summarizer for gene enrichment analysis results."""
 
     def summarize_enrichment(
-        self, gene_list: list[str], enrichment_results: list[dict[str, object]]
+        self, gene_list: list[str], enrichment_results: list[dict[str, object]], top_n: int = 10
     ) -> EnrichmentSummaryResponse:
         """Generate biological interpretation of enrichment results with follow-up questions.
 
@@ -175,10 +175,9 @@ class GeminiEnrichmentSummarizer(_GeminiBase):
         """
         # Format enrichment results for the prompt
         formatted_results = []
-        for i, result in enumerate(enrichment_results[:10], 1):  # Top 10 results
+        for i, result in enumerate(enrichment_results[:top_n], 1):
             formatted_results.append(
                 f"{i}. {result['term']} ({result['library']})\n"
-                f"   P-value: {result['p_value']:.2e}, "
                 f"Adjusted P-value: {result['adjusted_p_value']:.2e}\n"
                 f"   Gene count: {result['gene_count']}\n"
                 f"   Genes: {', '.join(result['genes'][:5])}{'...' if len(result['genes']) > 5 else ''}"
@@ -193,6 +192,7 @@ class GeminiEnrichmentSummarizer(_GeminiBase):
         prompt = ENRICHMENT_SUMMARY_PROMPT_TEMPLATE.format(
             gene_list=", ".join(gene_list),
             enrichment_results=formatted_enrichment,
+            top_n=top_n,
         )
 
         # Use structured output with Gemini's native JSON mode

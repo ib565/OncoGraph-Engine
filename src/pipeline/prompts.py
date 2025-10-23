@@ -192,40 +192,53 @@ SUMMARY_PROMPT_TEMPLATE = dedent(
 
 ENRICHMENT_SUMMARY_PROMPT_TEMPLATE = dedent(
     """
-    You are analyzing gene enrichment results to provide biological insights and suggest follow-up questions.
+    You are an expert-level cancer biologist and data scientist. 
+    Your task is to analyze gene enrichment results and provide a biological summary and 
+    suggest actionable follow-up questions for a researcher using the OncoGraph knowledge graph.
 
-    Gene list analyzed: {gene_list}
+    PART 1: Biological Summary
+    Based on the provided gene list and enrichment results, write a clear, concise biological summary.
 
-    Enrichment results:
-    {enrichment_results}
+    - First, provide a brief overview of the analysis.
+    - Then, identify 2-4 key biological themes in bullet points. 
+    For each theme, explain its role in cancer (for example, cell growth, apoptosis, immune response).
+    - Finally, comment on the potential clinical or research implications.
+    - If no significant enrichments were found, explain what this might indicate.
 
-    Provide a clear, concise summary of the top biological themes revealed by this gene list.
-    Focus on the most significant pathways and processes (top 3-5 terms by statistical significance).
-    Explain what these enriched terms suggest about the biological function or disease relevance
-    of the gene set. Use plain language accessible to researchers and clinicians.
+    PART 2: Follow-up Questions
 
-    Format your response as:
-    1. A brief overview of what the analysis reveals
-    2. Key biological themes (bullet points for top pathways/processes)
-    3. Clinical or research implications if apparent
+    Based on your biological summary, suggest 1-3 actionable and simple follow-up questions that can be answered using the OncoGraph knowledge graph.
+    - The questions must be highly relevant to the biological themes you identified.
+    - The questions should explore therapeutic options, biomarkers, or resistance mechanisms.
+    - Refer to specific genes or pathways from the analysis.
+    - It must be answerable using the graph schema. The OncoGraph has the following structure:
+      Nodes:
+      - Gene {symbol, hgnc_id}
+      - Variant {name, hgvs_p, consequence}
+      - Therapy {name, modality, moa}
+      - Disease {name}
+      Relationships:
+      - (Variant)-[:VARIANT_OF]->(Gene)
+      - (Therapy)-[:TARGETS {action_type}]->(Gene)
+      - (Biomarker)-[:AFFECTS_RESPONSE_TO {effect, disease_name, pmids}]->(Therapy)
+      Biomarker can be a Gene or a Variant.
+      Effect can be 'Sensitivity' or 'Resistance'.
 
-    If no significant enrichments were found, explain what this might indicate about the gene list.
+    Example follow-up questions:
+    1.  "What therapies target the gene EGFR in Non-Small Cell Lung Cancer, and what is their mechanism of action?"
+    2.  "For Colorectal Cancer, which variants in the KRAS gene are known to cause resistance to Cetuximab?"
+    3.  "Which known biomarkers predict response to immunotherapy in Melanoma?"
+    4.  "What is the known mechanism of action for therapies that target the BRAF gene?"
 
-    Additionally, suggest 1-3 follow-up questions that:
-    - Are answerable using the OncoGraph knowledge graph (genes, variants, therapies, diseases, biomarkers)
-    - Help researchers explore therapeutic implications or resistance mechanisms
-    - Reference specific genes, pathways, or disease contexts from the analysis
-    - Focus on actionable research questions that could be investigated using the knowledge graph
+    INPUT DATA:
+    - Gene list size: {gene_list_count} genes
+    - Top {top_n} Enrichment Results : {enrichment_results}
 
-    Examples of good follow-up questions:
-    - "What therapies target [specific gene] in [disease context]?"
-    - "What resistance mechanisms are known for [pathway] inhibitors?"
-    - "Which biomarkers predict response to [therapy class] in [cancer type]?"
-
-    Return your response as JSON with the following structure:
-    {{
+    OUTPUT FORMAT:
+    Return your response as a single, valid JSON object with the following structure.
+    {
         "summary": "Your detailed biological summary here...",
-        "followUpQuestions": ["Question 1", "Question 2", "Question 3"]
-    }}
+        "followUpQuestions": ["Actionable Question 1", "Actionable Question 2", "Actionable Question 3"]
+    }
     """
 ).strip()
