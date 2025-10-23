@@ -166,8 +166,15 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
         try {
           const messageEvent = event as MessageEvent;
           const data = JSON.parse(messageEvent.data) as SummaryResult;
+          
+          // Ensure data has the correct structure
+          const summaryResult: SummaryResult = {
+            summary: data.summary || "",
+            followUpQuestions: data.followUpQuestions || []
+          };
+          
           setHypothesisState({ 
-            summaryResult: data,
+            summaryResult: summaryResult,
             isSummaryLoading: false
           });
           
@@ -176,7 +183,8 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
             setHypothesisState({
               result: {
                 ...partialResult,
-                ...data,
+                summary: summaryResult.summary,
+                followUpQuestions: summaryResult.followUpQuestions,
               }
             });
           }
@@ -368,7 +376,7 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
                 </header>
                 <div className="card-content">
                   <div className="answer-content">
-                    {summaryResult ? (
+                    {summaryResult && typeof summaryResult === 'object' && 'summary' in summaryResult ? (
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{summaryResult.summary}</ReactMarkdown>
                     ) : isSummaryLoading ? (
                       <div className="loading-container">
@@ -395,7 +403,7 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
                   </p>
                 </header>
                 <div className="card-content">
-                  {summaryResult && summaryResult.followUpQuestions && summaryResult.followUpQuestions.length > 0 ? (
+                  {summaryResult && typeof summaryResult === 'object' && 'followUpQuestions' in summaryResult && summaryResult.followUpQuestions && summaryResult.followUpQuestions.length > 0 ? (
                     <div className="followup-questions">
                       {summaryResult.followUpQuestions.map((question, index) => (
                         <button

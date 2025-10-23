@@ -145,6 +145,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setGraphStateInternal(savedGraphState);
     }
     if (savedHypothesisState) {
+      // Validate and fix corrupted summaryResult
+      if (savedHypothesisState.summaryResult && typeof savedHypothesisState.summaryResult !== 'object') {
+        console.warn('Corrupted summaryResult detected, clearing it');
+        savedHypothesisState.summaryResult = null;
+      }
       setHypothesisStateInternal(savedHypothesisState);
     }
   }, []);
