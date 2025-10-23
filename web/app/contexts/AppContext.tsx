@@ -115,6 +115,7 @@ const HYPOTHESIS_STATE_KEY = 'oncograph_hypothesis_state';
 
 // Helper functions for localStorage
 const saveToStorage = (key: string, data: any) => {
+  if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(key, JSON.stringify(data));
   } catch (error) {
@@ -123,6 +124,7 @@ const saveToStorage = (key: string, data: any) => {
 };
 
 const loadFromStorage = (key: string) => {
+  if (typeof window === 'undefined') return null;
   try {
     const item = localStorage.getItem(key);
     return item ? JSON.parse(item) : null;
@@ -173,12 +175,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const clearGraphState = () => {
     setGraphStateInternal(initialState.graphState);
-    localStorage.removeItem(GRAPH_STATE_KEY);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(GRAPH_STATE_KEY);
+    }
   };
 
   const clearHypothesisState = () => {
     setHypothesisStateInternal(initialState.hypothesisState);
-    localStorage.removeItem(HYPOTHESIS_STATE_KEY);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(HYPOTHESIS_STATE_KEY);
+    }
   };
 
   const clearAllState = () => {
