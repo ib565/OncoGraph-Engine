@@ -28,7 +28,7 @@ class StubEnrichmentSummarizer:
         self._follow_up_questions = follow_up_questions or []
 
     def summarize_enrichment(
-        self, gene_list: list[str], enrichment_results: list[dict]
+        self, gene_list: list[str], enrichment_results: list[dict], top_n: int = 10
     ) -> EnrichmentSummaryResponse:
         return EnrichmentSummaryResponse(
             summary=self._summary, followUpQuestions=self._follow_up_questions
@@ -210,7 +210,7 @@ def test_analyze_genes_analyzer_exception(app_client: TestClient) -> None:
 
     assert response.status_code == 500
     payload = response.json()
-    assert "Analysis failed" in payload["detail"]
+    assert "Analysis failed" in payload["detail"]["message"]
 
 
 def test_analyze_genes_missing_genes_field(app_client: TestClient) -> None:
