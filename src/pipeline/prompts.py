@@ -213,14 +213,14 @@ ENRICHMENT_SUMMARY_PROMPT_TEMPLATE = dedent(
     - Refer to specific genes or pathways from the analysis.
     - It must be answerable using the graph schema. The OncoGraph has the following structure:
       Nodes:
-      - Gene {symbol, hgnc_id}
-      - Variant {name, hgvs_p, consequence}
-      - Therapy {name, modality, moa}
-      - Disease {name}
+      - Gene {{symbol, hgnc_id}}
+      - Variant {{name, hgvs_p, consequence}}
+      - Therapy {{name, modality, moa}}
+      - Disease {{name}}
       Relationships:
       - (Variant)-[:VARIANT_OF]->(Gene)
-      - (Therapy)-[:TARGETS {action_type}]->(Gene)
-      - (Biomarker)-[:AFFECTS_RESPONSE_TO {effect, disease_name, pmids}]->(Therapy)
+      - (Therapy)-[:TARGETS {{action_type}}]->(Gene)
+      - (Biomarker)-[:AFFECTS_RESPONSE_TO {{effect, disease_name, pmids}}]->(Therapy)
       Biomarker can be a Gene or a Variant.
       Effect can be 'Sensitivity' or 'Resistance'.
 
@@ -236,9 +236,9 @@ ENRICHMENT_SUMMARY_PROMPT_TEMPLATE = dedent(
 
     OUTPUT FORMAT:
     Return your response as a single, valid JSON object with the following structure.
-    {
+    {{
         "summary": "Your detailed biological summary here...",
         "followUpQuestions": ["Actionable Question 1", "Actionable Question 2", "Actionable Question 3"]
-    }
+    }}
     """
 ).strip()

@@ -191,6 +191,7 @@ class GeminiEnrichmentSummarizer(_GeminiBase):
 
         prompt = ENRICHMENT_SUMMARY_PROMPT_TEMPLATE.format(
             gene_list=", ".join(gene_list),
+            gene_list_count=len(gene_list),
             enrichment_results=formatted_enrichment,
             top_n=top_n,
         )
