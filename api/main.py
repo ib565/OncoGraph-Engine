@@ -447,14 +447,14 @@ def get_gene_set(
 
 @app.get("/analyze/genes/stream")
 def analyze_genes_stream(
-    genes: str, 
+    genes: str,
     analyzer: Annotated[GeneEnrichmentAnalyzer, Depends(get_enrichment_analyzer)],
     summarizer: Annotated[GeminiEnrichmentSummarizer, Depends(get_enrichment_summarizer)],
 ) -> StreamingResponse:
     """Server-Sent Events: stream gene enrichment analysis results progressively.
 
     Events emitted:
-      - event: partial, data: {"valid_genes": list, "warnings": list, 
+      - event: partial, data: {"valid_genes": list, "warnings": list,
         "enrichment_results": list, "plot_data": dict}
       - event: summary, data: {"summary": str, "followUpQuestions": list}
       - event: error,    data: {"message": str, "step": str | None}
@@ -480,9 +480,6 @@ def analyze_genes_stream(
     # Wrap trace with run_id context
     contextual_trace = with_context_trace(trace_sink, {"run_id": run_id})
 
-    # Bridge pipeline trace events into a queue for streaming
-    queue_sink = QueueTraceSink()
-
     # Placeholders to capture the outcome from a background thread
     outcome: dict[str, object] = {"done": False}
     done_event = threading.Event()
@@ -502,12 +499,14 @@ def analyze_genes_stream(
                         "gene_count": 0,
                         "error": "No valid gene symbols provided",
                         "error_step": "gene_parsing",
-                        "duration_ms": int((__import__("time").perf_counter() - started_perf) * 1000),
+                        "duration_ms": int(
+                            (__import__("time").perf_counter() - started_perf) * 1000
+                        ),
                     },
                 )
                 outcome["error"] = {
-                    "message": "No valid gene symbols provided", 
-                    "step": "gene_parsing"
+                    "message": "No valid gene symbols provided",
+                    "step": "gene_parsing",
                 }
                 return
 
@@ -580,9 +579,7 @@ def analyze_genes_stream(
             except Exception as exc:
                 import traceback
 
-                summary_duration = int(
-                    (__import__("time").perf_counter() - step_started) * 1000
-                )
+                summary_duration = int((__import__("time").perf_counter() - step_started) * 1000)
                 contextual_trace.record(
                     "error",
                     {
@@ -610,9 +607,7 @@ def analyze_genes_stream(
             }
 
             # Log final response
-            total_duration = int(
-                (__import__("time").perf_counter() - started_perf) * 1000
-            )
+            total_duration = int((__import__("time").perf_counter() - started_perf) * 1000)
             contextual_trace.record(
                 "enrichment_response",
                 {
@@ -620,7 +615,9 @@ def analyze_genes_stream(
                     "valid_genes_count": len(enrichment_result.valid_genes),
                     "enrichment_results_count": len(enrichment_result.enrichment_results),
                     "warnings_count": len(warnings),
-                    "has_plot_data": bool(enrichment_result.plot_data and enrichment_result.plot_data.get("data")),
+                    "has_plot_data": bool(
+                        enrichment_result.plot_data and enrichment_result.plot_data.get("data")
+                    ),
                     "followup_questions_count": len(summary_response.followUpQuestions),
                     "duration_ms": total_duration,
                 },
@@ -661,40 +658,45 @@ def analyze_genes_stream(
 
         loop = asyncio.get_event_loop()
 
-        def next_payload_blocking() -> dict[str, object] | None:
-            try:
-                # Use a short timeout to allow periodic checks for completion
-                return queue_sink.queue.get(timeout=0.25)
-            except Empty:
-                return None
+        # Poll for completion and emit results as they become available
+        while not done_event.is_set():
+            # Check if we have partial results to emit
+            if "partial" in outcome and "partial_emitted" not in outcome:
+                partial_data = outcome["partial"]  # type: ignore[assignment]
+                outcome["partial_emitted"] = True
+                yield f"event: partial\ndata: {json.dumps(partial_data)}\n\n"
+                # Update progress message
+                yield (
+                    f"event: progress\ndata: "
+                    f"{json.dumps({'message': 'Generating AI summary...'})}\n\n"
+                )
 
-        while not done_event.is_set() or not queue_sink.queue.empty():
-            payload = await loop.run_in_executor(None, next_payload_blocking)
-            if not payload:
-                # heartbeat to keep connection alive
-                yield ": keep-alive\n\n"
-                continue
+            # Check if we have summary results to emit
+            if "summary" in outcome and "summary_emitted" not in outcome:
+                summary_data = outcome["summary"]  # type: ignore[assignment]
+                outcome["summary_emitted"] = True
+                yield f"event: summary\ndata: {json.dumps(summary_data)}\n\n"
 
-            step = str(payload.get("step", ""))
-            if step == "error":
-                error_message = str(payload.get("error", ""))
-                error_step = str(payload.get("step", "unknown"))
-                error_payload = {"message": error_message, "step": error_step}
-                yield f"event: error\ndata: {json.dumps(error_payload)}\n\n"
-                continue
+            # Check if we have an error to emit
+            if "error" in outcome and "error_emitted" not in outcome:
+                err = outcome["error"]  # type: ignore[assignment]
+                outcome["error_emitted"] = True
+                yield f"event: error\ndata: {json.dumps(err)}\n\n"
+                break
 
-        # Emit partial results if available
-        if "partial" in outcome:
+            # Small delay to prevent busy waiting
+            await asyncio.sleep(0.1)
+
+        # Final check for any remaining results
+        if "partial" in outcome and "partial_emitted" not in outcome:
             partial_data = outcome["partial"]  # type: ignore[assignment]
             yield f"event: partial\ndata: {json.dumps(partial_data)}\n\n"
 
-        # Emit summary results if available
-        if "summary" in outcome:
+        if "summary" in outcome and "summary_emitted" not in outcome:
             summary_data = outcome["summary"]  # type: ignore[assignment]
             yield f"event: summary\ndata: {json.dumps(summary_data)}\n\n"
 
-        # Emit final error if present
-        if "error" in outcome:
+        if "error" in outcome and "error_emitted" not in outcome:
             err = outcome["error"]  # type: ignore[assignment]
             yield f"event: error\ndata: {json.dumps(err)}\n\n"
 

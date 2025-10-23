@@ -141,7 +141,8 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
     setIsSummaryLoading(false);
 
     try {
-      const eventSource = new EventSource(`${API_URL}/analyze/genes/stream?genes=${encodeURIComponent(trimmed)}`);
+      const url = `${API_URL}/analyze/genes/stream?genes=${encodeURIComponent(trimmed)}`;
+      const eventSource = new EventSource(url);
 
       eventSource.onmessage = (event) => {
         // Handle progress messages
@@ -156,11 +157,25 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
         }
       };
 
+      eventSource.onerror = (event) => {
+        console.error("EventSource error:", event);
+        
+        // Only show error if we haven't received any results yet
+        if (!partialResult && !summaryResult) {
+          setError("Connection error occurred during analysis");
+          setIsLoading(false);
+          setIsSummaryLoading(false);
+        }
+        eventSource.close();
+      };
+
       eventSource.addEventListener("partial", (event) => {
         try {
-          const data = JSON.parse(event.data) as PartialEnrichmentResult;
+          const messageEvent = event as MessageEvent;
+          const data = JSON.parse(messageEvent.data) as PartialEnrichmentResult;
           setPartialResult(data);
           setIsSummaryLoading(true);
+          setIsLoading(false); // Stop the main loading state
         } catch (err) {
           console.error("Failed to parse partial result:", err);
         }
@@ -168,7 +183,8 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
 
       eventSource.addEventListener("summary", (event) => {
         try {
-          const data = JSON.parse(event.data) as SummaryResult;
+          const messageEvent = event as MessageEvent;
+          const data = JSON.parse(messageEvent.data) as SummaryResult;
           setSummaryResult(data);
           setIsSummaryLoading(false);
           
@@ -179,6 +195,9 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
               ...data,
             });
           }
+          
+          // Close the EventSource since we have all results
+          eventSource.close();
         } catch (err) {
           console.error("Failed to parse summary result:", err);
         }
@@ -187,12 +206,17 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
       eventSource.addEventListener("error", (event) => {
         try {
           const messageEvent = event as MessageEvent;
-          const data = JSON.parse(messageEvent.data);
-          const message = data.message || "An error occurred during analysis";
-          setError(message);
+          if (messageEvent.data) {
+            const data = JSON.parse(messageEvent.data);
+            const message = data.message || "An error occurred during analysis";
+            setError(message);
+          } else {
+            setError("An error occurred during analysis");
+          }
           setIsLoading(false);
           setIsSummaryLoading(false);
         } catch (err) {
+          console.error("Failed to parse error result:", err);
           setError("An error occurred during analysis");
           setIsLoading(false);
           setIsSummaryLoading(false);
@@ -230,7 +254,7 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
             setIsSummaryLoading(false);
           }
         }
-      }, 120000); // 2 minutes timeout
+      }, 180000); // 3 minutes timeout
 
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
