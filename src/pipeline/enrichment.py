@@ -122,40 +122,43 @@ class GeneEnrichmentAnalyzer:
                 format="json",
             )
 
-            # Combine results from all libraries
+            # GSEAPy returns results as a single DataFrame, not a dictionary
+            if not hasattr(enr, "results") or enr.results.empty:
+                logger.info("No enrichment results found")
+                return []
+
+            df = enr.results
+
+            # Filter significant results
+            significant = df[df["Adjusted P-value"] < 0.05].copy()
+
+            if significant.empty:
+                logger.info("No significant enrichment results found (p < 0.05)")
+                return []
+
+            # Add library information (extract from Gene_set column)
+            significant["Library"] = significant["Gene_set"]
+            significant["Gene_Count"] = significant["Genes"].apply(
+                lambda x: len(x.split(";")) if pd.notna(x) else 0
+            )
+
+            # Convert to list of dicts
             all_results = []
-
-            for lib_name in self.enrichr_libraries:
-                if lib_name in enr.results:
-                    df = enr.results[lib_name]
-
-                    # Filter significant results
-                    significant = df[df["Adjusted P-value"] < 0.05].copy()
-
-                    # Add library information
-                    significant["Library"] = lib_name
-                    significant["Gene_Count"] = significant["Genes"].apply(
-                        lambda x: len(x.split(";"))
-                    )
-
-                    # Convert to list of dicts
-                    for _, row in significant.iterrows():
-                        all_results.append(
-                            {
-                                "term": row["Term"],
-                                "library": row["Library"],
-                                "p_value": float(row["P-value"]),
-                                "adjusted_p_value": float(row["Adjusted P-value"]),
-                                "odds_ratio": (
-                                    float(row["Odds Ratio"])
-                                    if pd.notna(row["Odds Ratio"])
-                                    else None
-                                ),
-                                "gene_count": int(row["Gene_Count"]),
-                                "genes": row["Genes"].split(";"),
-                                "description": row.get("Description", ""),
-                            }
-                        )
+            for _, row in significant.iterrows():
+                all_results.append(
+                    {
+                        "term": row["Term"],
+                        "library": row["Library"],
+                        "p_value": float(row["P-value"]),
+                        "adjusted_p_value": float(row["Adjusted P-value"]),
+                        "odds_ratio": (
+                            float(row["Odds Ratio"]) if pd.notna(row["Odds Ratio"]) else None
+                        ),
+                        "gene_count": int(row["Gene_Count"]),
+                        "genes": row["Genes"].split(";") if pd.notna(row["Genes"]) else [],
+                        "description": row.get("Description", ""),
+                    }
+                )
 
             # Sort by adjusted p-value and limit to top results
             all_results.sort(key=lambda x: x["adjusted_p_value"])
