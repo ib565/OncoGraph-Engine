@@ -95,7 +95,9 @@ class GeneEnrichmentAnalyzer:
             return valid_genes, invalid_genes
 
         except Exception as e:
+            import traceback
             logger.error(f"Gene normalization failed: {e}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             # Fallback: treat all genes as invalid
             return [], cleaned_genes
 
@@ -171,7 +173,9 @@ class GeneEnrichmentAnalyzer:
             return top_results
 
         except Exception as e:
+            import traceback
             logger.error(f"Enrichment analysis failed: {e}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return []
 
     def create_plot_data(self, enrichment_results: list[dict[str, Any]]) -> dict[str, Any]:
