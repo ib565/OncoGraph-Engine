@@ -26,6 +26,27 @@ type EnrichmentResponse = {
   followUpQuestions: string[];
 };
 
+type PartialEnrichmentResult = {
+  valid_genes: string[];
+  warnings: string[];
+  enrichment_results: Array<{
+    term: string;
+    library: string;
+    p_value: number;
+    adjusted_p_value: number;
+    odds_ratio?: number;
+    gene_count: number;
+    genes: string[];
+    description: string;
+  }>;
+  plot_data: any;
+};
+
+type SummaryResult = {
+  summary: string;
+  followUpQuestions: string[];
+};
+
 type GeneSetResponse = {
   genes: string[];
   description: string;
@@ -53,9 +74,12 @@ type HypothesisAnalyzerProps = {
 export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnalyzerProps = {}) {
   const [genes, setGenes] = useState("");
   const [result, setResult] = useState<EnrichmentResponse | null>(null);
+  const [partialResult, setPartialResult] = useState<PartialEnrichmentResult | null>(null);
+  const [summaryResult, setSummaryResult] = useState<SummaryResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingPreset, setIsLoadingPreset] = useState(false);
+  const [isSummaryLoading, setIsSummaryLoading] = useState(false);
 
   async function loadPreset(presetId: string) {
     if (!API_URL) {
@@ -94,7 +118,7 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
     }
   }
 
-  async function analyzeGenes(input: string) {
+  async function analyzeGenesStreaming(input: string) {
     const trimmed = input.trim();
 
     if (!trimmed) {
@@ -112,29 +136,113 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
     setIsLoading(true);
     setError(null);
     setResult(null);
+    setPartialResult(null);
+    setSummaryResult(null);
+    setIsSummaryLoading(false);
 
     try {
-      const response = await fetch(`${API_URL}/analyze/genes`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ genes: trimmed }),
+      const eventSource = new EventSource(`${API_URL}/analyze/genes/stream?genes=${encodeURIComponent(trimmed)}`);
+
+      eventSource.onmessage = (event) => {
+        // Handle progress messages
+        try {
+          const data = JSON.parse(event.data);
+          if (data.message) {
+            // Progress message - could be used for UI feedback
+            console.log("Progress:", data.message);
+          }
+        } catch (e) {
+          // Ignore parsing errors for progress messages
+        }
+      };
+
+      eventSource.addEventListener("partial", (event) => {
+        try {
+          const data = JSON.parse(event.data) as PartialEnrichmentResult;
+          setPartialResult(data);
+          setIsSummaryLoading(true);
+        } catch (err) {
+          console.error("Failed to parse partial result:", err);
+        }
       });
 
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        const detail = (payload as any)?.detail;
-        if (detail?.message) throw new Error(detail.message);
-        throw new Error(`Request failed with status ${response.status}`);
-      }
+      eventSource.addEventListener("summary", (event) => {
+        try {
+          const data = JSON.parse(event.data) as SummaryResult;
+          setSummaryResult(data);
+          setIsSummaryLoading(false);
+          
+          // Create complete result for backwards compatibility
+          if (partialResult) {
+            setResult({
+              ...partialResult,
+              ...data,
+            });
+          }
+        } catch (err) {
+          console.error("Failed to parse summary result:", err);
+        }
+      });
 
-      const data = (await response.json()) as EnrichmentResponse;
-      setResult(data);
+      eventSource.addEventListener("error", (event) => {
+        try {
+          const messageEvent = event as MessageEvent;
+          const data = JSON.parse(messageEvent.data);
+          const message = data.message || "An error occurred during analysis";
+          setError(message);
+          setIsLoading(false);
+          setIsSummaryLoading(false);
+        } catch (err) {
+          setError("An error occurred during analysis");
+          setIsLoading(false);
+          setIsSummaryLoading(false);
+        }
+        eventSource.close();
+      });
+
+      eventSource.addEventListener("progress", (event) => {
+        try {
+          const messageEvent = event as MessageEvent;
+          const data = JSON.parse(messageEvent.data);
+          if (data.message) {
+            console.log("Progress:", data.message);
+          }
+        } catch (e) {
+          // Ignore parsing errors for progress messages
+        }
+      });
+
+      // Close the event source when component unmounts or new analysis starts
+      const cleanup = () => {
+        eventSource.close();
+      };
+
+      // Store cleanup function for potential use
+      (eventSource as any).cleanup = cleanup;
+
+      // Set up timeout to close connection after reasonable time
+      setTimeout(() => {
+        if (eventSource.readyState !== EventSource.CLOSED) {
+          eventSource.close();
+          if (!partialResult && !summaryResult) {
+            setError("Analysis timed out");
+            setIsLoading(false);
+            setIsSummaryLoading(false);
+          }
+        }
+      }, 120000); // 2 minutes timeout
+
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setError(message);
-    } finally {
       setIsLoading(false);
+      setIsSummaryLoading(false);
     }
+  }
+
+  async function analyzeGenes(input: string) {
+    // Use streaming by default
+    await analyzeGenesStreaming(input);
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -203,26 +311,35 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
         </div>
       )}
 
-      {result && (
+      {(result || partialResult) && (
         <div className="result-overview">
           <div className="primary-column">
             {/* AI Summary */}
             <section className="card answer-card">
               <h3 className="section-title">Biological Summary</h3>
               <div className="answer-content">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.summary}</ReactMarkdown>
+                {summaryResult ? (
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{summaryResult.summary}</ReactMarkdown>
+                ) : isSummaryLoading ? (
+                  <div className="loading-container">
+                    <div className="spinner"></div>
+                    <p>Generating AI summary...</p>
+                  </div>
+                ) : (
+                  <p>Summary will appear here once analysis is complete.</p>
+                )}
               </div>
             </section>
 
             {/* Follow-up Questions */}
-            {result.followUpQuestions && result.followUpQuestions.length > 0 && (
-              <section className="card">
-                <h3 className="section-title">Suggested Next Steps</h3>
-                <p className="section-subtitle">
-                  Explore these questions using the Knowledge Graph Query tab:
-                </p>
+            <section className="card">
+              <h3 className="section-title">Suggested Next Steps</h3>
+              <p className="section-subtitle">
+                Explore these questions using the Knowledge Graph Query tab:
+              </p>
+              {summaryResult && summaryResult.followUpQuestions && summaryResult.followUpQuestions.length > 0 ? (
                 <div className="followup-questions">
-                  {result.followUpQuestions.map((question, index) => (
+                  {summaryResult.followUpQuestions.map((question, index) => (
                     <button
                       key={index}
                       className="followup-question-button"
@@ -237,15 +354,22 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
                     </button>
                   ))}
                 </div>
-              </section>
-            )}
+              ) : isSummaryLoading ? (
+                <div className="loading-container">
+                  <div className="spinner"></div>
+                  <p>Generating follow-up questions...</p>
+                </div>
+              ) : (
+                <p>Follow-up questions will appear here once analysis is complete.</p>
+              )}
+            </section>
 
             {/* Warnings */}
-            {result.warnings.length > 0 && (
+            {((partialResult && partialResult.warnings.length > 0) || (result && result.warnings.length > 0)) && (
               <section className="card">
                 <h3 className="section-title">Warnings</h3>
                 <div className="alert" role="alert">
-                  {result.warnings.map((warning, index) => (
+                  {(partialResult?.warnings || result?.warnings || []).map((warning, index) => (
                     <div key={index}>{warning}</div>
                   ))}
                 </div>
@@ -253,7 +377,8 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
             )}
 
             {/* Dot Plot Visualization */}
-            {result.plot_data && Object.keys(result.plot_data).length > 0 && (
+            {((partialResult && partialResult.plot_data && Object.keys(partialResult.plot_data).length > 0) || 
+              (result && result.plot_data && Object.keys(result.plot_data).length > 0)) && (
               <section className="card graph-card">
                 <header className="panel-header">
                   <h3 className="panel-title">Enrichment Dot Plot</h3>
@@ -264,8 +389,8 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
                 </header>
                 <div className="graph-shell">
                   <Plot
-                    data={result.plot_data.data || []}
-                    layout={result.plot_data.layout || {}}
+                    data={(partialResult?.plot_data?.data || result?.plot_data?.data) || []}
+                    layout={(partialResult?.plot_data?.layout || result?.plot_data?.layout) || {}}
                     style={{ width: "100%", height: "600px" }}
                     config={{
                       displayModeBar: true,
@@ -278,7 +403,8 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
             )}
 
             {/* Enrichment Results Table */}
-            {result.enrichment_results.length > 0 && (
+            {((partialResult && partialResult.enrichment_results.length > 0) || 
+              (result && result.enrichment_results.length > 0)) && (
               <section className="card rows-card">
                 <header className="panel-header">
                   <h3 className="panel-title">Enrichment Results</h3>
@@ -288,7 +414,7 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
                   </p>
                 </header>
                 <div className="rows-scroll" role="list">
-                  {result.enrichment_results.map((item, index) => (
+                  {(partialResult?.enrichment_results || result?.enrichment_results || []).map((item, index) => (
                     <article className="row-card" key={`enrichment-${index}`} role="listitem">
                       <header className="row-heading">
                         {item.term} ({item.library})
@@ -346,7 +472,7 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
             <section className="card">
               <h3 className="section-title">Analyzed Genes</h3>
               <div className="value-pills">
-                {result.valid_genes.map((gene, index) => (
+                {(partialResult?.valid_genes || result?.valid_genes || []).map((gene, index) => (
                   <span key={index} className="value-pill">
                     {gene}
                   </span>

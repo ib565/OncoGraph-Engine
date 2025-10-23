@@ -445,6 +445,267 @@ def get_gene_set(
         ) from exc
 
 
+@app.get("/analyze/genes/stream")
+def analyze_genes_stream(
+    genes: str, 
+    analyzer: Annotated[GeneEnrichmentAnalyzer, Depends(get_enrichment_analyzer)],
+    summarizer: Annotated[GeminiEnrichmentSummarizer, Depends(get_enrichment_summarizer)],
+) -> StreamingResponse:
+    """Server-Sent Events: stream gene enrichment analysis results progressively.
+
+    Events emitted:
+      - event: partial, data: {"valid_genes": list, "warnings": list, 
+        "enrichment_results": list, "plot_data": dict}
+      - event: summary, data: {"summary": str, "followUpQuestions": list}
+      - event: error,    data: {"message": str, "step": str | None}
+    """
+    started = datetime.now(UTC).isoformat()
+    started_perf = __import__("time").perf_counter()
+    run_id = os.getenv("TRACE_RUN_ID_OVERRIDE") or __import__("uuid").uuid4().hex
+
+    # Set up trace sinks with selective database logging
+    trace_sink = JsonlTraceSink(daily_trace_path(Path("logs") / "traces"))
+
+    pg_dsn = os.getenv("TRACE_DATABASE_URL") or os.getenv("DATABASE_URL")
+    if pg_dsn:
+        # Only log request/response/error events to database
+        db_allowed_steps = {"enrichment_request", "enrichment_response", "error"}
+        filtered_db_sink = FilteredTraceSink(PostgresTraceSink(pg_dsn), db_allowed_steps)
+        trace_sink = CompositeTraceSink(trace_sink, filtered_db_sink)
+
+    trace_stdout_flag = os.getenv("TRACE_STDOUT", "1").strip().lower()
+    if trace_stdout_flag in {"1", "true", "yes"}:
+        trace_sink = CompositeTraceSink(trace_sink, StdoutTraceSink())
+
+    # Wrap trace with run_id context
+    contextual_trace = with_context_trace(trace_sink, {"run_id": run_id})
+
+    # Bridge pipeline trace events into a queue for streaming
+    queue_sink = QueueTraceSink()
+
+    # Placeholders to capture the outcome from a background thread
+    outcome: dict[str, object] = {"done": False}
+    done_event = threading.Event()
+
+    def worker() -> None:
+        try:
+            # Parse gene list (comma or newline separated)
+            gene_symbols = []
+            for line in genes.split("\n"):
+                gene_symbols.extend([gene.strip() for gene in line.split(",") if gene.strip()])
+
+            if not gene_symbols:
+                contextual_trace.record(
+                    "error",
+                    {
+                        "started_at": started,
+                        "gene_count": 0,
+                        "error": "No valid gene symbols provided",
+                        "error_step": "gene_parsing",
+                        "duration_ms": int((__import__("time").perf_counter() - started_perf) * 1000),
+                    },
+                )
+                outcome["error"] = {
+                    "message": "No valid gene symbols provided", 
+                    "step": "gene_parsing"
+                }
+                return
+
+            # Log initial request
+            contextual_trace.record(
+                "enrichment_request",
+                {
+                    "started_at": started,
+                    "gene_count": len(gene_symbols),
+                    "genes_preview": gene_symbols[:5] if len(gene_symbols) > 5 else gene_symbols,
+                },
+            )
+
+            # Run gene normalization and enrichment analysis
+            step_started = __import__("time").perf_counter()
+            try:
+                # Pass trace sink to analyzer for detailed logging
+                analyzer.trace = contextual_trace
+                enrichment_result = analyzer.analyze(gene_symbols)
+            except Exception as exc:
+                import traceback
+
+                normalization_duration = int(
+                    (__import__("time").perf_counter() - step_started) * 1000
+                )
+                contextual_trace.record(
+                    "error",
+                    {
+                        "started_at": started,
+                        "gene_count": len(gene_symbols),
+                        "error": str(exc),
+                        "error_type": type(exc).__name__,
+                        "error_step": "gene_normalization",
+                        "duration_ms": normalization_duration,
+                        "traceback": traceback.format_exc(),
+                    },
+                )
+                outcome["error"] = {
+                    "message": f"Gene normalization failed: {str(exc)}",
+                    "error_type": type(exc).__name__,
+                    "step": "gene_normalization",
+                }
+                return
+
+            # Create warnings for invalid genes
+            warnings = []
+            if enrichment_result.invalid_genes:
+                warnings.append(
+                    f"Invalid gene symbols (excluded from analysis): "
+                    f"{', '.join(enrichment_result.invalid_genes)}"
+                )
+
+            if not enrichment_result.valid_genes:
+                warnings.append("No valid gene symbols found for analysis")
+
+            # Store partial results for immediate emission
+            outcome["partial"] = {
+                "valid_genes": enrichment_result.valid_genes,
+                "warnings": warnings,
+                "enrichment_results": enrichment_result.enrichment_results,
+                "plot_data": enrichment_result.plot_data,
+            }
+
+            # Generate AI summary with follow-up questions
+            step_started = __import__("time").perf_counter()
+            try:
+                summary_response = summarizer.summarize_enrichment(
+                    enrichment_result.valid_genes, enrichment_result.enrichment_results, top_n=7
+                )
+            except Exception as exc:
+                import traceback
+
+                summary_duration = int(
+                    (__import__("time").perf_counter() - step_started) * 1000
+                )
+                contextual_trace.record(
+                    "error",
+                    {
+                        "started_at": started,
+                        "gene_count": len(gene_symbols),
+                        "valid_genes_count": len(enrichment_result.valid_genes),
+                        "error": str(exc),
+                        "error_type": type(exc).__name__,
+                        "error_step": "ai_summary",
+                        "duration_ms": summary_duration,
+                        "traceback": traceback.format_exc(),
+                    },
+                )
+                outcome["error"] = {
+                    "message": f"AI summary generation failed: {str(exc)}",
+                    "error_type": type(exc).__name__,
+                    "step": "ai_summary",
+                }
+                return
+
+            # Store summary results
+            outcome["summary"] = {
+                "summary": summary_response.summary,
+                "followUpQuestions": summary_response.followUpQuestions,
+            }
+
+            # Log final response
+            total_duration = int(
+                (__import__("time").perf_counter() - started_perf) * 1000
+            )
+            contextual_trace.record(
+                "enrichment_response",
+                {
+                    "started_at": started,
+                    "valid_genes_count": len(enrichment_result.valid_genes),
+                    "enrichment_results_count": len(enrichment_result.enrichment_results),
+                    "warnings_count": len(warnings),
+                    "has_plot_data": bool(enrichment_result.plot_data and enrichment_result.plot_data.get("data")),
+                    "followup_questions_count": len(summary_response.followUpQuestions),
+                    "duration_ms": total_duration,
+                },
+            )
+
+        except Exception as exc:
+            import traceback
+
+            # Log detailed error information
+            error_details = {
+                "started_at": started,
+                "gene_count": len(gene_symbols) if "gene_symbols" in locals() else 0,
+                "error": str(exc),
+                "error_type": type(exc).__name__,
+                "error_step": "enrichment_analysis",
+                "duration_ms": int((__import__("time").perf_counter() - started_perf) * 1000),
+                "traceback": traceback.format_exc(),
+            }
+
+            contextual_trace.record("error", error_details)
+            outcome["error"] = {
+                "message": f"Gene analysis failed: {str(exc)}",
+                "error_type": type(exc).__name__,
+                "step": "enrichment_analysis",
+            }
+        finally:
+            outcome["done"] = True
+            done_event.set()
+
+    threading.Thread(target=worker, name=f"enrichment-runner-{run_id}", daemon=True).start()
+
+    async def event_stream():  # type: ignore[no-untyped-def]
+        # Immediately tell the UI we started
+        yield (
+            f"event: progress\ndata: "
+            f"{json.dumps({'message': 'Normalizing genes and running enrichment analysis'})}\n\n"
+        )
+
+        loop = asyncio.get_event_loop()
+
+        def next_payload_blocking() -> dict[str, object] | None:
+            try:
+                # Use a short timeout to allow periodic checks for completion
+                return queue_sink.queue.get(timeout=0.25)
+            except Empty:
+                return None
+
+        while not done_event.is_set() or not queue_sink.queue.empty():
+            payload = await loop.run_in_executor(None, next_payload_blocking)
+            if not payload:
+                # heartbeat to keep connection alive
+                yield ": keep-alive\n\n"
+                continue
+
+            step = str(payload.get("step", ""))
+            if step == "error":
+                error_message = str(payload.get("error", ""))
+                error_step = str(payload.get("step", "unknown"))
+                error_payload = {"message": error_message, "step": error_step}
+                yield f"event: error\ndata: {json.dumps(error_payload)}\n\n"
+                continue
+
+        # Emit partial results if available
+        if "partial" in outcome:
+            partial_data = outcome["partial"]  # type: ignore[assignment]
+            yield f"event: partial\ndata: {json.dumps(partial_data)}\n\n"
+
+        # Emit summary results if available
+        if "summary" in outcome:
+            summary_data = outcome["summary"]  # type: ignore[assignment]
+            yield f"event: summary\ndata: {json.dumps(summary_data)}\n\n"
+
+        # Emit final error if present
+        if "error" in outcome:
+            err = outcome["error"]  # type: ignore[assignment]
+            yield f"event: error\ndata: {json.dumps(err)}\n\n"
+
+    headers = {
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no",  # hint for some proxies (e.g., nginx)
+    }
+    return StreamingResponse(event_stream(), media_type="text/event-stream", headers=headers)
+
+
 @app.post("/analyze/genes", response_model=EnrichmentResponse)
 def analyze_genes(
     body: GeneListRequest,
