@@ -211,11 +211,21 @@ class GeminiCypherGenerator(_GeminiBase, CypherGenerator):
     """Gemini-backed Cypher generator adapter."""
 
     def generate_cypher(self, instructions: str) -> str:
+        # Check cache first
+        cache = get_llm_cache()
+        cache_key = f"generate_cypher:{stable_hash(instructions.strip())}"
+        cached_result = cache.get(cache_key)
+        if cached_result is not None:
+            return cached_result
+
         prompt = CYPHER_PROMPT_TEMPLATE.format(
             schema=SCHEMA_SNIPPET, instructions=instructions.strip()
         )
         text = self._call_model(prompt=prompt)
-        return _strip_code_fence(text)
+        result = _strip_code_fence(text)
+
+        cache.set(cache_key, result)
+        return result
 
 
 class GeminiSummarizer(_GeminiBase, Summarizer):
