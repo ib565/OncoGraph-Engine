@@ -213,8 +213,10 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
     if (initialTriggerRef.current === trimmedInitial) return;
 
     initialTriggerRef.current = trimmedInitial;
-    void runQuery(trimmedInitial);
-  }, [initialQuestion, runQuery]);
+    // Only populate the question text area, don't run the query automatically
+    // This allows users to edit the question before running it
+    setGraphState({ question: trimmedInitial });
+  }, [initialQuestion, setGraphState]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();

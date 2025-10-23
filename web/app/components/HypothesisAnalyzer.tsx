@@ -3,11 +3,8 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import dynamic from "next/dynamic";
 import { useAppContext, type EnrichmentResponse, type PartialEnrichmentResult, type SummaryResult } from "../contexts/AppContext";
-
-// Dynamically import Plotly to avoid SSR issues
-const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+import PlotlyChart from "./PlotlyChart";
 
 
 type GeneSetResponse = {
@@ -413,7 +410,7 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
                             if (onNavigateToQuery) {
                               onNavigateToQuery(question);
                             } else {
-                              // Navigate to Graph Q&A with the question
+                              // Navigate to Graph Q&A with the question using Next.js router
                               window.location.href = `/?q=${encodeURIComponent(question)}`;
                             }
                           }}
@@ -451,15 +448,9 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
                   </header>
                   <div className="card-content">
                     <div className="graph-shell">
-                      <Plot
+                      <PlotlyChart
                         data={(partialResult?.plot_data?.data || result?.plot_data?.data) || []}
                         layout={(partialResult?.plot_data?.layout || result?.plot_data?.layout) || {}}
-                        style={{ width: "100%", height: "600px" }}
-                        config={{
-                          displayModeBar: true,
-                          displaylogo: false,
-                          modeBarButtonsToRemove: ["pan2d", "lasso2d", "select2d"],
-                        }}
                         onClick={(event) => {
                           if (event.points && event.points.length > 0) {
                             const point = event.points[0];
