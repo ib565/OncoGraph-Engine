@@ -33,6 +33,7 @@ from pipeline import (
 from pipeline.enrichment import GeneEnrichmentAnalyzer
 from pipeline.trace import (
     CompositeTraceSink,
+    FilteredTraceSink,
     JsonlTraceSink,
     PostgresTraceSink,
     QueueTraceSink,
@@ -418,9 +419,10 @@ def get_gene_set(
     }
 
     if body.preset_id not in preset_queries:
+        available_presets = list(preset_queries.keys())
         raise HTTPException(
             status_code=400,
-            detail=f"Unknown preset_id: {body.preset_id}. Available presets: {list(preset_queries.keys())}",
+            detail=f"Unknown preset_id: {body.preset_id}. Available presets: {available_presets}",
         )
 
     preset = preset_queries[body.preset_id]
@@ -450,6 +452,27 @@ def analyze_genes(
     summarizer: Annotated[GeminiEnrichmentSummarizer, Depends(get_enrichment_summarizer)],
 ) -> EnrichmentResponse:
     """Analyze gene list for functional enrichment and generate AI summary."""
+    started = datetime.now(UTC).isoformat()
+    started_perf = __import__("time").perf_counter()
+    run_id = os.getenv("TRACE_RUN_ID_OVERRIDE") or __import__("uuid").uuid4().hex
+
+    # Set up trace sinks with selective database logging
+    trace_sink = JsonlTraceSink(daily_trace_path(Path("logs") / "traces"))
+
+    pg_dsn = os.getenv("TRACE_DATABASE_URL") or os.getenv("DATABASE_URL")
+    if pg_dsn:
+        # Only log request/response/error events to database
+        db_allowed_steps = {"enrichment_request", "enrichment_response", "error"}
+        filtered_db_sink = FilteredTraceSink(PostgresTraceSink(pg_dsn), db_allowed_steps)
+        trace_sink = CompositeTraceSink(trace_sink, filtered_db_sink)
+
+    trace_stdout_flag = os.getenv("TRACE_STDOUT", "1").strip().lower()
+    if trace_stdout_flag in {"1", "true", "yes"}:
+        trace_sink = CompositeTraceSink(trace_sink, StdoutTraceSink())
+
+    # Wrap trace with run_id context
+    contextual_trace = with_context_trace(trace_sink, {"run_id": run_id})
+
     try:
         # Parse gene list (comma or newline separated)
         gene_symbols = []
@@ -457,14 +480,59 @@ def analyze_genes(
             gene_symbols.extend([gene.strip() for gene in line.split(",") if gene.strip()])
 
         if not gene_symbols:
+            contextual_trace.record(
+                "error",
+                {
+                    "started_at": started,
+                    "gene_count": 0,
+                    "error": "No valid gene symbols provided",
+                    "error_step": "gene_parsing",
+                    "duration_ms": int((__import__("time").perf_counter() - started_perf) * 1000),
+                },
+            )
             raise HTTPException(status_code=400, detail="No valid gene symbols provided")
 
-        # Run enrichment analysis
+        # Log initial request
+        contextual_trace.record(
+            "enrichment_request",
+            {
+                "started_at": started,
+                "gene_count": len(gene_symbols),
+                "genes_preview": gene_symbols[:5] if len(gene_symbols) > 5 else gene_symbols,
+            },
+        )
+
+        # Run gene normalization
+        step_started = __import__("time").perf_counter()
         result = analyzer.analyze(gene_symbols)
+        normalization_duration = int((__import__("time").perf_counter() - step_started) * 1000)
+
+        # Log gene normalization results
+        contextual_trace.record(
+            "gene_normalization",
+            {
+                "valid_genes_count": len(result.valid_genes),
+                "invalid_genes_count": len(result.invalid_genes),
+                "invalid_genes": result.invalid_genes,
+                "duration_ms": normalization_duration,
+            },
+        )
 
         # Generate AI summary with follow-up questions
+        step_started = __import__("time").perf_counter()
         summary_response = summarizer.summarize_enrichment(
             result.valid_genes, result.enrichment_results
+        )
+        summary_duration = int((__import__("time").perf_counter() - step_started) * 1000)
+
+        # Log AI summary generation
+        contextual_trace.record(
+            "ai_summary",
+            {
+                "summary_length": len(summary_response.summary),
+                "followup_questions_count": len(summary_response.followUpQuestions),
+                "duration_ms": summary_duration,
+            },
         )
 
         # Create warnings for invalid genes
@@ -477,6 +545,21 @@ def analyze_genes(
         if not result.valid_genes:
             warnings.append("No valid gene symbols found for analysis")
 
+        # Log final response
+        total_duration = int((__import__("time").perf_counter() - started_perf) * 1000)
+        contextual_trace.record(
+            "enrichment_response",
+            {
+                "started_at": started,
+                "valid_genes_count": len(result.valid_genes),
+                "enrichment_results_count": len(result.enrichment_results),
+                "warnings_count": len(warnings),
+                "has_plot_data": bool(result.plot_data and result.plot_data.get("data")),
+                "followup_questions_count": len(summary_response.followUpQuestions),
+                "duration_ms": total_duration,
+            },
+        )
+
         return EnrichmentResponse(
             summary=summary_response.summary,
             valid_genes=result.valid_genes,
@@ -487,6 +570,18 @@ def analyze_genes(
         )
 
     except HTTPException:
+        # Re-raise HTTP exceptions without additional logging
         raise
     except Exception as exc:
+        # Log unexpected errors
+        contextual_trace.record(
+            "error",
+            {
+                "started_at": started,
+                "gene_count": len(gene_symbols) if "gene_symbols" in locals() else 0,
+                "error": str(exc),
+                "error_step": "enrichment_analysis",
+                "duration_ms": int((__import__("time").perf_counter() - started_perf) * 1000),
+            },
+        )
         raise HTTPException(status_code=500, detail=f"Gene analysis failed: {str(exc)}") from exc

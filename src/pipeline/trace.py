@@ -113,6 +113,23 @@ def daily_trace_path(base: Path | None = None) -> Path:
     return directory / filename
 
 
+class FilteredTraceSink:
+    """Filter trace events based on allowed step names.
+
+    This is useful for selective logging where only certain events
+    should be forwarded to a downstream sink (e.g., only request/response
+    events to database, but all events to stdout).
+    """
+
+    def __init__(self, sink: TraceSink, allowed_steps: set[str]) -> None:
+        self._sink = sink
+        self._allowed_steps = allowed_steps
+
+    def record(self, step: str, data: dict[str, object]) -> None:
+        if step in self._allowed_steps:
+            self._sink.record(step, data)
+
+
 class QueueTraceSink:
     """Push trace events into a thread-safe queue.
 
