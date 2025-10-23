@@ -279,7 +279,7 @@ class GeneEnrichmentAnalyzer:
         }
 
         for lib in set(libraries):
-            mask = [lib == l for l in libraries]
+            mask = [lib == l for l in libraries]  # noqa: E741
             fig.add_trace(
                 go.Scatter(
                     x=[p for i, p in enumerate(p_values) if mask[i]],
