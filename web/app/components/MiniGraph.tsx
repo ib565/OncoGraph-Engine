@@ -228,23 +228,25 @@ export function MiniGraph({ rows, height = 320 }: MiniGraphProps) {
     let cancelled = false;
 
     async function init() {
-      // Ensure we're on the client side
-      if (typeof window === 'undefined') return;
+      // Ensure we're on the client side and container exists
+      if (typeof window === 'undefined' || !containerRef.current) return;
       
-      const cytoscapeMod: CytoscapeModule = await import("cytoscape");
-      const cytoscape = (cytoscapeMod as any).default ?? (cytoscapeMod as any);
-      let layoutName: "cose-bilkent" | "grid" = "grid";
       try {
-        const coseBilkentMod: CytoscapeModule = await import("cytoscape-cose-bilkent");
-        const coseBilkent = (coseBilkentMod as any).default ?? (coseBilkentMod as any);
-        cytoscape.use(coseBilkent);
-        layoutName = "cose-bilkent";
-      } catch (err) {
-        // Fallback if layout plugin unavailable
-        layoutName = "grid";
-      }
+        const cytoscapeMod: CytoscapeModule = await import("cytoscape");
+        const cytoscape = (cytoscapeMod as any).default ?? (cytoscapeMod as any);
+        let layoutName: "cose-bilkent" | "grid" = "grid";
+        
+        try {
+          const coseBilkentMod: CytoscapeModule = await import("cytoscape-cose-bilkent");
+          const coseBilkent = (coseBilkentMod as any).default ?? (coseBilkentMod as any);
+          cytoscape.use(coseBilkent);
+          layoutName = "cose-bilkent";
+        } catch (err) {
+          // Fallback if layout plugin unavailable
+          layoutName = "grid";
+        }
 
-      if (cancelled || !containerRef.current) return;
+        if (cancelled || !containerRef.current) return;
 
       const cy = cytoscape({
         container: containerRef.current,
@@ -310,13 +312,16 @@ export function MiniGraph({ rows, height = 320 }: MiniGraphProps) {
         layout: getLayoutOptions(layoutName),
       });
 
-      cyRef.current = cy;
-      layoutNameRef.current = layoutName;
-      cy.one("layoutstop", () => {
-        try {
-          cy.fit(undefined, 20);
-        } catch {}
-      });
+        cyRef.current = cy;
+        layoutNameRef.current = layoutName;
+        cy.one("layoutstop", () => {
+          try {
+            cy.fit(undefined, 20);
+          } catch {}
+        });
+      } catch (error) {
+        console.error("Error initializing cytoscape:", error);
+      }
     }
 
     init();

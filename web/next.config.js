@@ -8,6 +8,10 @@ const nextConfig = {
         fs: false,
         net: false,
         tls: false,
+        canvas: false,
+        "plotly.js": false,
+        "cytoscape": false,
+        "cytoscape-cose-bilkent": false,
       };
     }
     
@@ -33,6 +37,8 @@ const nextConfig = {
   trailingSlash: false,
   // Better handling of dynamic imports
   swcMinify: true,
+  // Disable static optimization for error pages
+  output: 'standalone',
 };
 
 module.exports = nextConfig;

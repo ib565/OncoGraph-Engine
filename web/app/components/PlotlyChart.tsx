@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useState, useEffect } from "react";
 
-// Dynamic import with better error handling
+// Dynamic import with better error handling and proper SSR handling
 const Plot = dynamic(() => import("react-plotly.js"), { 
   ssr: false,
   loading: () => (
@@ -30,7 +30,7 @@ const Plot = dynamic(() => import("react-plotly.js"), {
       </div>
     </div>
   )
-}) as any;
+});
 
 // Add CSS for spinner animation
 const spinnerStyle = `
@@ -82,14 +82,18 @@ export default function PlotlyChart({ data, layout, onClick }: PlotlyChartProps)
     );
   }
 
-  // Add spinner styles to head
+  // Add spinner styles to head (only on client side)
   useEffect(() => {
-    const style = document.createElement('style');
-    style.textContent = spinnerStyle;
-    document.head.appendChild(style);
-    return () => {
-      document.head.removeChild(style);
-    };
+    if (typeof window !== 'undefined') {
+      const style = document.createElement('style');
+      style.textContent = spinnerStyle;
+      document.head.appendChild(style);
+      return () => {
+        if (document.head.contains(style)) {
+          document.head.removeChild(style);
+        }
+      };
+    }
   }, []);
 
   if (hasError) {
