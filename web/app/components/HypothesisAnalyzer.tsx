@@ -274,14 +274,18 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
   }
 
   return (
-    <section className="card query-card">
-      <div className="card-heading">
-        <h2 className="card-title">Hypothesis Analyzer</h2>
-        <p className="card-subtitle">
-          Analyze gene lists for functional enrichment and biological themes.
-          Enter gene symbols separated by commas or newlines.
-        </p>
+    <div className="bench-panel">
+      <div className="panel-header">
+        <h3 className="panel-title">Hypothesis Analyzer</h3>
       </div>
+      <div className="panel-content">
+        <div className="card-heading">
+          <h2 className="card-title">Analyze Gene Lists</h2>
+          <p className="card-subtitle">
+            Analyze gene lists for functional enrichment and biological themes.
+            Enter gene symbols separated by commas or newlines.
+          </p>
+        </div>
 
       <form className="query-form" onSubmit={handleSubmit}>
         <div className="preset-section">
@@ -369,9 +373,12 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
                       onClick={() => {
                         if (onNavigateToQuery) {
                           onNavigateToQuery(question);
+                        } else {
+                          // Navigate to Graph Q&A with the question
+                          window.location.href = `/?q=${encodeURIComponent(question)}`;
                         }
                       }}
-                      disabled={!onNavigateToQuery}
+                      disabled={false}
                     >
                       {question}
                     </button>
@@ -505,6 +512,7 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
           </div>
         </div>
       )}
-    </section>
+      </div>
+    </div>
   );
 }

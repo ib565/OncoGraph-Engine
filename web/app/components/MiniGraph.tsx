@@ -392,8 +392,6 @@ export function MiniGraph({ rows, height = 320 }: MiniGraphProps) {
         height,
         width: "100%",
         background: "#ffffff",
-        border: "1px solid #e5e7eb",
-        borderRadius: "0.75rem",
       }}
     />
   );
