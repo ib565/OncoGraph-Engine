@@ -53,6 +53,7 @@ class QueryResponse(BaseModel):
     answer: str
     cypher: str
     rows: list[dict[str, object]]
+    run_id: str
 
 
 class GeneListRequest(BaseModel):
@@ -76,6 +77,11 @@ class EnrichmentResponse(BaseModel):
     enrichment_results: list[dict[str, object]]
     plot_data: dict[str, object]
     followUpQuestions: list[str]
+
+
+class FeedbackRequest(BaseModel):
+    run_id: str = Field(..., min_length=1, description="Run ID to associate feedback with")
+    cypher_correct: bool = Field(..., description="Whether the generated Cypher query was correct")
 
 
 @lru_cache(maxsize=1)
@@ -279,7 +285,9 @@ def query(body: QueryRequest, engine: Annotated[QueryEngine, Depends(get_engine)
             },
         )
 
-    return QueryResponse(answer=result.answer, cypher=result.cypher, rows=result.rows)
+    return QueryResponse(
+        answer=result.answer, cypher=result.cypher, rows=result.rows, run_id=run_id
+    )
 
 
 @app.get("/query/stream")
@@ -407,7 +415,7 @@ def query_stream(
         # Emit the final result or error
         if "result" in outcome:
             res: QueryEngineResult = outcome["result"]  # type: ignore[assignment]
-            data = {"answer": res.answer, "cypher": res.cypher, "rows": res.rows}
+            data = {"answer": res.answer, "cypher": res.cypher, "rows": res.rows, "run_id": run_id}
             yield f"event: result\ndata: {json.dumps(data)}\n\n"
         elif "error" in outcome:
             err = outcome["error"]  # type: ignore[assignment]
@@ -419,6 +427,28 @@ def query_stream(
         "X-Accel-Buffering": "no",  # hint for some proxies (e.g., nginx)
     }
     return StreamingResponse(event_stream(), media_type="text/event-stream", headers=headers)
+
+
+@app.post("/query/feedback")
+def submit_feedback(
+    body: FeedbackRequest, engine: Annotated[QueryEngine, Depends(get_engine)]
+) -> dict[str, str]:
+    """Submit user feedback about Cypher query correctness."""
+
+    # Get the trace sink from the engine
+    if engine.trace is None:
+        raise HTTPException(status_code=400, detail="Tracing not available")
+
+    # Record the feedback to traces
+    feedback_data = {
+        "run_id": body.run_id,
+        "cypher_correct": body.cypher_correct,
+        "feedback_timestamp": datetime.now(UTC).isoformat(),
+    }
+
+    engine.trace.record("user_feedback", feedback_data)
+
+    return {"message": "Feedback recorded successfully"}
 
 
 @app.post("/graph-gene-sets", response_model=GeneSetResponse)

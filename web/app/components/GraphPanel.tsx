@@ -61,11 +61,13 @@ const getUrlLabel = (value: string) => {
 
 export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
   const { graphState, setGraphState } = useAppContext();
-  const { question, result, error, isLoading, progress, lastQuery } = graphState;
+  const { question, result, error, isLoading, progress, lastQuery, run_id } = graphState;
   
   const sseRef = useRef<EventSource | null>(null);
   const [dotCount, setDotCount] = useState(0);
   const initialTriggerRef = useRef<string | null>(null);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
 
   useEffect(() => {
     if (!isLoading || !progress) {
@@ -101,8 +103,10 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
       isLoading: true,
       error: null,
       result: null,
-      progress: null
+      progress: null,
+      run_id: null
     });
+    setFeedbackSubmitted(false);
 
     // Try SSE first for progress streaming
     const url = `${API_URL}/query/stream?question=${encodeURIComponent(trimmed)}`;
@@ -132,7 +136,7 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
       es.addEventListener("result", (evt: MessageEvent) => {
         try {
           const data = JSON.parse(evt.data) as QueryResponse;
-          setGraphState({ result: data });
+          setGraphState({ result: data, run_id: data.run_id });
         } catch {
           setGraphState({ error: "Malformed result from server" });
         } finally {
@@ -172,7 +176,7 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
                 throw new Error(`Request failed with status ${response.status}`);
               }
               const data = (await response.json()) as QueryResponse;
-              setGraphState({ result: data });
+              setGraphState({ result: data, run_id: data.run_id });
             } catch (err) {
               const message = err instanceof Error ? err.message : String(err);
               setGraphState({ error: message });
@@ -197,7 +201,7 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
           throw new Error(`Request failed with status ${response.status}`);
         }
         const data = (await response.json()) as QueryResponse;
-        setGraphState({ result: data });
+        setGraphState({ result: data, run_id: data.run_id });
       } catch (fallbackErr) {
         const message = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
         setGraphState({ error: message });
@@ -221,6 +225,34 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await runQuery(question);
+  }
+
+  async function submitFeedback(cypherCorrect: boolean) {
+    if (!run_id) return;
+    
+    setFeedbackLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/query/feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          run_id, 
+          cypher_correct: cypherCorrect 
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Feedback submission failed with status ${response.status}`);
+      }
+      
+      setFeedbackSubmitted(true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("Failed to submit feedback:", message);
+      // Don't show error to user for feedback - it's optional
+    } finally {
+      setFeedbackLoading(false);
+    }
   }
 
   return (
@@ -489,6 +521,39 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
                   <div className="card-content">
                     <div className="cypher-scroll">
                       <pre className="code-block">{result.cypher}</pre>
+                    </div>
+                    
+                    {/* Feedback Section */}
+                    <div className="feedback-section" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #e5e7eb' }}>
+                      <p style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#6b7280' }}>
+                        Was the Cypher generated correctly?
+                      </p>
+                      {feedbackSubmitted ? (
+                        <p style={{ margin: '0', fontSize: '14px', color: '#10b981' }}>
+                          ✓ Feedback recorded. Thank you!
+                        </p>
+                      ) : (
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            onClick={() => submitFeedback(true)}
+                            disabled={feedbackLoading}
+                            style={{ fontSize: '14px', padding: '6px 12px' }}
+                          >
+                            {feedbackLoading ? 'Submitting...' : 'Yes'}
+                          </button>
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            onClick={() => submitFeedback(false)}
+                            disabled={feedbackLoading}
+                            style={{ fontSize: '14px', padding: '6px 12px' }}
+                          >
+                            {feedbackLoading ? 'Submitting...' : 'No'}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

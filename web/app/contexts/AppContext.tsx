@@ -7,6 +7,7 @@ type QueryResponse = {
   answer: string;
   cypher: string;
   rows: Array<Record<string, unknown>>;
+  run_id: string;
 };
 
 type GraphState = {
@@ -16,6 +17,7 @@ type GraphState = {
   isLoading: boolean;
   progress: string | null;
   lastQuery: string | null;
+  run_id: string | null;
 };
 
 // Types for Hypothesis Analyzer state
@@ -89,6 +91,7 @@ const initialState: AppState = {
     isLoading: false,
     progress: null,
     lastQuery: null,
+    run_id: null,
   },
   hypothesisState: {
     genes: '',
