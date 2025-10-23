@@ -108,8 +108,7 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
       const geneList = data.genes.join(", ");
       setGenes(geneList);
       
-      // Automatically trigger analysis
-      await analyzeGenes(geneList);
+      // Just populate the text area - user can modify and click analyze manually
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setError(message);
