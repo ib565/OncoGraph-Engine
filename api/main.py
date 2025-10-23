@@ -505,6 +505,8 @@ def analyze_genes(
         # Run gene normalization
         step_started = __import__("time").perf_counter()
         try:
+            # Pass trace sink to analyzer for detailed logging
+            analyzer.trace = contextual_trace
             result = analyzer.analyze(gene_symbols)
         except Exception as exc:
             import traceback

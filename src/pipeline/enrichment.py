@@ -32,7 +32,7 @@ class EnrichmentResult:
 class GeneEnrichmentAnalyzer:
     """Analyzes gene lists for functional enrichment."""
 
-    def __init__(self) -> None:
+    def __init__(self, trace=None) -> None:
         """Initialize the analyzer with required dependencies."""
         if mygene is None:
             raise ImportError("mygene package is required for gene enrichment analysis")
@@ -41,6 +41,15 @@ class GeneEnrichmentAnalyzer:
 
         self.mg = mygene.MyGeneInfo()
         self.enrichr_libraries = ["GO_Biological_Process_2023", "KEGG_2021_Human", "Reactome_2022"]
+        self.trace = trace
+
+    def _trace(self, step: str, data: dict[str, object]) -> None:
+        """Log trace event if trace sink is available."""
+        if self.trace is not None:
+            try:
+                self.trace.record(step, data)
+            except Exception:
+                pass
 
     def normalize_genes(self, gene_symbols: list[str]) -> tuple[list[str], list[str]]:
         """Normalize gene symbols and separate valid from invalid genes.
@@ -62,6 +71,16 @@ class GeneEnrichmentAnalyzer:
 
         try:
             # Query MyGene for gene information
+            self._trace(
+                "mygene_query",
+                {
+                    "input_genes_count": len(cleaned_genes),
+                    "input_genes_preview": (
+                        cleaned_genes[:10] if len(cleaned_genes) > 10 else cleaned_genes
+                    ),
+                },
+            )
+
             query_result = self.mg.querymany(
                 cleaned_genes,
                 scopes="symbol,alias",
@@ -87,6 +106,21 @@ class GeneEnrichmentAnalyzer:
 
             # Remove duplicates while preserving order
             valid_genes = list(dict.fromkeys(valid_genes))
+
+            # Log normalization results
+            self._trace(
+                "mygene_results",
+                {
+                    "valid_genes_count": len(valid_genes),
+                    "invalid_genes_count": len(invalid_genes),
+                    "valid_genes_preview": (
+                        valid_genes[:10] if len(valid_genes) > 10 else valid_genes
+                    ),
+                    "invalid_genes": (
+                        invalid_genes[:10] if len(invalid_genes) > 10 else invalid_genes
+                    ),
+                },
+            )
 
             logger.info(
                 f"Normalized {len(cleaned_genes)} input genes: {len(valid_genes)} valid, {len(invalid_genes)} invalid"
@@ -115,6 +149,16 @@ class GeneEnrichmentAnalyzer:
             return []
 
         try:
+            # Log enrichment analysis start
+            self._trace(
+                "enrichr_start",
+                {
+                    "gene_list_count": len(gene_list),
+                    "gene_list_preview": gene_list[:10] if len(gene_list) > 10 else gene_list,
+                    "libraries": self.enrichr_libraries,
+                },
+            )
+
             # Run enrichr analysis
             enr = gp.enrichr(
                 gene_list=gene_list,
@@ -166,6 +210,24 @@ class GeneEnrichmentAnalyzer:
             # Sort by adjusted p-value and limit to top results
             all_results.sort(key=lambda x: x["adjusted_p_value"])
             top_results = all_results[:15]
+
+            # Log enrichment results
+            self._trace(
+                "enrichr_results",
+                {
+                    "total_significant_terms": len(all_results),
+                    "top_results_count": len(top_results),
+                    "top_terms_preview": [
+                        {
+                            "term": r["term"],
+                            "library": r["library"],
+                            "adjusted_p_value": r["adjusted_p_value"],
+                            "gene_count": r["gene_count"],
+                        }
+                        for r in top_results[:5]
+                    ],
+                },
+            )
 
             logger.info(
                 f"Found {len(all_results)} significant enrichment terms, returning top {len(top_results)}"
