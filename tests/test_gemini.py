@@ -122,7 +122,11 @@ def test_summarizer_handles_empty_rows():
 
 def test_enrichment_summarizer_formats_results():
     """Test that enrichment summarizer formats results correctly."""
-    stub_client = StubClient(["The genes show DNA repair enrichment."])
+    import json
+
+    stub_client = StubClient(
+        [json.dumps({"summary": "The genes show DNA repair enrichment.", "followUpQuestions": []})]
+    )
     summarizer = GeminiEnrichmentSummarizer(client=stub_client)
 
     gene_list = ["BRCA1", "BRCA2"]
@@ -140,7 +144,8 @@ def test_enrichment_summarizer_formats_results():
 
     result = summarizer.summarize_enrichment(gene_list, enrichment_results)
 
-    assert result == "The genes show DNA repair enrichment."
+    assert result.summary == "The genes show DNA repair enrichment."
+    assert result.followUpQuestions == []
     call = stub_client.models.calls[0]
     assert "BRCA1, BRCA2" in call["contents"][0]
     assert "DNA repair" in call["contents"][0]
@@ -149,19 +154,26 @@ def test_enrichment_summarizer_formats_results():
 
 def test_enrichment_summarizer_handles_empty_results():
     """Test enrichment summarizer with empty results."""
-    stub_client = StubClient(["No significant enrichments found."])
+    import json
+
+    stub_client = StubClient(
+        [json.dumps({"summary": "No significant enrichments found.", "followUpQuestions": []})]
+    )
     summarizer = GeminiEnrichmentSummarizer(client=stub_client)
 
     result = summarizer.summarize_enrichment(["BRCA1"], [])
 
-    assert result == "No significant enrichments found."
+    assert result.summary == "No significant enrichments found."
+    assert result.followUpQuestions == []
     call = stub_client.models.calls[0]
     assert "No significant enrichments found" in call["contents"][0]
 
 
 def test_enrichment_summarizer_limits_results():
     """Test that enrichment summarizer limits to top 10 results."""
-    stub_client = StubClient(["Summary"])
+    import json
+
+    stub_client = StubClient([json.dumps({"summary": "Summary", "followUpQuestions": []})])
     summarizer = GeminiEnrichmentSummarizer(client=stub_client)
 
     # Create 15 mock results
@@ -178,8 +190,10 @@ def test_enrichment_summarizer_limits_results():
         for i in range(15)
     ]
 
-    summarizer.summarize_enrichment(["BRCA1"], enrichment_results)
+    result = summarizer.summarize_enrichment(["BRCA1"], enrichment_results)
 
+    assert result.summary == "Summary"
+    assert result.followUpQuestions == []
     call = stub_client.models.calls[0]
     # Should only include first 10 results
     assert call["contents"][0].count("Pathway") == 10

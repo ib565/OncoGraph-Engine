@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from api import main
 from pipeline.enrichment import EnrichmentResult
+from pipeline.gemini import EnrichmentSummaryResponse
 
 
 class StubEnrichmentAnalyzer:
@@ -22,11 +23,16 @@ class StubEnrichmentAnalyzer:
 class StubEnrichmentSummarizer:
     """Stub summarizer for testing."""
 
-    def __init__(self, summary: str):
+    def __init__(self, summary: str, follow_up_questions: list[str] | None = None):
         self._summary = summary
+        self._follow_up_questions = follow_up_questions or []
 
-    def summarize_enrichment(self, gene_list: list[str], enrichment_results: list[dict]) -> str:
-        return self._summary
+    def summarize_enrichment(
+        self, gene_list: list[str], enrichment_results: list[dict]
+    ) -> EnrichmentSummaryResponse:
+        return EnrichmentSummaryResponse(
+            summary=self._summary, followUpQuestions=self._follow_up_questions
+        )
 
 
 @pytest.fixture
@@ -76,6 +82,7 @@ def test_analyze_genes_success(app_client: TestClient) -> None:
     assert len(payload["enrichment_results"]) == 1
     assert payload["enrichment_results"][0]["term"] == "DNA repair"
     assert payload["plot_data"] == {"data": [], "layout": {}}
+    assert payload["followUpQuestions"] == []
 
 
 def test_analyze_genes_empty_input(app_client: TestClient) -> None:
