@@ -28,7 +28,7 @@ const nextConfig = {
   },
   // Optimize chunks for better loading
   experimental: {
-    optimizeCss: true,
+    // optimizeCss: true,
   },
   // Ensure proper chunk loading
   generateEtags: false,
