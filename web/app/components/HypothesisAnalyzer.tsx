@@ -347,7 +347,37 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
                   className="primary-button"
                   disabled={isLoading || isLoadingPreset || !genes.trim()}
                 >
-                  {isLoading ? "Analyzing..." : isLoadingPreset ? "Loading preset..." : "Analyze Genes"}
+                  {isLoading ? (
+                    <>
+                      <div className="button-spinner" style={{
+                        display: "inline-block",
+                        width: "16px",
+                        height: "16px",
+                        border: "2px solid #ffffff",
+                        borderTop: "2px solid transparent",
+                        borderRadius: "50%",
+                        animation: "spin 1s linear infinite",
+                        marginRight: "8px"
+                      }}></div>
+                      Analyzing...
+                    </>
+                  ) : isLoadingPreset ? (
+                    <>
+                      <div className="button-spinner" style={{
+                        display: "inline-block",
+                        width: "16px",
+                        height: "16px",
+                        border: "2px solid #ffffff",
+                        borderTop: "2px solid transparent",
+                        borderRadius: "50%",
+                        animation: "spin 1s linear infinite",
+                        marginRight: "8px"
+                      }}></div>
+                      Loading preset...
+                    </>
+                  ) : (
+                    "Analyze Genes"
+                  )}
                 </button>
               </form>
             </div>
