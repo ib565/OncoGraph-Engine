@@ -71,6 +71,7 @@ class GeneSetResponse(BaseModel):
 class EnrichmentResponse(BaseModel):
     summary: str
     valid_genes: list[str]
+    invalid_genes: list[str]
     warnings: list[str]
     enrichment_results: list[dict[str, object]]
     plot_data: dict[str, object]
@@ -642,6 +643,7 @@ def analyze_genes_stream(
             # Store partial results for immediate emission
             outcome["partial"] = {
                 "valid_genes": enrichment_result.valid_genes,
+                "invalid_genes": enrichment_result.invalid_genes,
                 "warnings": warnings,
                 "enrichment_results": enrichment_result.enrichment_results,
                 "plot_data": enrichment_result.plot_data,
@@ -963,6 +965,7 @@ def analyze_genes(
         return EnrichmentResponse(
             summary=summary_response.summary,
             valid_genes=result.valid_genes,
+            invalid_genes=result.invalid_genes,
             warnings=warnings,
             enrichment_results=result.enrichment_results,
             plot_data=result.plot_data,

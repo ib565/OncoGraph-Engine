@@ -10,6 +10,8 @@ from typing import Any
 import pandas as pd
 import plotly.graph_objects as go
 
+from .utils import get_enrichment_cache, stable_hash
+
 try:  # pragma: no cover - optional dependencies
     import gseapy as gp
     import mygene
@@ -70,6 +72,13 @@ class GeneEnrichmentAnalyzer:
         if not cleaned_genes:
             return [], []
 
+        # Check cache first
+        cache = get_enrichment_cache()
+        cache_key = f"normalize_genes:{stable_hash(sorted(cleaned_genes))}"
+        cached_result = cache.get(cache_key)
+        if cached_result is not None:
+            return cached_result
+
         try:
             # Query MyGene for gene information
             self._trace(
@@ -127,7 +136,9 @@ class GeneEnrichmentAnalyzer:
                 f"Normalized {len(cleaned_genes)} input genes: {len(valid_genes)} valid, {len(invalid_genes)} invalid"
             )
 
-            return valid_genes, invalid_genes
+            result = (valid_genes, invalid_genes)
+            cache.set(cache_key, result)
+            return result
 
         except Exception as e:
             import traceback
@@ -148,6 +159,13 @@ class GeneEnrichmentAnalyzer:
         """
         if not gene_list:
             return []
+
+        # Check cache first
+        cache = get_enrichment_cache()
+        cache_key = f"run_enrichment:{stable_hash(sorted(gene_list))}:{stable_hash(self.enrichr_libraries)}"
+        cached_result = cache.get(cache_key)
+        if cached_result is not None:
+            return cached_result
 
         try:
             # Log enrichment analysis start
@@ -234,6 +252,7 @@ class GeneEnrichmentAnalyzer:
                 f"Found {len(all_results)} significant enrichment terms, returning top {len(top_results)}"
             )
 
+            cache.set(cache_key, top_results)
             return top_results
 
         except Exception as e:

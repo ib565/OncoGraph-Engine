@@ -20,6 +20,7 @@ from .types import (
     PipelineError,
     Summarizer,
 )
+from .utils import get_llm_cache, stable_hash
 
 try:  # pragma: no cover - optional dependency at runtime
     from google import genai  # type: ignore
@@ -189,11 +190,21 @@ class GeminiInstructionExpander(_GeminiBase, InstructionExpander):
     """Gemini-backed instruction expansion adapter."""
 
     def expand_instructions(self, question: str) -> str:
+        # Check cache first
+        cache = get_llm_cache()
+        cache_key = f"expand_instructions:{stable_hash(question.strip())}"
+        cached_result = cache.get(cache_key)
+        if cached_result is not None:
+            return cached_result
+
         prompt = INSTRUCTION_PROMPT_TEMPLATE.format(
             schema=SCHEMA_SNIPPET, question=question.strip()
         )
         text = self._call_model(prompt=prompt)
-        return text.strip()
+        result = text.strip()
+
+        cache.set(cache_key, result)
+        return result
 
 
 class GeminiCypherGenerator(_GeminiBase, CypherGenerator):
@@ -211,13 +222,23 @@ class GeminiSummarizer(_GeminiBase, Summarizer):
     """Gemini-backed summarizer for Cypher results."""
 
     def summarize(self, question: str, rows: list[dict[str, object]]) -> str:
+        # Check cache first
+        cache = get_llm_cache()
+        cache_key = f"summarize:{stable_hash(question.strip())}:{stable_hash(rows)}"
+        cached_result = cache.get(cache_key)
+        if cached_result is not None:
+            return cached_result
+
         formatted_rows = _format_rows(rows)
         prompt = SUMMARY_PROMPT_TEMPLATE.format(
             question=question.strip(),
             rows=formatted_rows,
         )
         text = self._call_model(prompt=prompt)
-        return text.strip()
+        result = text.strip()
+
+        cache.set(cache_key, result)
+        return result
 
 
 class GeminiEnrichmentSummarizer(_GeminiBase):
@@ -235,6 +256,13 @@ class GeminiEnrichmentSummarizer(_GeminiBase):
         Returns:
             Structured response with summary and follow-up questions
         """
+        # Check cache first
+        cache = get_llm_cache()
+        cache_key = f"summarize_enrichment:{stable_hash(sorted(gene_list))}:{top_n}:{stable_hash(enrichment_results)}"
+        cached_result = cache.get(cache_key)
+        if cached_result is not None:
+            return cached_result
+
         # Format enrichment results for the prompt
         formatted_results = []
         for i, result in enumerate(enrichment_results[:top_n], 1):
@@ -287,6 +315,8 @@ class GeminiEnrichmentSummarizer(_GeminiBase):
             import json
 
             data = json.loads(text)
-            return EnrichmentSummaryResponse(**data)
+            result = EnrichmentSummaryResponse(**data)
+            cache.set(cache_key, result)
+            return result
         except (json.JSONDecodeError, ValueError) as e:
             raise PipelineError(f"Failed to parse structured response: {e}") from e
