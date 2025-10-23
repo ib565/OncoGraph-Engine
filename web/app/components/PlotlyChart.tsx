@@ -59,7 +59,9 @@ export default function PlotlyChart({ data, layout, onClick }: PlotlyChartProps)
     const style = document.createElement('style');
     style.textContent = spinnerStyle;
     document.head.appendChild(style);
-    return () => document.head.removeChild(style);
+    return () => {
+      document.head.removeChild(style);
+    };
   }, []);
 
   if (!isClient) {
