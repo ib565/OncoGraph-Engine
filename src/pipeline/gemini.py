@@ -261,6 +261,9 @@ class GeminiEnrichmentSummarizer(_GeminiBase):
         cache_key = f"summarize_enrichment:{stable_hash(sorted(gene_list))}:{top_n}:{stable_hash(enrichment_results)}"
         cached_result = cache.get(cache_key)
         if cached_result is not None:
+            # Reconstruct the Pydantic model from the cached dictionary
+            if isinstance(cached_result, dict):
+                return EnrichmentSummaryResponse(**cached_result)
             return cached_result
 
         # Format enrichment results for the prompt

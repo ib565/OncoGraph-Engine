@@ -92,6 +92,31 @@ class TestTTLCache:
         assert cached_value == [1, 2, 3]
         assert cached_value is not original_list
 
+    def test_cache_pydantic_model(self):
+        """Test that Pydantic models are properly cached and retrieved."""
+        from pydantic import BaseModel
+
+        class TestModel(BaseModel):
+            name: str
+            value: int
+
+        cache = TTLCache(default_ttl_seconds=60)
+
+        original_model = TestModel(name="test", value=42)
+        cache.set("pydantic_key", original_model)
+
+        # Retrieve from cache
+        cached_model = cache.get("pydantic_key")
+
+        # Should be a dictionary (serialized form)
+        assert isinstance(cached_model, dict)
+        assert cached_model == {"name": "test", "value": 42}
+
+        # Should be able to reconstruct the model
+        reconstructed = TestModel(**cached_model)
+        assert reconstructed.name == "test"
+        assert reconstructed.value == 42
+
     def test_cache_thread_safety(self):
         """Test that cache operations are thread-safe."""
         import threading

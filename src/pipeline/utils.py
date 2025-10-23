@@ -60,7 +60,10 @@ class TTLCache:
         elif isinstance(obj, dict):
             return {k: self._deep_copy(v) for k, v in obj.items()}
         else:
-            # For complex objects, try JSON serialization/deserialization
+            # For Pydantic models, use model_dump() for proper serialization
+            if hasattr(obj, "model_dump"):
+                return obj.model_dump()
+            # For other complex objects, try JSON serialization/deserialization
             try:
                 return json.loads(json.dumps(obj, default=str))
             except (TypeError, ValueError):
