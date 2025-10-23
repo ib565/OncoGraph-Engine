@@ -243,233 +243,288 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
         <h3 className="panel-title">Knowledge Graph Query</h3>
       </div>
       <div className="panel-content">
-        <form className="query-form" onSubmit={handleSubmit}>
-          <input
-            className="query-input"
-            value={question}
-            onChange={(event) => setQuestion(event.target.value)}
-            placeholder="e.g. Do KRAS mutations affect response to anti-EGFR therapy in colorectal cancer?"
-            disabled={isLoading}
-          />
-          <button
-            type="submit"
-            className="primary-button"
-            disabled={isLoading || !question.trim()}
-          >
-            {isLoading ? "Running..." : "Ask"}
-          </button>
-        </form>
+        {/* Row 1: Query Input | Example Queries */}
+        <div className="layout-row">
+          <div className="layout-column query-column">
+            <div className="card">
+              <header className="panel-header">
+                <h3 className="panel-title">Query</h3>
+              </header>
+              <div className="card-content">
+                <form className="query-form" onSubmit={handleSubmit}>
+                  <input
+                    className="query-input"
+                    value={question}
+                    onChange={(event) => setQuestion(event.target.value)}
+                    placeholder="e.g. Do KRAS mutations affect response to anti-EGFR therapy in colorectal cancer?"
+                    disabled={isLoading}
+                  />
+                  <button
+                    type="submit"
+                    className="primary-button"
+                    disabled={isLoading || !question.trim()}
+                  >
+                    {isLoading ? "Running..." : "Ask"}
+                  </button>
+                </form>
+                
+                {error && (
+                  <div className="alert" role="alert">
+                    {error}
+                  </div>
+                )}
 
-        {EXAMPLE_QUERIES.length > 0 && (
-          <div className="examples" aria-label="Example queries">
-            <span className="examples-label">Example queries</span>
-            <div className="examples-grid">
-              {EXAMPLE_QUERIES.map((example) => (
-                <button
-                  key={example}
-                  type="button"
-                  className="example-button"
-                  onClick={() => {
-                    void runQuery(example);
-                  }}
-                  disabled={isLoading}
-                >
-                  {example}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {error && (
-          <div className="alert" role="alert">
-            {error}
-          </div>
-        )}
-
-        {isLoading && progress && !error && (
-          <div className="status-message" role="status" aria-live="polite">
-            {animatedProgress ?? progress}
-          </div>
-        )}
-
-        {result && (
-          <div className="result-overview">
-            <div className="card answer-card">
-              {lastQuery && (
-                <p className="question-text">
-                  <span className="question-label">Question</span>
-                  {lastQuery}
-                </p>
-              )}
-              <h2 className="section-title">Answer</h2>
-              <div className="answer-content">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.answer}</ReactMarkdown>
+                {isLoading && progress && !error && (
+                  <div className="status-message" role="status" aria-live="polite">
+                    {animatedProgress ?? progress}
+                  </div>
+                )}
               </div>
             </div>
-
-            <div className="card graph-card">
+          </div>
+          
+          <div className="layout-column examples-column">
+            <div className="card">
               <header className="panel-header">
-                <h3 className="panel-title">Interactive subgraph</h3>
-                <p className="panel-copy">
-                  Inspect entities and relationships driving the synthesized answer. Drag to reposition nodes for clarity.
-                </p>
+                <h3 className="panel-title">Example Queries</h3>
               </header>
-              <div className="graph-shell">
-                <div className="graph-container">
-                  <MiniGraph rows={result.rows} height={300} />
+              <div className="card-content">
+                {EXAMPLE_QUERIES.length > 0 && (
+                  <div className="examples" aria-label="Example queries">
+                    <div className="examples-grid">
+                      {EXAMPLE_QUERIES.map((example) => (
+                        <button
+                          key={example}
+                          type="button"
+                          className="example-button"
+                          onClick={() => {
+                            setQuestion(example);
+                          }}
+                          disabled={isLoading}
+                        >
+                          {example}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {result && (
+          <>
+            {/* Row 2: Answer | Subgraph */}
+            <div className="layout-row">
+              <div className="layout-column answer-column">
+                <div className="card">
+                  <header className="panel-header">
+                    <h3 className="panel-title">Answer</h3>
+                  </header>
+                  <div className="card-content">
+                    {lastQuery && (
+                      <p className="question-text">
+                        <span className="question-label">Question</span>
+                        {lastQuery}
+                      </p>
+                    )}
+                    <div className="answer-content">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.answer}</ReactMarkdown>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="layout-column subgraph-column">
+                <div className="card">
+                  <header className="panel-header">
+                    <h3 className="panel-title">Interactive Subgraph</h3>
+                    <p className="panel-copy">
+                      Inspect entities and relationships driving the synthesized answer. Drag to reposition nodes for clarity.
+                    </p>
+                  </header>
+                  <div className="card-content">
+                    <div className="graph-shell">
+                      <div className="graph-container">
+                        <MiniGraph rows={result.rows} height={400} />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="card rows-card">
-              <header className="panel-header">
-                <h3 className="panel-title">Cypher rows</h3>
-                <p className="panel-copy">
-                  Explore the raw query results with references.
-                </p>
-              </header>
-              {result.rows?.length ? (
-                <div className="rows-scroll" role="list">
-                  {result.rows.map((row, index) => {
-                    const entries = Object.entries(row).filter(([, value]) => isMeaningfulValue(value));
+            {/* Row 3: Cypher Rows | Cypher Query */}
+            <div className="layout-row">
+              <div className="layout-column rows-column">
+                <div className="card">
+                  <header className="panel-header">
+                    <h3 className="panel-title">Cypher Rows</h3>
+                    <p className="panel-copy">
+                      Explore the raw query results with references.
+                    </p>
+                  </header>
+                  <div className="card-content">
+                    {result.rows?.length ? (
+                      <div className="rows-scroll" role="list">
+                        {result.rows.map((row, index) => {
+                          const entries = Object.entries(row).filter(([, value]) => isMeaningfulValue(value));
 
-                    if (entries.length === 0) {
-                      return (
-                        <article className="row-card" key={`row-${index}`} role="listitem">
-                          <header className="row-heading">Row {index + 1}</header>
-                          <p className="empty-row">No populated columns.</p>
-                        </article>
-                      );
-                    }
+                          if (entries.length === 0) {
+                            return (
+                              <article className="row-card" key={`row-${index}`} role="listitem">
+                                <header className="row-heading">Row {index + 1}</header>
+                                <p className="empty-row">No populated columns.</p>
+                              </article>
+                            );
+                          }
 
-                    return (
-                      <article className="row-card" key={`row-${index}`} role="listitem">
-                        <header className="row-heading">Row {index + 1}</header>
-                        <dl className="row-details">
-                          {entries.map(([key, value]) => {
-                            const label = formatKeyLabel(key);
+                          return (
+                            <article className="row-card" key={`row-${index}`} role="listitem">
+                              <header className="row-heading">Row {index + 1}</header>
+                              <dl className="row-details">
+                                {entries.map(([key, value]) => {
+                                  const label = formatKeyLabel(key);
 
-                            if (Array.isArray(value)) {
-                              const sanitized = sanitizeArrayValue(value);
-                              if (!sanitized.length) {
-                                return null;
-                              }
+                                  if (Array.isArray(value)) {
+                                    const sanitized = sanitizeArrayValue(value);
+                                    if (!sanitized.length) {
+                                      return null;
+                                    }
 
-                              return (
-                                <Fragment key={key}>
-                                  <dt className="row-key">{label}</dt>
-                                  <dd className="row-value">
-                                    <div className="value-pills">
-                                      {sanitized.map((item, pillIndex) => {
-                                        if (typeof item === "string") {
-                                          return isHttpUrl(item) ? (
+                                    return (
+                                      <Fragment key={key}>
+                                        <dt className="row-key">{label}</dt>
+                                        <dd className="row-value">
+                                          <div className="value-pills">
+                                            {sanitized.map((item, pillIndex) => {
+                                              if (typeof item === "string") {
+                                                return isHttpUrl(item) ? (
+                                                  <a
+                                                    key={`${key}-${pillIndex}`}
+                                                    className="value-pill value-pill-link"
+                                                    href={item}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                  >
+                                                    {getUrlLabel(item)}
+                                                  </a>
+                                                ) : (
+                                                  <span
+                                                    key={`${key}-${pillIndex}`}
+                                                    className="value-pill"
+                                                  >
+                                                    {item}
+                                                  </span>
+                                                );
+                                              }
+
+                                              return (
+                                                <span
+                                                  key={`${key}-${pillIndex}`}
+                                                  className="value-pill"
+                                                >
+                                                  {String(item)}
+                                                </span>
+                                              );
+                                            })}
+                                          </div>
+                                        </dd>
+                                      </Fragment>
+                                    );
+                                  }
+
+                                  if (typeof value === "string") {
+                                    const trimmed = value.trim();
+                                    if (!trimmed) {
+                                      return null;
+                                    }
+
+                                    return (
+                                      <Fragment key={key}>
+                                        <dt className="row-key">{label}</dt>
+                                        <dd className="row-value">
+                                          {isHttpUrl(trimmed) ? (
                                             <a
-                                              key={`${key}-${pillIndex}`}
-                                              className="value-pill value-pill-link"
-                                              href={item}
+                                              className="value-link"
+                                              href={trimmed}
                                               target="_blank"
                                               rel="noreferrer"
                                             >
-                                              {getUrlLabel(item)}
+                                              {getUrlLabel(trimmed)}
                                             </a>
                                           ) : (
-                                            <span
-                                              key={`${key}-${pillIndex}`}
-                                              className="value-pill"
-                                            >
-                                              {item}
-                                            </span>
-                                          );
-                                        }
+                                            <span>{trimmed}</span>
+                                          )}
+                                        </dd>
+                                      </Fragment>
+                                    );
+                                  }
 
-                                        return (
-                                          <span
-                                            key={`${key}-${pillIndex}`}
-                                            className="value-pill"
-                                          >
-                                            {String(item)}
-                                          </span>
-                                        );
-                                      })}
-                                    </div>
-                                  </dd>
-                                </Fragment>
-                              );
-                            }
+                                  if (typeof value === "object" && value !== null) {
+                                    return (
+                                      <Fragment key={key}>
+                                        <dt className="row-key">{label}</dt>
+                                        <dd className="row-value">
+                                          <pre className="value-json">
+                                            {JSON.stringify(value, null, 2)}
+                                          </pre>
+                                        </dd>
+                                      </Fragment>
+                                    );
+                                  }
 
-                            if (typeof value === "string") {
-                              const trimmed = value.trim();
-                              if (!trimmed) {
-                                return null;
-                              }
-
-                              return (
-                                <Fragment key={key}>
-                                  <dt className="row-key">{label}</dt>
-                                  <dd className="row-value">
-                                    {isHttpUrl(trimmed) ? (
-                                      <a
-                                        className="value-link"
-                                        href={trimmed}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                      >
-                                        {getUrlLabel(trimmed)}
-                                      </a>
-                                    ) : (
-                                      <span>{trimmed}</span>
-                                    )}
-                                  </dd>
-                                </Fragment>
-                              );
-                            }
-
-                            if (typeof value === "object" && value !== null) {
-                              return (
-                                <Fragment key={key}>
-                                  <dt className="row-key">{label}</dt>
-                                  <dd className="row-value">
-                                    <pre className="value-json">
-                                      {JSON.stringify(value, null, 2)}
-                                    </pre>
-                                  </dd>
-                                </Fragment>
-                              );
-                            }
-
-                            return (
-                              <Fragment key={key}>
-                                <dt className="row-key">{label}</dt>
-                                <dd className="row-value">{String(value)}</dd>
-                              </Fragment>
-                            );
-                          })}
-                        </dl>
-                      </article>
-                    );
-                  })}
+                                  return (
+                                    <Fragment key={key}>
+                                      <dt className="row-key">{label}</dt>
+                                      <dd className="row-value">{String(value)}</dd>
+                                    </Fragment>
+                                  );
+                                })}
+                              </dl>
+                            </article>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="empty-state">No rows returned from the query.</p>
+                    )}
+                  </div>
                 </div>
-              ) : (
-                <p className="empty-state">No rows returned from the query.</p>
-              )}
-            </div>
-
-            <div className="card cypher-card">
-              <header className="panel-header">
-                <h3 className="panel-title">Cypher query</h3>
-                <p className="panel-copy">Reference the exact graph query executed.</p>
-              </header>
-              <div className="cypher-scroll">
-                <pre className="code-block">{result.cypher}</pre>
+              </div>
+              
+              <div className="layout-column cypher-column">
+                <div className="card">
+                  <header className="panel-header">
+                    <h3 className="panel-title">Cypher Query</h3>
+                    <p className="panel-copy">Reference the exact graph query executed.</p>
+                  </header>
+                  <div className="card-content">
+                    <div className="cypher-scroll">
+                      <pre className="code-block">{result.cypher}</pre>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          </>
         )}
 
         {!result && (
-          <div className="graph-container">
-            <MiniGraph rows={rows} height={300} />
+          <div className="layout-row">
+            <div className="layout-column full-width">
+              <div className="card">
+                <header className="panel-header">
+                  <h3 className="panel-title">Knowledge Graph</h3>
+                </header>
+                <div className="card-content">
+                  <div className="graph-container">
+                    <MiniGraph rows={rows} height={400} />
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
