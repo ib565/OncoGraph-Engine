@@ -5,7 +5,6 @@ import MiniGraph from "./MiniGraph";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useAppContext, type QueryResponse } from "../contexts/AppContext";
-import ErrorBoundary from "./ErrorBoundary";
 
 type GraphPanelProps = {
   rows: Array<Record<string, unknown>>;
@@ -105,32 +104,7 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
       progress: null
     });
 
-    // Try SSE first for progress streaming (only on client side)
-    if (typeof window === 'undefined') {
-      // Fallback to POST for SSR
-      try {
-        const response = await fetch(`${API_URL}/query`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question: trimmed }),
-        });
-        if (!response.ok) {
-          const payload = await response.json().catch(() => ({}));
-          const detail = (payload as any)?.detail;
-          if (detail?.message) throw new Error(detail.message);
-          throw new Error(`Request failed with status ${response.status}`);
-        }
-        const data = (await response.json()) as QueryResponse;
-        setGraphState({ result: data });
-      } catch (fallbackErr) {
-        const message = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
-        setGraphState({ error: message });
-      } finally {
-        setGraphState({ progress: null, isLoading: false });
-      }
-      return;
-    }
-
+    // Try SSE first for progress streaming
     const url = `${API_URL}/query/stream?question=${encodeURIComponent(trimmed)}`;
     try {
       const es = new EventSource(url, { withCredentials: false });
@@ -359,9 +333,7 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
                   <div className="card-content">
                     <div className="graph-shell">
                       <div className="graph-container">
-                        <ErrorBoundary>
-                          <MiniGraph rows={result.rows} height={400} />
-                        </ErrorBoundary>
+                        <MiniGraph rows={result.rows} height={400} />
                       </div>
                     </div>
                   </div>
@@ -534,9 +506,7 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
                 </header>
                 <div className="card-content">
                   <div className="graph-container">
-                    <ErrorBoundary>
-                      <MiniGraph rows={rows} height={400} />
-                    </ErrorBoundary>
+                    <MiniGraph rows={rows} height={400} />
                   </div>
                 </div>
               </div>

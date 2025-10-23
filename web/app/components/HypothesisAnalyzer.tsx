@@ -5,7 +5,6 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useAppContext, type EnrichmentResponse, type PartialEnrichmentResult, type SummaryResult } from "../contexts/AppContext";
 import PlotlyChart from "./PlotlyChart";
-import ErrorBoundary from "./ErrorBoundary";
 
 
 type GeneSetResponse = {
@@ -479,11 +478,10 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
                   </header>
                   <div className="card-content">
                     <div className="graph-shell">
-                      <ErrorBoundary>
-                        <PlotlyChart
-                          data={(partialResult?.plot_data?.data || result?.plot_data?.data) || []}
-                          layout={(partialResult?.plot_data?.layout || result?.plot_data?.layout) || {}}
-                          onClick={(event) => {
+                      <PlotlyChart
+                        data={(partialResult?.plot_data?.data || result?.plot_data?.data) || []}
+                        layout={(partialResult?.plot_data?.layout || result?.plot_data?.layout) || {}}
+                        onClick={(event) => {
                           if (event.points && event.points.length > 0) {
                             const point = event.points[0];
                             const term = point.y;
@@ -505,7 +503,6 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
                           }
                         }}
                       />
-                      </ErrorBoundary>
                     </div>
                   </div>
                 </div>

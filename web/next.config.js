@@ -27,9 +27,6 @@ const nextConfig = {
     return config;
   },
   // Optimize chunks for better loading
-  experimental: {
-    // optimizeCss: true,
-  },
   // Ensure proper chunk loading
   generateEtags: false,
   poweredByHeader: false,
@@ -37,8 +34,6 @@ const nextConfig = {
   trailingSlash: false,
   // Better handling of dynamic imports
   swcMinify: true,
-  // Disable static optimization for error pages
-  output: 'standalone',
 };
 
 module.exports = nextConfig;
