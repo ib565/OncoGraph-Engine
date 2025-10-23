@@ -192,33 +192,78 @@ def query(body: QueryRequest, engine: Annotated[QueryEngine, Depends(get_engine)
     try:
         result: QueryEngineResult = traced_engine.run(body.question.strip())
     except PipelineError as exc:
+        # Log detailed error information
+        error_details = {
+            "started_at": started,
+            "question": body.question.strip(),
+            "error": str(exc),
+            "error_step": exc.step or "unknown",
+            "duration_ms": int((__import__("time").perf_counter() - started_perf) * 1000),
+        }
+
+        # Add original exception details if available
+        if exc.__cause__:
+            error_details["original_exception"] = {
+                "type": type(exc.__cause__).__name__,
+                "message": str(exc.__cause__),
+            }
+            # Add specific error attributes if available
+            if hasattr(exc.__cause__, "details"):
+                error_details["original_exception"]["details"] = str(exc.__cause__.details)
+            if hasattr(exc.__cause__, "code"):
+                error_details["original_exception"]["code"] = str(exc.__cause__.code)
+            if hasattr(exc.__cause__, "status_code"):
+                error_details["original_exception"]["status_code"] = str(exc.__cause__.status_code)
+
         if traced_engine.trace is not None:
-            traced_engine.trace.record(
-                "error",
-                {
-                    "started_at": started,
-                    "question": body.question.strip(),
-                    "error": str(exc),
-                    "error_step": exc.step or "unknown",
-                    "duration_ms": int((__import__("time").perf_counter() - started_perf) * 1000),
-                },
-            )
-        raise HTTPException(
-            status_code=400, detail={"message": str(exc), "step": exc.step}
-        ) from exc
+            traced_engine.trace.record("error", error_details)
+
+        # Create detailed error response
+        detail_response = {
+            "message": str(exc),
+            "step": exc.step,
+            "error_type": type(exc).__name__,
+        }
+
+        # Include original exception details in response
+        if exc.__cause__:
+            detail_response["original_error"] = {
+                "type": type(exc.__cause__).__name__,
+                "message": str(exc.__cause__),
+            }
+            if hasattr(exc.__cause__, "details"):
+                detail_response["original_error"]["details"] = str(exc.__cause__.details)
+            if hasattr(exc.__cause__, "code"):
+                detail_response["original_error"]["code"] = str(exc.__cause__.code)
+
+        raise HTTPException(status_code=400, detail=detail_response) from exc
     except Exception as exc:  # pragma: no cover - defensive guard
+        # Log detailed error information for unexpected exceptions
+        error_details = {
+            "started_at": started,
+            "question": body.question.strip(),
+            "error": str(exc),
+            "error_type": type(exc).__name__,
+            "error_step": "unknown",
+            "duration_ms": int((__import__("time").perf_counter() - started_perf) * 1000),
+        }
+
+        # Add traceback for debugging
+        import traceback
+
+        error_details["traceback"] = traceback.format_exc()
+
         if traced_engine.trace is not None:
-            traced_engine.trace.record(
-                "error",
-                {
-                    "started_at": started,
-                    "question": body.question.strip(),
-                    "error": str(exc),
-                    "error_step": "unknown",
-                    "duration_ms": int((__import__("time").perf_counter() - started_perf) * 1000),
-                },
-            )
-        raise HTTPException(status_code=500, detail={"message": str(exc)}) from exc
+            traced_engine.trace.record("error", error_details)
+
+        # Create detailed error response
+        detail_response = {
+            "message": str(exc),
+            "error_type": type(exc).__name__,
+            "step": "unknown",
+        }
+
+        raise HTTPException(status_code=500, detail=detail_response) from exc
 
     if traced_engine.trace is not None:
         traced_engine.trace.record(
@@ -271,9 +316,41 @@ def query_stream(
             result: QueryEngineResult = traced_engine.run(question.strip())
             outcome["result"] = result
         except PipelineError as exc:
-            outcome["error"] = {"message": str(exc), "step": exc.step}
+            # Create detailed error information
+            error_info = {
+                "message": str(exc),
+                "step": exc.step,
+                "error_type": type(exc).__name__,
+            }
+
+            # Add original exception details if available
+            if exc.__cause__:
+                error_info["original_error"] = {
+                    "type": type(exc.__cause__).__name__,
+                    "message": str(exc.__cause__),
+                }
+                if hasattr(exc.__cause__, "details"):
+                    error_info["original_error"]["details"] = str(exc.__cause__.details)
+                if hasattr(exc.__cause__, "code"):
+                    error_info["original_error"]["code"] = str(exc.__cause__.code)
+                if hasattr(exc.__cause__, "status_code"):
+                    error_info["original_error"]["status_code"] = str(exc.__cause__.status_code)
+
+            outcome["error"] = error_info
         except Exception as exc:  # pragma: no cover - defensive
-            outcome["error"] = {"message": str(exc), "step": "unknown"}
+            # Create detailed error information for unexpected exceptions
+            error_info = {
+                "message": str(exc),
+                "step": "unknown",
+                "error_type": type(exc).__name__,
+            }
+
+            # Add traceback for debugging
+            import traceback
+
+            error_info["traceback"] = traceback.format_exc()
+
+            outcome["error"] = error_info
         finally:
             outcome["done"] = True
             done_event.set()

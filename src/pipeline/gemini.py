@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from pydantic import BaseModel
-from tenacity import retry, retry_if_not_exception_type, stop_after_attempt, wait_exponential
 
 from .prompts import (
     CYPHER_PROMPT_TEMPLATE,
@@ -102,12 +102,8 @@ class _GeminiBase:
             max_output_tokens=self.config.max_output_tokens,
         )
 
-    @retry(
-        retry=retry_if_not_exception_type(PipelineError),  # Retry except PipelineError
-        stop=stop_after_attempt(3),  # Maximum 3 attempts
-        wait=wait_exponential(multiplier=1, min=1, max=10),  # Exponential backoff
-    )
     def _call_model(self, *, prompt: str) -> str:
+        """Call Gemini API with retry logic and comprehensive error handling."""
         config_payload = self._build_content_config()
         kwargs = {
             "model": self.config.model,
@@ -116,11 +112,77 @@ class _GeminiBase:
         if config_payload is not None:
             kwargs["config"] = config_payload
 
-        response = self._client.models.generate_content(**kwargs)
-        text = getattr(response, "text", None)
-        if not text:
-            raise PipelineError("Gemini response did not include text")
-        return text
+        # Simple retry loop with exponential backoff
+        last_exception = None
+        for attempt in range(3):  # 3 attempts total
+            try:
+                response = self._client.models.generate_content(**kwargs)
+                text = getattr(response, "text", None)
+                if not text:
+                    raise PipelineError("Gemini response did not include text")
+                return text
+            except Exception as exc:
+                last_exception = exc
+
+                # Log detailed error information for each attempt
+                error_details = {
+                    "attempt": attempt + 1,
+                    "total_attempts": 3,
+                    "exception_type": type(exc).__name__,
+                    "exception_message": str(exc),
+                    "model": self.config.model,
+                    "prompt_length": len(prompt),
+                }
+
+                # Extract additional error context
+                if hasattr(exc, "details"):
+                    error_details["details"] = str(exc.details)
+                if hasattr(exc, "code"):
+                    error_details["code"] = str(exc.code)
+                if hasattr(exc, "status_code"):
+                    error_details["status_code"] = str(exc.status_code)
+                if hasattr(exc, "reason"):
+                    error_details["reason"] = str(exc.reason)
+
+                logging.warning(f"Gemini API call failed: {error_details}")
+
+                # Don't retry on the last attempt
+                if attempt == 2:
+                    break
+
+                # Wait before retry (exponential backoff: 1s, 2s, 4s)
+                import time
+
+                time.sleep(2**attempt)
+
+        # If we get here, all retries failed - preserve the original exception
+        if last_exception:
+            # Create a comprehensive error message that preserves all details
+            error_parts = [
+                "Gemini API call failed after 3 attempts",
+                f"Exception: {type(last_exception).__name__}",
+                f"Message: {str(last_exception)}",
+            ]
+
+            # Add specific error details if available
+            if hasattr(last_exception, "details") and last_exception.details:
+                error_parts.append(f"Details: {last_exception.details}")
+            if hasattr(last_exception, "code") and last_exception.code:
+                error_parts.append(f"Code: {last_exception.code}")
+            if hasattr(last_exception, "status_code") and last_exception.status_code:
+                error_parts.append(f"Status: {last_exception.status_code}")
+            if hasattr(last_exception, "reason") and last_exception.reason:
+                error_parts.append(f"Reason: {last_exception.reason}")
+
+            error_msg = " | ".join(error_parts)
+
+            # Create a PipelineError that preserves the original exception
+            pipeline_error = PipelineError(error_msg)
+            # Preserve the original exception as the cause
+            pipeline_error.__cause__ = last_exception
+            raise pipeline_error
+        else:
+            raise PipelineError("Gemini API call failed for unknown reason")
 
 
 class GeminiInstructionExpander(_GeminiBase, InstructionExpander):
