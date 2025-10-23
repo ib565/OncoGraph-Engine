@@ -508,6 +508,7 @@ def analyze_genes(
             result = analyzer.analyze(gene_symbols)
         except Exception as exc:
             import traceback
+
             normalization_duration = int((__import__("time").perf_counter() - step_started) * 1000)
             contextual_trace.record(
                 "error",
@@ -521,15 +522,18 @@ def analyze_genes(
                     "traceback": traceback.format_exc(),
                 },
             )
-            print(f"ERROR in gene normalization: {type(exc).__name__}: {exc}", file=__import__("sys").stderr)
+            print(
+                f"ERROR in gene normalization: {type(exc).__name__}: {exc}",
+                file=__import__("sys").stderr,
+            )
             print(f"Traceback:\n{traceback.format_exc()}", file=__import__("sys").stderr)
             raise HTTPException(
                 status_code=500,
                 detail={
                     "message": f"Gene normalization failed: {str(exc)}",
                     "error_type": type(exc).__name__,
-                    "step": "gene_normalization"
-                }
+                    "step": "gene_normalization",
+                },
             ) from exc
         normalization_duration = int((__import__("time").perf_counter() - step_started) * 1000)
 
@@ -552,6 +556,7 @@ def analyze_genes(
             )
         except Exception as exc:
             import traceback
+
             summary_duration = int((__import__("time").perf_counter() - step_started) * 1000)
             contextual_trace.record(
                 "error",
@@ -566,15 +571,18 @@ def analyze_genes(
                     "traceback": traceback.format_exc(),
                 },
             )
-            print(f"ERROR in AI summary generation: {type(exc).__name__}: {exc}", file=__import__("sys").stderr)
+            print(
+                f"ERROR in AI summary generation: {type(exc).__name__}: {exc}",
+                file=__import__("sys").stderr,
+            )
             print(f"Traceback:\n{traceback.format_exc()}", file=__import__("sys").stderr)
             raise HTTPException(
                 status_code=500,
                 detail={
                     "message": f"AI summary generation failed: {str(exc)}",
                     "error_type": type(exc).__name__,
-                    "step": "ai_summary"
-                }
+                    "step": "ai_summary",
+                },
             ) from exc
         summary_duration = int((__import__("time").perf_counter() - step_started) * 1000)
 
@@ -628,7 +636,7 @@ def analyze_genes(
     except Exception as exc:
         # Import traceback for better error reporting
         import traceback
-        
+
         # Log detailed error information
         error_details = {
             "started_at": started,
@@ -639,18 +647,21 @@ def analyze_genes(
             "duration_ms": int((__import__("time").perf_counter() - started_perf) * 1000),
             "traceback": traceback.format_exc(),
         }
-        
+
         contextual_trace.record("error", error_details)
-        
+
         # Also print to stderr for immediate visibility
-        print(f"ERROR in enrichment analysis: {type(exc).__name__}: {exc}", file=__import__("sys").stderr)
+        print(
+            f"ERROR in enrichment analysis: {type(exc).__name__}: {exc}",
+            file=__import__("sys").stderr,
+        )
         print(f"Traceback:\n{traceback.format_exc()}", file=__import__("sys").stderr)
-        
+
         raise HTTPException(
-            status_code=500, 
+            status_code=500,
             detail={
                 "message": f"Gene analysis failed: {str(exc)}",
                 "error_type": type(exc).__name__,
-                "step": "enrichment_analysis"
-            }
+                "step": "enrichment_analysis",
+            },
         ) from exc

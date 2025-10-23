@@ -96,6 +96,7 @@ class GeneEnrichmentAnalyzer:
 
         except Exception as e:
             import traceback
+
             logger.error(f"Gene normalization failed: {e}")
             logger.error(f"Traceback: {traceback.format_exc()}")
             # Fallback: treat all genes as invalid
@@ -174,6 +175,7 @@ class GeneEnrichmentAnalyzer:
 
         except Exception as e:
             import traceback
+
             logger.error(f"Enrichment analysis failed: {e}")
             logger.error(f"Traceback: {traceback.format_exc()}")
             return []
