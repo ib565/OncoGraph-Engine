@@ -34,9 +34,26 @@ type HypothesisAnalyzerProps = {
   onNavigateToQuery?: (question: string) => void;
 };
 
+// Library color mapping consistent with backend
+const getLibraryColor = (library: string): string => {
+  const libraryColors: Record<string, string> = {
+    "GO_Biological_Process_2023": "#1f77b4",
+    "KEGG_2021_Human": "#ff7f0e", 
+    "Reactome_2022": "#2ca02c",
+  };
+  return libraryColors[library] || "#d62728";
+};
+
 export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnalyzerProps = {}) {
   const { hypothesisState, setHypothesisState } = useAppContext();
   const { genes, result, partialResult, summaryResult, error, isLoading, isLoadingPreset, isSummaryLoading } = hypothesisState;
+  
+  // State for dot plot drawer
+  const [selectedTerm, setSelectedTerm] = useState<{
+    term: string;
+    library: string;
+    genes: string[];
+  } | null>(null);
 
   async function loadPreset(presetId: string) {
     if (!API_URL) {
@@ -435,6 +452,27 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
                           displaylogo: false,
                           modeBarButtonsToRemove: ["pan2d", "lasso2d", "select2d"],
                         }}
+                        onClick={(event) => {
+                          if (event.points && event.points.length > 0) {
+                            const point = event.points[0];
+                            const term = point.y;
+                            const library = point.data.name?.replace(/ /g, "_") || "";
+                            
+                            // Find the enrichment result for this term
+                            const enrichmentResults = partialResult?.enrichment_results || result?.enrichment_results || [];
+                            const matchingResult = enrichmentResults.find(
+                              (item: any) => item.term === term && item.library === library
+                            );
+                            
+                            if (matchingResult) {
+                              setSelectedTerm({
+                                term: matchingResult.term,
+                                library: matchingResult.library,
+                                genes: matchingResult.genes || []
+                              });
+                            }
+                          }
+                        }}
                       />
                     </div>
                   </div>
@@ -447,7 +485,7 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
           <div className="layout-row">
             {/* Enrichment Results Column */}
             {((partialResult && partialResult.enrichment_results.length > 0) || 
-              (result && result.enrichment_results.length > 0)) && (
+              (result && result.enrichment_results.length > 0)) ? (
               <div className="layout-column enrichment-column">
                 <div className="card rows-card">
                   <header className="panel-header">
@@ -456,13 +494,62 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
                       Detailed results from functional enrichment analysis.
                       Results are sorted by statistical significance.
                     </p>
+                    {/* Gene count chips */}
+                    <div className="gene-count-chips" style={{ marginTop: "8px" }}>
+                      <span 
+                        className="gene-count-chip" 
+                        title="Symbols normalized with mygene.info (Human)."
+                        style={{ 
+                          display: "inline-block", 
+                          padding: "4px 8px", 
+                          marginRight: "8px", 
+                          backgroundColor: "#e3f2fd", 
+                          color: "#1976d2", 
+                          borderRadius: "12px", 
+                          fontSize: "12px",
+                          cursor: "help"
+                        }}
+                      >
+                        Used genes: {(partialResult?.valid_genes?.length || result?.valid_genes?.length) || 0}
+                      </span>
+                      <span 
+                        className="gene-count-chip" 
+                        title="Symbols normalized with mygene.info (Human)."
+                        style={{ 
+                          display: "inline-block", 
+                          padding: "4px 8px", 
+                          backgroundColor: "#fff3e0", 
+                          color: "#f57c00", 
+                          borderRadius: "12px", 
+                          fontSize: "12px",
+                          cursor: "help"
+                        }}
+                      >
+                        Unrecognized: {(partialResult?.invalid_genes?.length || result?.invalid_genes?.length) || 0}
+                      </span>
+                    </div>
                   </header>
                   <div className="card-content">
                     <div className="enrichment-scroll" role="list">
                       {(partialResult?.enrichment_results || result?.enrichment_results || []).map((item, index) => (
                         <article className="row-card" key={`enrichment-${index}`} role="listitem">
                           <header className="row-heading">
-                            {item.term} ({item.library})
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                              <span>{item.term}</span>
+                              <span 
+                                className="library-pill"
+                                style={{
+                                  padding: "2px 6px",
+                                  borderRadius: "8px",
+                                  fontSize: "10px",
+                                  fontWeight: "500",
+                                  backgroundColor: getLibraryColor(item.library),
+                                  color: "white"
+                                }}
+                              >
+                                {item.library.replace(/_/g, " ")}
+                              </span>
+                            </div>
                           </header>
                           <dl className="row-details">
                             <div className="row-item">
@@ -470,7 +557,7 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
                               <dd className="row-value">{item.p_value.toExponential(2)}</dd>
                             </div>
                             <div className="row-item">
-                              <dt className="row-key">Adjusted P-value</dt>
+                              <dt className="row-key">FDR</dt>
                               <dd className="row-value">{item.adjusted_p_value.toExponential(2)}</dd>
                             </div>
                             <div className="row-item">
@@ -510,6 +597,86 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
                         </article>
                       ))}
                     </div>
+                    {/* Methods note */}
+                    <div className="methods-note" style={{ 
+                      marginTop: "16px", 
+                      padding: "12px", 
+                      backgroundColor: "#f5f5f5", 
+                      borderRadius: "4px", 
+                      fontSize: "12px", 
+                      color: "#666",
+                      borderLeft: "3px solid #2196f3"
+                    }}>
+                      <strong>Methods:</strong> Over-representation analysis via Enrichr (GSEApy). Libraries: KEGG 2021 Human, Reactome 2022, GO BP 2023. Multiple testing: adjusted p-value (FDR).
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              // Empty state when no enrichment results
+              <div className="layout-column enrichment-column">
+                <div className="card rows-card">
+                  <header className="panel-header">
+                    <h3 className="panel-title">Enrichment Results</h3>
+                    <p className="panel-copy">
+                      No significant enrichment results found for the analyzed genes.
+                    </p>
+                    {/* Gene count chips even for empty state */}
+                    <div className="gene-count-chips" style={{ marginTop: "8px" }}>
+                      <span 
+                        className="gene-count-chip" 
+                        title="Symbols normalized with mygene.info (Human)."
+                        style={{ 
+                          display: "inline-block", 
+                          padding: "4px 8px", 
+                          marginRight: "8px", 
+                          backgroundColor: "#e3f2fd", 
+                          color: "#1976d2", 
+                          borderRadius: "12px", 
+                          fontSize: "12px",
+                          cursor: "help"
+                        }}
+                      >
+                        Used genes: {(partialResult?.valid_genes?.length || result?.valid_genes?.length) || 0}
+                      </span>
+                      <span 
+                        className="gene-count-chip" 
+                        title="Symbols normalized with mygene.info (Human)."
+                        style={{ 
+                          display: "inline-block", 
+                          padding: "4px 8px", 
+                          backgroundColor: "#fff3e0", 
+                          color: "#f57c00", 
+                          borderRadius: "12px", 
+                          fontSize: "12px",
+                          cursor: "help"
+                        }}
+                      >
+                        Unrecognized: {(partialResult?.invalid_genes?.length || result?.invalid_genes?.length) || 0}
+                      </span>
+                    </div>
+                  </header>
+                  <div className="card-content">
+                    <div style={{ 
+                      padding: "24px", 
+                      textAlign: "center", 
+                      color: "#666",
+                      fontStyle: "italic"
+                    }}>
+                      No significant pathways or processes were enriched in this gene set.
+                    </div>
+                    {/* Methods note even for empty state */}
+                    <div className="methods-note" style={{ 
+                      marginTop: "16px", 
+                      padding: "12px", 
+                      backgroundColor: "#f5f5f5", 
+                      borderRadius: "4px", 
+                      fontSize: "12px", 
+                      color: "#666",
+                      borderLeft: "3px solid #2196f3"
+                    }}>
+                      <strong>Methods:</strong> Over-representation analysis via Enrichr (GSEApy). Libraries: KEGG 2021 Human, Reactome 2022, GO BP 2023. Multiple testing: adjusted p-value (FDR).
+                    </div>
                   </div>
                 </div>
               </div>
@@ -546,6 +713,46 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
                     <div className="alert" role="alert">
                       {(partialResult?.warnings || result?.warnings || []).map((warning, index) => (
                         <div key={index}>{warning}</div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Dot Plot Drawer */}
+          {selectedTerm && (
+            <div className="layout-row">
+              <div className="layout-column full-width">
+                <div className="card">
+                  <header className="panel-header">
+                    <h3 className="panel-title">Overlap Genes: {selectedTerm.term}</h3>
+                    <p className="panel-copy">
+                      Library: {selectedTerm.library.replace(/_/g, " ")} • {selectedTerm.genes.length} genes
+                    </p>
+                    <button
+                      onClick={() => setSelectedTerm(null)}
+                      style={{
+                        position: "absolute",
+                        top: "16px",
+                        right: "16px",
+                        background: "none",
+                        border: "none",
+                        fontSize: "20px",
+                        cursor: "pointer",
+                        color: "#666"
+                      }}
+                    >
+                      ×
+                    </button>
+                  </header>
+                  <div className="card-content">
+                    <div className="value-pills">
+                      {selectedTerm.genes.map((gene, index) => (
+                        <span key={index} className="value-pill">
+                          {gene}
+                        </span>
                       ))}
                     </div>
                   </div>

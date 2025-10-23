@@ -22,6 +22,7 @@ type GraphState = {
 type EnrichmentResponse = {
   summary: string;
   valid_genes: string[];
+  invalid_genes: string[];
   warnings: string[];
   enrichment_results: Array<{
     term: string;
@@ -39,6 +40,7 @@ type EnrichmentResponse = {
 
 type PartialEnrichmentResult = {
   valid_genes: string[];
+  invalid_genes: string[];
   warnings: string[];
   enrichment_results: Array<{
     term: string;
