@@ -4,12 +4,7 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import MiniGraph from "./MiniGraph";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-
-type QueryResponse = {
-  answer: string;
-  cypher: string;
-  rows: Array<Record<string, unknown>>;
-};
+import { useAppContext, type QueryResponse } from "../contexts/AppContext";
 
 type GraphPanelProps = {
   rows: Array<Record<string, unknown>>;
@@ -65,14 +60,11 @@ const getUrlLabel = (value: string) => {
 };
 
 export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
-  const [question, setQuestion] = useState("");
-  const [result, setResult] = useState<QueryResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [progress, setProgress] = useState<string | null>(null);
+  const { graphState, setGraphState } = useAppContext();
+  const { question, result, error, isLoading, progress, lastQuery } = graphState;
+  
   const sseRef = useRef<EventSource | null>(null);
   const [dotCount, setDotCount] = useState(0);
-  const [lastQuery, setLastQuery] = useState<string | null>(null);
   const initialTriggerRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -99,22 +91,18 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
     const trimmed = input.trim();
 
     if (!trimmed) {
-      setQuestion("");
+      setGraphState({ question: "" });
       return;
     }
 
-    setQuestion(trimmed);
-    setLastQuery(trimmed);
-
-    if (!API_URL) {
-      setError("NEXT_PUBLIC_API_URL is not configured");
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-    setResult(null);
-    setProgress(null);
+    setGraphState({ 
+      question: trimmed,
+      lastQuery: trimmed,
+      isLoading: true,
+      error: null,
+      result: null,
+      progress: null
+    });
 
     // Try SSE first for progress streaming
     const url = `${API_URL}/query/stream?question=${encodeURIComponent(trimmed)}`;
@@ -133,7 +121,7 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
         try {
           const data = JSON.parse(evt.data) as { message?: string };
           if (data?.message) {
-            setProgress(data.message);
+            setGraphState({ progress: data.message });
             setDotCount(0);
           }
         } catch {
@@ -144,26 +132,24 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
       es.addEventListener("result", (evt: MessageEvent) => {
         try {
           const data = JSON.parse(evt.data) as QueryResponse;
-          setResult(data);
+          setGraphState({ result: data });
         } catch {
-          setError("Malformed result from server");
+          setGraphState({ error: "Malformed result from server" });
         } finally {
-          setProgress(null);
+          setGraphState({ progress: null, isLoading: false });
           close();
-          setIsLoading(false);
         }
       });
 
       es.addEventListener("error", (evt: MessageEvent) => {
         try {
           const data = JSON.parse((evt as MessageEvent).data) as { message?: string };
-          setError(data?.message || "Request failed");
+          setGraphState({ error: data?.message || "Request failed" });
         } catch {
-          setError("Request failed");
+          setGraphState({ error: "Request failed" });
         } finally {
-          setProgress(null);
+          setGraphState({ progress: null, isLoading: false });
           close();
-          setIsLoading(false);
         }
       });
 
@@ -186,13 +172,12 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
                 throw new Error(`Request failed with status ${response.status}`);
               }
               const data = (await response.json()) as QueryResponse;
-              setResult(data);
+              setGraphState({ result: data });
             } catch (err) {
               const message = err instanceof Error ? err.message : String(err);
-              setError(message);
+              setGraphState({ error: message });
             } finally {
-              setProgress(null);
-              setIsLoading(false);
+              setGraphState({ progress: null, isLoading: false });
             }
           })();
         }
@@ -212,13 +197,12 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
           throw new Error(`Request failed with status ${response.status}`);
         }
         const data = (await response.json()) as QueryResponse;
-        setResult(data);
+        setGraphState({ result: data });
       } catch (fallbackErr) {
         const message = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
-        setError(message);
+        setGraphState({ error: message });
       } finally {
-        setProgress(null);
-        setIsLoading(false);
+        setGraphState({ progress: null, isLoading: false });
       }
     }
   }, []);
@@ -255,7 +239,7 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
                   <input
                     className="query-input"
                     value={question}
-                    onChange={(event) => setQuestion(event.target.value)}
+                    onChange={(event) => setGraphState({ question: event.target.value })}
                     placeholder="e.g. Do KRAS mutations affect response to anti-EGFR therapy in colorectal cancer?"
                     disabled={isLoading}
                   />
@@ -298,7 +282,7 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
                           type="button"
                           className="example-button"
                           onClick={() => {
-                            setQuestion(example);
+                            setGraphState({ question: example });
                           }}
                           disabled={isLoading}
                         >

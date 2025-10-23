@@ -122,8 +122,31 @@ body {
   background: rgba(35, 179, 211, 0.1);
 }
 
-.top-bar-status {
+.top-bar-actions {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.clear-button {
+  font-size: 12px;
+  color: var(--text-2);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.clear-button:hover {
+  color: var(--text-1);
+  border-color: var(--text-2);
+  background: var(--bg-surface);
+}
+
+.top-bar-status {
   font-size: 12px;
   color: var(--text-2);
 }

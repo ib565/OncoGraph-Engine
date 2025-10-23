@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import TopBar from "./components/TopBar";
+import { AppProvider } from "./contexts/AppContext";
 
 export const metadata: Metadata = {
   title: "OncoGraph",
@@ -25,12 +26,14 @@ export default function RootLayout({
           MozOsxFontSmoothing: "grayscale",
         }}
       >
-        <div className="app-shell">
-          <TopBar />
-          <main className="workspace">
-            {children}
-          </main>
-        </div>
+        <AppProvider>
+          <div className="app-shell">
+            <TopBar />
+            <main className="workspace">
+              {children}
+            </main>
+          </div>
+        </AppProvider>
       </body>
     </html>
   );

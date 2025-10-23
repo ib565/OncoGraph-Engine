@@ -4,48 +4,11 @@ import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import dynamic from "next/dynamic";
+import { useAppContext, type EnrichmentResponse, type PartialEnrichmentResult, type SummaryResult } from "../contexts/AppContext";
 
 // Dynamically import Plotly to avoid SSR issues
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 
-type EnrichmentResponse = {
-  summary: string;
-  valid_genes: string[];
-  warnings: string[];
-  enrichment_results: Array<{
-    term: string;
-    library: string;
-    p_value: number;
-    adjusted_p_value: number;
-    odds_ratio?: number;
-    gene_count: number;
-    genes: string[];
-    description: string;
-  }>;
-  plot_data: any;
-  followUpQuestions: string[];
-};
-
-type PartialEnrichmentResult = {
-  valid_genes: string[];
-  warnings: string[];
-  enrichment_results: Array<{
-    term: string;
-    library: string;
-    p_value: number;
-    adjusted_p_value: number;
-    odds_ratio?: number;
-    gene_count: number;
-    genes: string[];
-    description: string;
-  }>;
-  plot_data: any;
-};
-
-type SummaryResult = {
-  summary: string;
-  followUpQuestions: string[];
-};
 
 type GeneSetResponse = {
   genes: string[];
@@ -72,23 +35,19 @@ type HypothesisAnalyzerProps = {
 };
 
 export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnalyzerProps = {}) {
-  const [genes, setGenes] = useState("");
-  const [result, setResult] = useState<EnrichmentResponse | null>(null);
-  const [partialResult, setPartialResult] = useState<PartialEnrichmentResult | null>(null);
-  const [summaryResult, setSummaryResult] = useState<SummaryResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingPreset, setIsLoadingPreset] = useState(false);
-  const [isSummaryLoading, setIsSummaryLoading] = useState(false);
+  const { hypothesisState, setHypothesisState } = useAppContext();
+  const { genes, result, partialResult, summaryResult, error, isLoading, isLoadingPreset, isSummaryLoading } = hypothesisState;
 
   async function loadPreset(presetId: string) {
     if (!API_URL) {
-      setError("NEXT_PUBLIC_API_URL is not configured");
+      setHypothesisState({ error: "NEXT_PUBLIC_API_URL is not configured" });
       return;
     }
 
-    setIsLoadingPreset(true);
-    setError(null);
+    setHypothesisState({ 
+      isLoadingPreset: true,
+      error: null 
+    });
 
     try {
       const response = await fetch(`${API_URL}/graph-gene-sets`, {
@@ -106,14 +65,14 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
 
       const data = (await response.json()) as GeneSetResponse;
       const geneList = data.genes.join(", ");
-      setGenes(geneList);
+      setHypothesisState({ genes: geneList });
       
       // Just populate the text area - user can modify and click analyze manually
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      setError(message);
+      setHypothesisState({ error: message });
     } finally {
-      setIsLoadingPreset(false);
+      setHypothesisState({ isLoadingPreset: false });
     }
   }
 
@@ -121,23 +80,25 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
     const trimmed = input.trim();
 
     if (!trimmed) {
-      setGenes("");
+      setHypothesisState({ genes: "" });
       return;
     }
 
-    setGenes(trimmed);
+    setHypothesisState({ genes: trimmed });
 
     if (!API_URL) {
-      setError("NEXT_PUBLIC_API_URL is not configured");
+      setHypothesisState({ error: "NEXT_PUBLIC_API_URL is not configured" });
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
-    setResult(null);
-    setPartialResult(null);
-    setSummaryResult(null);
-    setIsSummaryLoading(false);
+    setHypothesisState({
+      isLoading: true,
+      error: null,
+      result: null,
+      partialResult: null,
+      summaryResult: null,
+      isSummaryLoading: false
+    });
 
     try {
       const url = `${API_URL}/analyze/genes/stream?genes=${encodeURIComponent(trimmed)}`;
@@ -161,9 +122,11 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
         
         // Only show error if we haven't received any results yet
         if (!partialResult && !summaryResult) {
-          setError("Connection error occurred during analysis");
-          setIsLoading(false);
-          setIsSummaryLoading(false);
+          setHypothesisState({ 
+            error: "Connection error occurred during analysis",
+            isLoading: false,
+            isSummaryLoading: false
+          });
         }
         eventSource.close();
       };
@@ -172,9 +135,11 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
         try {
           const messageEvent = event as MessageEvent;
           const data = JSON.parse(messageEvent.data) as PartialEnrichmentResult;
-          setPartialResult(data);
-          setIsSummaryLoading(true);
-          setIsLoading(false); // Stop the main loading state
+          setHypothesisState({ 
+            partialResult: data,
+            isSummaryLoading: true,
+            isLoading: false
+          });
         } catch (err) {
           console.error("Failed to parse partial result:", err);
         }
@@ -184,14 +149,18 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
         try {
           const messageEvent = event as MessageEvent;
           const data = JSON.parse(messageEvent.data) as SummaryResult;
-          setSummaryResult(data);
-          setIsSummaryLoading(false);
+          setHypothesisState({ 
+            summaryResult: data,
+            isSummaryLoading: false
+          });
           
           // Create complete result for backwards compatibility
           if (partialResult) {
-            setResult({
-              ...partialResult,
-              ...data,
+            setHypothesisState({
+              result: {
+                ...partialResult,
+                ...data,
+              }
             });
           }
           
@@ -208,17 +177,25 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
           if (messageEvent.data) {
             const data = JSON.parse(messageEvent.data);
             const message = data.message || "An error occurred during analysis";
-            setError(message);
+            setHypothesisState({ 
+              error: message,
+              isLoading: false,
+              isSummaryLoading: false
+            });
           } else {
-            setError("An error occurred during analysis");
+            setHypothesisState({ 
+              error: "An error occurred during analysis",
+              isLoading: false,
+              isSummaryLoading: false
+            });
           }
-          setIsLoading(false);
-          setIsSummaryLoading(false);
         } catch (err) {
           console.error("Failed to parse error result:", err);
-          setError("An error occurred during analysis");
-          setIsLoading(false);
-          setIsSummaryLoading(false);
+          setHypothesisState({ 
+            error: "An error occurred during analysis",
+            isLoading: false,
+            isSummaryLoading: false
+          });
         }
         eventSource.close();
       });
@@ -248,18 +225,22 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
         if (eventSource.readyState !== EventSource.CLOSED) {
           eventSource.close();
           if (!partialResult && !summaryResult) {
-            setError("Analysis timed out");
-            setIsLoading(false);
-            setIsSummaryLoading(false);
+            setHypothesisState({ 
+              error: "Analysis timed out",
+              isLoading: false,
+              isSummaryLoading: false
+            });
           }
         }
       }, 180000); // 3 minutes timeout
 
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      setError(message);
-      setIsLoading(false);
-      setIsSummaryLoading(false);
+      setHypothesisState({ 
+        error: message,
+        isLoading: false,
+        isSummaryLoading: false
+      });
     }
   }
 
@@ -333,7 +314,7 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
                 <textarea
                   className="query-input"
                   value={genes}
-                  onChange={(event) => setGenes(event.target.value)}
+                  onChange={(event) => setHypothesisState({ genes: event.target.value })}
                   placeholder="e.g. BRCA1, BRCA2, TP53, ATM, CHEK2"
                   disabled={isLoading || isLoadingPreset}
                   rows={4}

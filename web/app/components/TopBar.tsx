@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAppContext } from "../contexts/AppContext";
 
 const tabs = [
   { href: "/", label: "Graph Q&A" },
@@ -10,6 +11,7 @@ const tabs = [
 
 export default function TopBar() {
   const pathname = usePathname();
+  const { clearAllState } = useAppContext();
 
   return (
     <div className="top-bar">
@@ -30,8 +32,17 @@ export default function TopBar() {
         })}
       </nav>
 
-      <div className="top-bar-status" aria-live="polite">
-        Ready
+      <div className="top-bar-actions">
+        <button
+          onClick={clearAllState}
+          className="clear-button"
+          title="Clear all data and start fresh"
+        >
+          Clear All
+        </button>
+        <div className="top-bar-status" aria-live="polite">
+          Ready
+        </div>
       </div>
     </div>
   );
