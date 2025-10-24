@@ -10,9 +10,9 @@ SCHEMA_SNIPPET = dedent(
     - Helper label: Biomarker (applied to Gene and Variant)
     - Relationships:
       (Variant)-[:VARIANT_OF]->(Gene)
-      (Therapy)-[:TARGETS {source, moa?, action_type?, ref_sources?, ref_ids?, ref_urls?}]->(Gene)
-      (Biomarker)-[:AFFECTS_RESPONSE_TO {effect, disease_name, disease_id?,
-        pmids, source, notes?}]->(Therapy)
+      (Therapy)-[:TARGETS {{source, moa?, action_type?, ref_sources?, ref_ids?, ref_urls?}}]->(Gene)
+      (Biomarker)-[:AFFECTS_RESPONSE_TO {{effect, disease_name, disease_id?,
+        pmids, source, notes?}}]->(Therapy)
     - Array properties: pmids, tags
     - No parameters: inline single-quoted literals only
       (no $variables)
@@ -20,21 +20,68 @@ SCHEMA_SNIPPET = dedent(
     Preferred return columns (choose minimally sufficient for the question):
     - AFFECTS queries (predictive evidence): project
       variant_name, gene_symbol, therapy_name, effect, disease_name, pmids.
+      Always include pmids as an array; default to [] when absent.
+    - Gene-only AFFECTS queries ("Which genes..."):
+      set variant_name = NULL, return gene_symbol, therapy_name, effect,
+      disease_name, pmids, and de-duplicate by gene_symbol, therapy_name,
+      disease_name. Aggregate pmids across evidence rows into a single array.
     - TARGETS queries (mechanism/targeting): project
-      gene_symbol, therapy_name, r.moa AS targets_moa (if available), and
-      r.ref_sources, r.ref_ids, r.ref_urls. Optionally also derive pmids from
-      reference source/ids.
+      gene_symbol, therapy_name, r.moa AS targets_moa, and also return pmids
+      derived from r.ref_sources/r.ref_ids when available. Include
+      r.ref_sources, r.ref_ids, r.ref_urls for transparency.
     - Always include therapy_name and at least one of gene_symbol or variant_name.
     - For mixed queries, set missing columns to NULL; include pmids only when
-      available (AFFECTS) or derived from references.
+      available (AFFECTS) or derived from references (TARGETS).
+
+    Always include evidence (pmids):
+    - For AFFECTS queries, use rel.pmids (coalesce to []).
+    - For gene-only AFFECTS, aggregate pmids across all evidence rows that
+      contribute to a gene–therapy–disease tuple.
+    - For TARGETS queries, derive pmids from references:
+      filter r.ref_sources/r.ref_ids to PMIDs where the source contains
+      'pubmed' or equals 'pmid' (case-insensitive); default to [].
+
+    Canonical example (AFFECTS; gene-only with pmid aggregation; adapt values):
+      MATCH (b:Biomarker)-[rel:AFFECTS_RESPONSE_TO]->(t:Therapy)
+      WHERE (
+        toLower(t.name) = toLower('cetuximab')
+        OR toLower(t.name) = toLower('panitumumab')
+        OR any(s IN coalesce(t.synonyms, [])
+               WHERE toLower(s) = toLower('cetuximab'))
+        OR any(s IN coalesce(t.synonyms, [])
+               WHERE toLower(s) = toLower('panitumumab'))
+        OR toLower(t.name) CONTAINS toLower('cetuximab')
+        OR toLower(t.name) CONTAINS toLower('panitumumab')
+      )
+      AND toLower(rel.effect) = 'resistance'
+      AND toLower(rel.disease_name) CONTAINS toLower('colorectal')
+      OPTIONAL MATCH (b)-[:VARIANT_OF]->(g:Gene)
+      WITH
+        CASE WHEN b:Gene THEN b.symbol ELSE g.symbol END AS gene_symbol,
+        t.name AS therapy_name,
+        rel.disease_name AS disease_name,
+        coalesce(rel.pmids, []) AS pmids
+      WHERE gene_symbol IS NOT NULL
+      WITH gene_symbol, therapy_name, disease_name, collect(pmids) AS pmid_lists
+      WITH gene_symbol, therapy_name, disease_name,
+           reduce(allp = [], lst IN pmid_lists | allp + lst) AS pmids
+      RETURN
+        NULL AS variant_name,
+        gene_symbol,
+        therapy_name,
+        'resistance' AS effect,
+        disease_name,
+        pmids
+      LIMIT 100
 
     Canonical example (AFFECTS; adapt values as needed):
       MATCH (b:Biomarker)-[rel:AFFECTS_RESPONSE_TO]->(t:Therapy)
       WHERE (
-        any(tag IN t.tags WHERE toLower(tag) CONTAINS toLower('anti-EGFR'))
-        OR (t)-[:TARGETS]->(:Gene {symbol: 'EGFR'})
+        any(tag IN coalesce(t.tags, [])
+            WHERE toLower(tag) CONTAINS toLower('anti-EGFR'))
+        OR (t)-[:TARGETS]->(:Gene {{symbol: 'EGFR'}})
       )
-      AND rel.effect = 'resistance'
+      AND toLower(rel.effect) = 'resistance'
       AND toLower(rel.disease_name) CONTAINS toLower('colorectal')
       OPTIONAL MATCH (b)-[:VARIANT_OF]->(g:Gene)
       RETURN
@@ -70,18 +117,23 @@ SCHEMA_SNIPPET = dedent(
       LIMIT 100
 
     Canonical rules:
-    - Gene-only: match biomarker as the Gene OR any Variant VARIANT_OF that Gene
-      (prefer single MATCH + OR; avoid WHERE immediately after UNWIND).
+    - Gene-only: match biomarker as the Gene OR any Variant VARIANT_OF that Gene.
+      For gene-only questions, collapse to gene-level in the RETURN:
+        • return NULL AS variant_name,
+        • return gene_symbol (from b:Gene or via VARIANT_OF),
+        • de-duplicate by gene_symbol, therapy_name, disease_name,
+        • aggregate pmids across evidence rows into a single array.
     - Specific variant:
       - Always require VARIANT_OF to the named gene.
       - Prefer equality on Variant.name for full names like 'KRAS G12C' or
-        'BCR::ABL1 Fusion'. Fallback to toLower(Variant.name) CONTAINS toLower('<TOKEN>').
-      - For fusion tokens (e.g., "EML4-ALK", "EML4::ALK"), match either orientation:
+        'BCR::ABL1 Fusion'. Fallback to toLower(Variant.name) CONTAINS
+        toLower('<TOKEN>'), or hgvs_p = 'p.<TOKEN>', or synonyms CONTAINS.
+      - For fusion tokens (e.g., 'EML4-ALK', 'EML4::ALK'), match either orientation:
         toLower(Variant.name) CONTAINS toLower('EML4::ALK') OR
         toLower(Variant.name) CONTAINS toLower('ALK::EML4').
-      - For alteration-class tokens ("Amplification", "Overexpression", "Deletion",
-        "Loss-of-function", "Fusion", "Wildtype"), use toLower(Variant.name)
-        CONTAINS toLower('<TOKEN>') together with VARIANT_OF to the gene.
+      - For alteration-class tokens ('Amplification', 'Overexpression',
+        'Deletion', 'Loss-of-function', 'Fusion', 'Wildtype'), use
+        toLower(Variant.name) CONTAINS toLower('<TOKEN>') together with VARIANT_OF.
     - Gene synonyms: allow equality on symbol OR equality on any synonyms (case-insensitive).
     - Therapy class: match via tags (case-insensitive contains) OR via TARGETS to the gene.
     - Therapy name: when a specific therapy is named, prefer case-insensitive equality on
@@ -94,8 +146,12 @@ SCHEMA_SNIPPET = dedent(
       the question names a specific disease entity.
     - Filter scoping: place WHERE filters that constrain (b)-[rel:AFFECTS_RESPONSE_TO]->(t)
       immediately after introducing those bindings. Do not attach such filters to OPTIONAL MATCH.
-    - Do not assume the biomarker equals the therapy’s target gene unless explicitly named as the biomarker.
-    """  # noqa: E501
+    - Effect filtering: compare case-insensitively, e.g., toLower(rel.effect) = 'resistance'
+      or 'sensitivity'.
+    - Array usage: wrap arrays with coalesce(..., []) before any()/all() checks.
+    - Do not assume the biomarker equals the therapy's target gene unless explicitly named
+      as the biomarker.
+    """
 ).strip()
 
 INSTRUCTION_PROMPT_TEMPLATE = dedent(
@@ -107,24 +163,42 @@ INSTRUCTION_PROMPT_TEMPLATE = dedent(
 
     Task: Rewrite the user's question as 3–6 short bullet points that
     reference the schema labels, relationships, and property names. Keep guidance
-    tumor‑agnostic unless a disease is explicitly named. Output only bullets
+    tumor-agnostic unless a disease is explicitly named. Output only bullets
     starting with "- "; no Cypher and no JSON.
 
-    Important: If only an amino‑acid token (e.g., "G12C") appears in the
+    Always include evidence (PMIDs):
+    - For AFFECTS queries, return pmids from rel.pmids (array; default []).
+    - For gene-only AFFECTS questions, collapse to gene-level and aggregate pmids
+      across evidence rows for each gene–therapy–disease tuple.
+    - For TARGETS queries, derive pmids from r.ref_sources/r.ref_ids by selecting
+      entries where the source contains 'pubmed' or equals 'pmid' (case-insensitive).
+
+    - If the question asks for "genes" (no specific variant named), instruct to:
+      • match (b:Gene) OR (b:Variant)-[:VARIANT_OF]->(g:Gene),
+      • return gene_symbol only (set variant_name to NULL),
+      • de-duplicate by gene_symbol, therapy_name, and disease_name,
+      • aggregate pmids across evidence rows.
+
+    - When checking array properties (e.g., synonyms, tags), wrap with coalesce(..., [])
+      before using any()/all() to avoid nulls.
+    - Compare effect case-insensitively with toLower(rel.effect).
+
+    Important: If only an amino-acid token (e.g., "G12C") appears in the
     question, do NOT write equality on Variant.name or Variant.hgvs_p to that
-    bare token. Instead, reference the guarded token‑handling pattern from the
+    bare token. Instead, reference the guarded token-handling pattern from the
     canonical rules (VARIANT_OF + name CONTAINS + hgvs_p 'p.<TOKEN>' or CONTAINS
     + synonyms CONTAINS). If a full variant name (e.g., "KRAS G12C") appears,
     prefer exact equality on Variant.name together with the VARIANT_OF guard.
 
     - When the question uses an umbrella disease term (e.g., "lung cancer"), include a
-      bullet instructing minimal anchor filtering: require only 'lung' (case‑insensitive)
+      bullet instructing minimal anchor filtering: require only 'lung' (case-insensitive)
       to appear in rel.disease_name. Do not require 'cancer'/'carcinoma' to maximize recall.
     - When a therapy is explicitly named, include a bullet to match Therapy by
-      case‑insensitive name equality and allow synonyms/CONTAINS as fallbacks.
+      case-insensitive name equality and allow synonyms/CONTAINS as fallbacks.
     - When the question asks which therapies target a gene or requests mechanisms of
       action (MOA), include a bullet to match (t:Therapy)-[r:TARGETS]->(g:Gene) for the
-      gene (consider synonyms) and to project r.moa AS targets_moa.
+      gene (consider synonyms) and to project r.moa AS targets_moa. Also instruct to
+      derive pmids from references as described above.
 
     User question: {question}
     """
@@ -141,31 +215,51 @@ CYPHER_PROMPT_TEMPLATE = dedent(
       and RETURN columns.
     - Produce a single Cypher query only (no commentary or fences).
     - Include a RETURN clause and a LIMIT.
+    - Keep queries simple: prefer MATCH/OPTIONAL MATCH, WHERE, WITH, RETURN.
     - Follow the canonical rules above (gene‑or‑variant, VARIANT_OF for variants,
-      therapy class via tags or TARGETS, case-insensitive disease equality,
+      therapy class via tags or TARGETS, case-insensitive disease handling,
       filter scoping, and no parameters).
     - For tokenized variants (e.g., "G12C") or alteration classes ("Amplification",
       "Overexpression", "Deletion", "Loss-of-function", "Fusion", "Wildtype"),
       prefer equality on Variant.name when a full name is known, otherwise use
       toLower(Variant.name) CONTAINS toLower('<TOKEN>') together with VARIANT_OF.
-    - For fusions ("EML4-ALK", "EML4::ALK"), match both orientations in Variant.name.
+    - For fusions ("EML4-ALK", "EML4::ALK"), match both orientations in
+      Variant.name.
     - Do NOT use parameters (no $variables); inline single-quoted literals from
       the instruction text.
-    - Return the minimally sufficient set of columns for the question:
-      • For AFFECTS queries, project variant_name, gene_symbol, therapy_name, effect,
-        disease_name, pmids (pmids must be an array; default []).
-      • For TARGETS queries, project gene_symbol, therapy_name, r.moa AS targets_moa.
-      • Always include therapy_name and at least one of variant_name or gene_symbol.
-      • When mixing patterns, set missing columns to NULL (and pmids to []) for stability.
-    - Prefer case-insensitive equality for exact entity names (Variant.name,
-      Therapy.name, Gene.symbol). Include robust fallbacks where appropriate:
-        • Variant: equality on full name; OR name CONTAINS token; OR hgvs_p equality
-          to 'p.<TOKEN>'; OR synonyms CONTAINS token; always guard with VARIANT_OF
-          to the gene when variant-specific.
-        • Therapy: equality on t.name; OR synonyms equality; OR toLower(t.name) CONTAINS.
-        • Disease (umbrella terms): minimal anchor filtering as described above
-          (e.g., toLower(rel.disease_name) CONTAINS toLower('lung')); otherwise use
-          case-insensitive equality for specific diseases.
+
+    Always include evidence (pmids):
+    - For AFFECTS queries, project pmids from rel.pmids as an array
+      (use coalesce(rel.pmids, [])).
+    - If the question asks for genes (not variants), collapse evidence to the
+      gene level: map Variant->Gene via VARIANT_OF, return NULL AS variant_name,
+      de-duplicate rows by gene_symbol, therapy_name, disease_name, and aggregate
+      pmids across evidence rows into a single array (collect + reduce).
+    - For TARGETS queries, derive pmids from r.ref_sources/r.ref_ids by selecting
+      PubMed/PMID references (case-insensitive) and return them as pmids
+      (default to [] if none).
+
+    Return the minimally sufficient set of columns for the question:
+    - For AFFECTS queries, project variant_name, gene_symbol, therapy_name, effect,
+      disease_name, pmids (pmids must be an array; default []).
+    - For TARGETS queries, project gene_symbol, therapy_name, r.moa AS targets_moa,
+      and pmids as derived above. Also return r.ref_sources, r.ref_ids, r.ref_urls.
+    - Always include therapy_name and at least one of variant_name or gene_symbol.
+    - When mixing patterns, set missing columns to NULL (and pmids to []) for
+      stability.
+
+    Robust fallbacks:
+    - Variant: equality on full name; OR name CONTAINS token; OR hgvs_p equality
+      to 'p.<TOKEN>'; OR synonyms CONTAINS token; always guard with VARIANT_OF
+      to the gene when variant-specific.
+    - Therapy: equality on t.name; OR synonyms equality; OR toLower(t.name)
+      CONTAINS; wrap arrays with coalesce(..., []).
+    - Disease (umbrella terms): minimal anchor filtering as described above
+      (e.g., toLower(rel.disease_name) CONTAINS toLower('lung')); otherwise use
+      case-insensitive equality for specific diseases.
+    - Effect: compare case-insensitively (e.g., toLower(rel.effect) = 'resistance').
+    - Arrays: when using any()/all() over arrays (e.g., synonyms, tags), wrap with
+      coalesce(property, []) to avoid null issues.
 
     Instruction text:
     {instructions}
