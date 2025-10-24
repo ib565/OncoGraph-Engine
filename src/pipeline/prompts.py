@@ -187,6 +187,7 @@ SUMMARY_PROMPT_TEMPLATE = dedent(
     provided (e.g., targets_moa). Cite PubMed IDs (PMIDs) inline when available.
     If there are rows irrelevant to the question, exclude them from the answer.
     If there are no rows, explicitly state that no evidence was found. Do not invent data.
+    Use simple markdown formatting for the answer.
     """
 ).strip()
 
@@ -229,6 +230,8 @@ ENRICHMENT_SUMMARY_PROMPT_TEMPLATE = dedent(
     2.  "For Colorectal Cancer, which variants in the KRAS gene are known to cause resistance to Cetuximab?"
     3.  "Which known biomarkers predict response to immunotherapy in Melanoma?"
     4.  "What is the known mechanism of action for therapies that target the BRAF gene?"
+
+    Use simple markdown formatting for the summary.
 
     INPUT DATA:
     - Gene list size: {gene_list_count} genes
