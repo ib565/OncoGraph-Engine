@@ -4,7 +4,7 @@
 ---
 
 ## Links
-- **Live demo:** [https://onco-graph.vercel.app/](https://onco-graph.vercel.app/)
+- **Live demo:** [https://onco-graph-engine.vercel.app/](https://onco-graph-engine.vercel.app/)
 - **90‑sec video:** `<add_url>`
 
 ---
