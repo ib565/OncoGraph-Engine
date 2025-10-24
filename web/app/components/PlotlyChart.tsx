@@ -50,8 +50,19 @@ export default function PlotlyChart({ data, layout, onClick }: PlotlyChartProps)
   const [isClient, setIsClient] = useState(false);
   const [hasError, setHasError] = useState(false);
 
+  // Combined effect: set client flag and add spinner styles
   useEffect(() => {
     setIsClient(true);
+    if (typeof window !== 'undefined') {
+      const style = document.createElement('style');
+      style.textContent = spinnerStyle;
+      document.head.appendChild(style);
+      return () => {
+        if (document.head.contains(style)) {
+          document.head.removeChild(style);
+        }
+      };
+    }
   }, []);
 
   // Don't render anything on server side
@@ -81,20 +92,6 @@ export default function PlotlyChart({ data, layout, onClick }: PlotlyChartProps)
       </div>
     );
   }
-
-  // Add spinner styles to head (only on client side)
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const style = document.createElement('style');
-      style.textContent = spinnerStyle;
-      document.head.appendChild(style);
-      return () => {
-        if (document.head.contains(style)) {
-          document.head.removeChild(style);
-        }
-      };
-    }
-  }, []);
 
   if (hasError) {
     return (
@@ -131,27 +128,21 @@ export default function PlotlyChart({ data, layout, onClick }: PlotlyChartProps)
     );
   }
 
-  try {
-    return (
-      <Plot
-        data={data || []}
-        layout={layout || {}}
-        style={{ width: "100%", height: "600px" }}
-        config={{
-          displayModeBar: true,
-          displaylogo: false,
-          modeBarButtonsToRemove: ["pan2d", "lasso2d", "select2d"],
-        }}
-        onClick={onClick}
-        onError={(error: any) => {
-          console.error("Plotly error:", error);
-          setHasError(true);
-        }}
-      />
-    );
-  } catch (error) {
-    console.error("Error rendering Plotly chart:", error);
-    setHasError(true);
-    return null;
-  }
+  return (
+    <Plot
+      data={data || []}
+      layout={layout || {}}
+      style={{ width: "100%", height: "600px" }}
+      config={{
+        displayModeBar: true,
+        displaylogo: false,
+        modeBarButtonsToRemove: ["pan2d", "lasso2d", "select2d"],
+      }}
+      onClick={onClick}
+      onError={(error: any) => {
+        console.error("Plotly error:", error);
+        setHasError(true);
+      }}
+    />
+  );
 }
