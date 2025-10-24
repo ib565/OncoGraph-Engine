@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import MiniGraph from "./MiniGraph";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -59,15 +60,30 @@ const getUrlLabel = (value: string) => {
   }
 };
 
+// Helper function to extract and deduplicate gene symbols from result rows
+const extractGeneSymbols = (rows: Array<Record<string, unknown>>): string[] => {
+  const geneSymbols = new Set<string>();
+  
+  rows.forEach(row => {
+    if (row.gene_symbol && typeof row.gene_symbol === 'string' && row.gene_symbol.trim()) {
+      geneSymbols.add(row.gene_symbol.trim());
+    }
+  });
+  
+  return Array.from(geneSymbols).sort();
+};
+
 export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
-  const { graphState, setGraphState } = useAppContext();
+  const { graphState, setGraphState, setHypothesisState, hypothesisState } = useAppContext();
   const { question, result, error, isLoading, progress, lastQuery, run_id } = graphState;
+  const router = useRouter();
   
   const sseRef = useRef<EventSource | null>(null);
   const [dotCount, setDotCount] = useState(0);
   const initialTriggerRef = useRef<string | null>(null);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
 
   useEffect(() => {
     if (!isLoading || !progress) {
@@ -255,6 +271,42 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
     }
   }
 
+  // Handle copying genes to clipboard
+  async function handleCopyGenes() {
+    if (!result?.rows) return;
+    
+    const geneSymbols = extractGeneSymbols(result.rows);
+    if (geneSymbols.length === 0) return;
+    
+    const geneString = geneSymbols.join(", ");
+    
+    try {
+      await navigator.clipboard.writeText(geneString);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy to clipboard:", err);
+    }
+  }
+
+  // Handle moving genes to Hypothesis Analyzer
+  function handleMoveToHypothesisAnalyzer() {
+    if (!result?.rows) return;
+    
+    const geneSymbols = extractGeneSymbols(result.rows);
+    if (geneSymbols.length === 0) return;
+    
+    const geneString = geneSymbols.join(", ");
+    
+    // Get current genes from hypothesis state and append
+    const currentGenes = hypothesisState.genes.trim();
+    const newGenes = currentGenes ? `${currentGenes}, ${geneString}` : geneString;
+    setHypothesisState({ genes: newGenes });
+    
+    // Navigate to hypotheses tab
+    router.push('/hypotheses');
+  }
+
   return (
     <div className="graph-panel">
       <div className="panel-header">
@@ -378,10 +430,59 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
               <div className="layout-column rows-column">
                 <div className="card">
                   <header className="panel-header">
-                    <h3 className="panel-title">Cypher Rows</h3>
-                    <p className="panel-copy">
-                      Explore the raw query results with references.
-                    </p>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                      <div style={{ flex: 1 }}>
+                        <h3 className="panel-title">Cypher Rows</h3>
+                        <p className="panel-copy">
+                          Explore the raw query results with references.
+                        </p>
+                      </div>
+                      {result?.rows && extractGeneSymbols(result.rows).length > 0 && (
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            onClick={handleCopyGenes}
+                            style={{ 
+                              fontSize: '12px', 
+                              padding: '6px 12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                            title={`Copy ${extractGeneSymbols(result.rows).length} gene symbols to clipboard`}
+                          >
+                            {copySuccess ? (
+                              <>
+                                <span>✓</span>
+                                <span>Copied!</span>
+                              </>
+                            ) : (
+                              <>
+                                <span>📋</span>
+                                <span>Copy Genes</span>
+                              </>
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            className="primary-button"
+                            onClick={handleMoveToHypothesisAnalyzer}
+                            style={{ 
+                              fontSize: '12px', 
+                              padding: '6px 12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                            title={`Move ${extractGeneSymbols(result.rows).length} gene symbols to Hypothesis Analyzer`}
+                          >
+                            <span>🧬</span>
+                            <span>Move to Hypothesis Analyzer</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </header>
                   <div className="card-content">
                     {result.rows?.length ? (
