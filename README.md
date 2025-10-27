@@ -1,9 +1,9 @@
 # OncoGraph Engine
 
+**Knowledge-graph Q&A + pathway enrichment for oncology research**
+
 [![Live Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://onco-graph-engine.vercel.app/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-
-**Knowledge-graph Q&A + pathway enrichment for oncology research**
 
 **📺 90-second demo video:** `<add_url>`
 
