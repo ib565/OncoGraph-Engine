@@ -113,16 +113,28 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
       return;
     }
 
+    setFeedbackSubmitted(false);
+    
+    // Check if backend is awake before starting the actual query
+    let backendWaking = false;
+    try {
+      const healthCheckPromise = fetch(`${API_URL}/healthz`, { signal: AbortSignal.timeout(3000) });
+      await healthCheckPromise;
+      // Backend is awake - proceed normally
+    } catch (err) {
+      // Backend is sleeping - show wake-up message
+      backendWaking = true;
+    }
+
     setGraphState({ 
       question: trimmed,
       lastQuery: trimmed,
       isLoading: true,
       error: null,
       result: null,
-      progress: null,
+      progress: backendWaking ? "Render Backend is waking up (may take 1-2 minutes)..." : null,
       run_id: null
     });
-    setFeedbackSubmitted(false);
 
     // Try SSE first for progress streaming
     const url = `${API_URL}/query/stream?question=${encodeURIComponent(trimmed)}`;

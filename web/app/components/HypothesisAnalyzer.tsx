@@ -63,6 +63,15 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
       error: null 
     });
 
+    // Check if backend is awake
+    try {
+      await fetch(`${API_URL}/healthz`, { signal: AbortSignal.timeout(3000) });
+      // Backend is awake - proceed normally
+    } catch (err) {
+      // Backend is sleeping - show wake-up message
+      setHypothesisState({ error: "Backend is waking up (may take 1-2 minutes)..." });
+    }
+
     try {
       const response = await fetch(`${API_URL}/graph-gene-sets`, {
         method: "POST",
@@ -105,9 +114,19 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
       return;
     }
 
+    // Check if backend is awake
+    let backendWaking = false;
+    try {
+      await fetch(`${API_URL}/healthz`, { signal: AbortSignal.timeout(3000) });
+      // Backend is awake - proceed normally
+    } catch (err) {
+      // Backend is sleeping - show wake-up message
+      backendWaking = true;
+    }
+
     setHypothesisState({
       isLoading: true,
-      error: null,
+      error: backendWaking ? "Backend is waking up (may take 1-2 minutes)..." : null,
       result: null,
       partialResult: null,
       summaryResult: null,
