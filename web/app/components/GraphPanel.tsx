@@ -14,7 +14,7 @@ type GraphPanelProps = {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 const EXAMPLE_QUERIES: string[] = [
-  "What biomarkers predict resistance to anti-EGFR therapies in colorectal cancer?",
+  "Which genes predict resistance to cetuximab or panitumumab in colorectal cancer?",
   "Which therapies target KRAS and what are their mechanisms of action?",
   "What is the predicted response of EGFR L858R to Gefitinib in Lung Cancer?",
 ];
