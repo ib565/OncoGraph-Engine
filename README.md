@@ -2,7 +2,9 @@
 
 **Knowledge-graph Q&A + pathway enrichment for oncology research**
 
-[Try the live deployment](https://onco-graph-engine.vercel.app/) | [Watch the 2-min demo](https://www.youtube.com/watch?v=4HtPS-SvBwk) | [Technical Details for devs](docs/TECHNICAL_DETAILS.md)
+[Try the live deployment](https://onco-graph-engine.vercel.app/) | [Watch the 2-min demo](https://www.youtube.com/watch?v=4HtPS-SvBwk)
+
+**For developers:** [Technical Details](docs/TECHNICAL_DETAILS.md) — Architecture, security, testing, etc
 
 ---
 
