@@ -68,9 +68,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run OncoGraph pipeline")
     parser.add_argument("question", nargs="+", help="User question text")
     parser.add_argument("--no-log", action="store_true", help="Disable JSONL logging")
-    parser.add_argument(
-        "--debug", action="store_true", help="Print stack traces and verbose step output"
-    )
+    parser.add_argument("--debug", action="store_true", help="Print stack traces and verbose step output")
     parser.add_argument("--trace", action="store_true", help="Stream trace events to stdout")
     args = parser.parse_args(argv)
 

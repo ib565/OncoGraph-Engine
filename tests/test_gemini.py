@@ -156,9 +156,7 @@ def test_enrichment_summarizer_handles_empty_results():
     """Test enrichment summarizer with empty results."""
     import json
 
-    stub_client = StubClient(
-        [json.dumps({"summary": "No significant enrichments found.", "followUpQuestions": []})]
-    )
+    stub_client = StubClient([json.dumps({"summary": "No significant enrichments found.", "followUpQuestions": []})])
     summarizer = GeminiEnrichmentSummarizer(client=stub_client)
 
     result = summarizer.summarize_enrichment(["BRCA1"], [])

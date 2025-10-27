@@ -197,9 +197,7 @@ class GeminiInstructionExpander(_GeminiBase, InstructionExpander):
         if cached_result is not None:
             return cached_result
 
-        prompt = INSTRUCTION_PROMPT_TEMPLATE.format(
-            schema=SCHEMA_SNIPPET, question=question.strip()
-        )
+        prompt = INSTRUCTION_PROMPT_TEMPLATE.format(schema=SCHEMA_SNIPPET, question=question.strip())
         text = self._call_model(prompt=prompt)
         result = text.strip()
 
@@ -218,9 +216,7 @@ class GeminiCypherGenerator(_GeminiBase, CypherGenerator):
         if cached_result is not None:
             return cached_result
 
-        prompt = CYPHER_PROMPT_TEMPLATE.format(
-            schema=SCHEMA_SNIPPET, instructions=instructions.strip()
-        )
+        prompt = CYPHER_PROMPT_TEMPLATE.format(schema=SCHEMA_SNIPPET, instructions=instructions.strip())
         text = self._call_model(prompt=prompt)
         result = _strip_code_fence(text)
 
@@ -286,11 +282,7 @@ class GeminiEnrichmentSummarizer(_GeminiBase):
                 f"   Genes: {', '.join(result['genes'][:5])}{'...' if len(result['genes']) > 5 else ''}"
             )
 
-        formatted_enrichment = (
-            "\n".join(formatted_results)
-            if formatted_results
-            else "No significant enrichments found"
-        )
+        formatted_enrichment = "\n".join(formatted_results) if formatted_results else "No significant enrichments found"
 
         prompt = ENRICHMENT_SUMMARY_PROMPT_TEMPLATE.format(
             gene_list=", ".join(gene_list),

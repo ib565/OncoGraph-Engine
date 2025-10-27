@@ -58,22 +58,16 @@ class QueryEngine:
                 "error",
                 {"step": "expand_instructions", "error": str(exc), "duration_ms": duration_ms},
             )
-            raise PipelineError(
-                f"Instruction expansion failed: {exc}", step="expand_instructions"
-            ) from exc
+            raise PipelineError(f"Instruction expansion failed: {exc}", step="expand_instructions") from exc
 
         try:
             step_started = perf_counter()
             cypher_draft = self.generator.generate_cypher(instructions)
             duration_ms = int((perf_counter() - step_started) * 1000)
-            self._trace(
-                "generate_cypher", {"cypher_draft": cypher_draft, "duration_ms": duration_ms}
-            )
+            self._trace("generate_cypher", {"cypher_draft": cypher_draft, "duration_ms": duration_ms})
         except Exception as exc:
             duration_ms = int((perf_counter() - step_started) * 1000)
-            self._trace(
-                "error", {"step": "generate_cypher", "error": str(exc), "duration_ms": duration_ms}
-            )
+            self._trace("error", {"step": "generate_cypher", "error": str(exc), "duration_ms": duration_ms})
             raise PipelineError(f"Cypher generation failed: {exc}", step="generate_cypher") from exc
 
         try:

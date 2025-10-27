@@ -20,8 +20,8 @@ Outputs (relative to --out-dir):
 
 Design notes:
 - Minimal external deps (standard library only) to avoid requirements churn.
-- Hybrid TARGETS population: curated seeds + CIViC sensitivity-majority heuristic.
-- Basic tag enrichment: uses TARGETS and name suffix heuristics (mab/tinib).
+- TARGETS populated from OpenTargets only (no heuristic inference).
+- Tag enrichment uses OpenTargets targets + name suffix heuristics (mab/tinib).
 """
 
 from __future__ import annotations
@@ -97,10 +97,7 @@ def _load_civic_json(input_json: str | None, url: str | None) -> list[dict]:
         print(f"[civic] Loading local JSON: {input_json}")
         with open(input_json, encoding="utf-8") as f:
             data = json.load(f)
-        print(
-            f"[civic] Local JSON loaded: "
-            f"{len(data) if isinstance(data, list) else 'records' in data}"
-        )
+        print(f"[civic] Local JSON loaded: " f"{len(data) if isinstance(data, list) else 'records' in data}")
         return data if isinstance(data, list) else data.get("records", [])
 
     if not url:
@@ -119,9 +116,7 @@ def _load_civic_json(input_json: str | None, url: str | None) -> list[dict]:
         return []
 
 
-def _fetch_civic_v2_graphql(
-    api_url: str, page_size: int = 500, max_pages: int | None = None
-) -> list[dict]:
+def _fetch_civic_v2_graphql(api_url: str, page_size: int = 500, max_pages: int | None = None) -> list[dict]:
     """Fetch CIViC v2 EvidenceItems via GraphQL with cursor pagination.
 
     Returns a list of raw dicts normalized to the v1-like shape expected by
@@ -262,9 +257,7 @@ def _to_evidence_items(raw_items: list[dict]) -> list[CivicEvidence]:
         variant_name_raw = None
         variant_hgvs_p = None
         if isinstance(obj.get("variant"), dict):
-            variant_name_raw = _safe_get(obj, ["variant", "name"]) or _safe_get(
-                obj, ["variant", "display_name"]
-            )
+            variant_name_raw = _safe_get(obj, ["variant", "name"]) or _safe_get(obj, ["variant", "display_name"])
             variant_hgvs_p = _safe_get(obj, ["variant", "hgvs_expressions", "p_dot"]) or _safe_get(
                 obj, ["variant", "hgvs_expressions", "protein"]
             )
@@ -311,9 +304,7 @@ def _to_evidence_items(raw_items: list[dict]) -> list[CivicEvidence]:
                 therapies.append(name.strip())
 
         # Clinical significance and PMIDs
-        clinical_significance = _safe_get(obj, ["clinical_significance"]) or _safe_get(
-            obj, ["evidence_direction"]
-        )
+        clinical_significance = _safe_get(obj, ["clinical_significance"]) or _safe_get(obj, ["evidence_direction"])
         pmids: list[str] = []
         sources = obj.get("sources") or obj.get("citations") or obj.get("evidence_sources")
         if isinstance(sources, list):
@@ -321,44 +312,32 @@ def _to_evidence_items(raw_items: list[dict]) -> list[CivicEvidence]:
                 pmid = None
                 if isinstance(s, dict):
                     pmid = (
-                        _safe_get(s, ["pubmed_id"])
-                        or _safe_get(s, ["pmid"])
-                        or _safe_get(s, ["citation_id"])
+                        _safe_get(s, ["pubmed_id"]) or _safe_get(s, ["pmid"]) or _safe_get(s, ["citation_id"])
                     )  # type: ignore[arg-type]
                 if pmid:
                     pmids.append(str(pmid))
 
-        evidence_statement = _safe_get(obj, ["evidence_statement"]) or _safe_get(
-            obj, ["description"]
-        )
+        evidence_statement = _safe_get(obj, ["evidence_statement"]) or _safe_get(obj, ["description"])
 
         items.append(
             CivicEvidence(
                 gene_symbol=gene_symbol.strip() if isinstance(gene_symbol, str) else None,
-                variant_name=(
-                    variant_name_raw.strip() if isinstance(variant_name_raw, str) else None
-                ),
+                variant_name=(variant_name_raw.strip() if isinstance(variant_name_raw, str) else None),
                 variant_hgvs_p=variant_hgvs_p.strip() if isinstance(variant_hgvs_p, str) else None,
                 disease_name=disease_name.strip() if isinstance(disease_name, str) else None,
                 disease_doid=disease_doid.strip() if isinstance(disease_doid, str) else None,
                 therapies=[t for t in therapies if t],
                 clinical_significance=(
-                    clinical_significance.strip()
-                    if isinstance(clinical_significance, str)
-                    else None
+                    clinical_significance.strip() if isinstance(clinical_significance, str) else None
                 ),
                 pmids=[p for p in pmids if p],
-                evidence_statement=(
-                    evidence_statement.strip() if isinstance(evidence_statement, str) else None
-                ),
+                evidence_statement=(evidence_statement.strip() if isinstance(evidence_statement, str) else None),
             )
         )
     return items
 
 
-def _normalize_variant_name(
-    gene_symbol: str | None, variant_name_raw: str | None
-) -> tuple[str | None, str | None]:
+def _normalize_variant_name(gene_symbol: str | None, variant_name_raw: str | None) -> tuple[str | None, str | None]:
     if not gene_symbol or not variant_name_raw:
         return None, variant_name_raw
     token = variant_name_raw
@@ -520,10 +499,7 @@ def run_civic_ingest(
     # Build TARGETS and enrichments from OpenTargets
     print(f"[civic] Querying OpenTargets for {len(therapy_rows)} therapies…")
     ot_target_rows, ot_extra_genes, ot_enrich = build_targets_and_enrichments(therapy_rows)
-    print(
-        "[civic] OpenTargets returned "
-        f"{len(ot_target_rows)} TARGETS rows; extra genes={len(ot_extra_genes)}"
-    )
+    print("[civic] OpenTargets returned " f"{len(ot_target_rows)} TARGETS rows; extra genes={len(ot_extra_genes)}")
 
     # Apply therapy enrichments and extend genes list
     for tname, enrich in ot_enrich.items():
@@ -583,10 +559,7 @@ def run_civic_ingest(
     if not base_gene_symbols:
         print("[civic][warn] No genes derived. Check molecularProfile.name parsing.")
     if not variant_rows:
-        print(
-            "[civic][warn] No variants derived. Evidence set may be gene-level only, "
-            "or tokens lacked digits."
-        )
+        print("[civic][warn] No variants derived. Evidence set may be gene-level only, " "or tokens lacked digits.")
     _write_csv(
         date_dir / "nodes" / "genes.csv",
         ["symbol", "hgnc_id", "synonyms"],

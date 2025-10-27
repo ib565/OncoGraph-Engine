@@ -55,9 +55,7 @@ class Neo4jExecutor:
             with self._driver.session() as session:
                 return session.execute_read(self._run_query, cypher)
         except Exception as exc:  # pragma: no cover - defensive
-            raise PipelineError(
-                f"Neo4j execution failed: {type(exc).__name__}: {exc}", step="execute_read"
-            ) from exc
+            raise PipelineError(f"Neo4j execution failed: {type(exc).__name__}: {exc}", step="execute_read") from exc
 
     def _run_query(self, tx: Session, cypher: str) -> list[dict[str, object]]:
         result = tx.run(

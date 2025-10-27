@@ -85,9 +85,7 @@ class GeneEnrichmentAnalyzer:
                 "mygene_query",
                 {
                     "input_genes_count": len(cleaned_genes),
-                    "input_genes_preview": (
-                        cleaned_genes[:10] if len(cleaned_genes) > 10 else cleaned_genes
-                    ),
+                    "input_genes_preview": (cleaned_genes[:10] if len(cleaned_genes) > 10 else cleaned_genes),
                 },
             )
 
@@ -123,12 +121,8 @@ class GeneEnrichmentAnalyzer:
                 {
                     "valid_genes_count": len(valid_genes),
                     "invalid_genes_count": len(invalid_genes),
-                    "valid_genes_preview": (
-                        valid_genes[:10] if len(valid_genes) > 10 else valid_genes
-                    ),
-                    "invalid_genes": (
-                        invalid_genes[:10] if len(invalid_genes) > 10 else invalid_genes
-                    ),
+                    "valid_genes_preview": (valid_genes[:10] if len(valid_genes) > 10 else valid_genes),
+                    "invalid_genes": (invalid_genes[:10] if len(invalid_genes) > 10 else invalid_genes),
                 },
             )
 
@@ -204,9 +198,7 @@ class GeneEnrichmentAnalyzer:
 
             # Add library information (extract from Gene_set column)
             significant["Library"] = significant["Gene_set"]
-            significant["Gene_Count"] = significant["Genes"].apply(
-                lambda x: len(x.split(";")) if pd.notna(x) else 0
-            )
+            significant["Gene_Count"] = significant["Genes"].apply(lambda x: len(x.split(";")) if pd.notna(x) else 0)
 
             # Convert to list of dicts
             all_results = []
@@ -217,9 +209,7 @@ class GeneEnrichmentAnalyzer:
                         "library": row["Library"],
                         "p_value": float(row["P-value"]),
                         "adjusted_p_value": float(row["Adjusted P-value"]),
-                        "odds_ratio": (
-                            float(row["Odds Ratio"]) if pd.notna(row["Odds Ratio"]) else None
-                        ),
+                        "odds_ratio": (float(row["Odds Ratio"]) if pd.notna(row["Odds Ratio"]) else None),
                         "gene_count": int(row["Gene_Count"]),
                         "genes": row["Genes"].split(";") if pd.notna(row["Genes"]) else [],
                         "description": row.get("Description", ""),
@@ -248,9 +238,7 @@ class GeneEnrichmentAnalyzer:
                 },
             )
 
-            logger.info(
-                f"Found {len(all_results)} significant enrichment terms, returning top {len(top_results)}"
-            )
+            logger.info(f"Found {len(all_results)} significant enrichment terms, returning top {len(top_results)}")
 
             cache.set(cache_key, top_results)
             return top_results

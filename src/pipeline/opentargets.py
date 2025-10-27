@@ -10,9 +10,7 @@ from urllib.request import Request, urlopen
 OT_URL = "https://api.platform.opentargets.org/api/v4/graphql"
 
 
-def _post_graphql(
-    query: str, variables: dict[str, Any] | None = None, *, url: str = OT_URL
-) -> dict[str, Any]:
+def _post_graphql(query: str, variables: dict[str, Any] | None = None, *, url: str = OT_URL) -> dict[str, Any]:
     payload = {"query": query, "variables": variables or {}}
     data_bytes = json.dumps(payload).encode("utf-8")
     headers = {"Content-Type": "application/json"}
@@ -31,20 +29,14 @@ def _post_graphql(
             code = getattr(exc, "code", None)
             if code in (429, 500, 502, 503, 504) and attempt < 3:
                 sleep_s = 2**attempt
-                print(
-                    f"[opentargets][warn] HTTP {code}; retrying in {sleep_s}s "
-                    f"(attempt {attempt}/3)"
-                )
+                print(f"[opentargets][warn] HTTP {code}; retrying in {sleep_s}s " f"(attempt {attempt}/3)")
                 time.sleep(sleep_s)
                 continue
             raise
         except URLError:
             if attempt < 3:
                 sleep_s = 2**attempt
-                print(
-                    f"[opentargets][warn] Network error; retrying in {sleep_s}s "
-                    f"(attempt {attempt}/3)"
-                )
+                print(f"[opentargets][warn] Network error; retrying in {sleep_s}s " f"(attempt {attempt}/3)")
                 time.sleep(sleep_s)
                 continue
             raise
@@ -103,9 +95,7 @@ def search_drugs_by_name(names: list[str], *, page_size: int = 5) -> dict[str, d
             drug = obj or {}
             # prefer exact case-insensitive match in name, synonyms, or tradeNames
             synonyms = set((drug.get("synonyms") or []) + (drug.get("tradeNames") or []))
-            if str(drug.get("name") or "").lower() == name_lower or name_lower in {
-                s.lower() for s in synonyms
-            }:
+            if str(drug.get("name") or "").lower() == name_lower or name_lower in {s.lower() for s in synonyms}:
                 best = hit
                 break
         if best is None and hits:
@@ -232,11 +222,7 @@ def build_targets_and_enrichments(
 
         moa_rows = ((drug_data.get("mechanismsOfAction") or {}).get("rows")) or []
         for row in moa_rows:
-            labels = [
-                _norm(gs.get("approvedSymbol"))
-                for gs in (row.get("targets") or [])
-                if isinstance(gs, dict)
-            ]
+            labels = [_norm(gs.get("approvedSymbol")) for gs in (row.get("targets") or []) if isinstance(gs, dict)]
             labels = [g for g in labels if g]
             if not labels:
                 continue
@@ -309,7 +295,5 @@ def build_targets_and_enrichments(
                 }
             )
 
-    print(
-        f"[opentargets] produced {len(targets_rows)} TARGETS rows across {len(extra_genes)} genes"
-    )
+    print(f"[opentargets] produced {len(targets_rows)} TARGETS rows across {len(extra_genes)} genes")
     return targets_rows, extra_genes, therapy_enrichments

@@ -5,8 +5,6 @@ from __future__ import annotations
 import time
 from unittest.mock import patch
 
-import pytest
-
 from pipeline.utils import TTLCache, get_cache_ttl, get_llm_cache_ttl, stable_hash
 
 

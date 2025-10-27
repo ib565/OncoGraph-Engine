@@ -62,18 +62,14 @@ def test_validator_rejects_unknown_relationship():
 def test_validator_does_not_misread_relationship_as_label():
     validator = make_validator()
     # Valid relationship should not be flagged as a label
-    validated = validator.validate_cypher(
-        "MATCH (a:Gene)-[:AFFECTS_RESPONSE_TO]->(t:Therapy) RETURN a, t LIMIT 5"
-    )
+    validated = validator.validate_cypher("MATCH (a:Gene)-[:AFFECTS_RESPONSE_TO]->(t:Therapy) RETURN a, t LIMIT 5")
     assert validated.endswith(f"LIMIT {PipelineConfig().default_limit}") or "LIMIT" in validated
 
 
 def test_validator_handles_backticked_relationship_type():
     validator = make_validator()
     # Backticks around relationship type should be allowed and recognized
-    validated = validator.validate_cypher(
-        "MATCH (a:Gene)-[r:`AFFECTS_RESPONSE_TO`]->(t:Therapy) RETURN r LIMIT 5"
-    )
+    validated = validator.validate_cypher("MATCH (a:Gene)-[r:`AFFECTS_RESPONSE_TO`]->(t:Therapy) RETURN r LIMIT 5")
     assert "RETURN r" in validated
 
 
@@ -86,6 +82,8 @@ def test_validator_requires_return_clause():
 
 def test_validator_rewrites_disease_name_equality_to_case_insensitive():
     validator = make_validator()
-    cypher = "MATCH (b:Biomarker)-[r:AFFECTS_RESPONSE_TO]->(t:Therapy) WHERE r.disease_name = 'colorectal cancer' RETURN r"
+    cypher = (
+        "MATCH (b:Biomarker)-[r:AFFECTS_RESPONSE_TO]->(t:Therapy) WHERE r.disease_name = 'colorectal cancer' RETURN r"
+    )
     validated = validator.validate_cypher(cypher)
     assert "toLower(r.disease_name) = toLower('colorectal cancer')" in validated

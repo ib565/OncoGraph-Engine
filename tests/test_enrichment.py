@@ -217,9 +217,7 @@ class TestEnrichmentSummaryResponse:
     def test_enrichment_summary_response_validation(self):
         """Test that validation works correctly."""
         # Valid response
-        response = EnrichmentSummaryResponse(
-            summary="Test summary", followUpQuestions=["Question 1", "Question 2"]
-        )
+        response = EnrichmentSummaryResponse(summary="Test summary", followUpQuestions=["Question 1", "Question 2"])
         assert response.summary == "Test summary"
         assert response.followUpQuestions == ["Question 1", "Question 2"]
 
@@ -247,9 +245,7 @@ class TestGeminiEnrichmentSummarizer:
 
         # Mock the response
         mock_response = MagicMock()
-        mock_response.text = (
-            '{"summary": "Test summary", "followUpQuestions": ["Question 1", "Question 2"]}'
-        )
+        mock_response.text = '{"summary": "Test summary", "followUpQuestions": ["Question 1", "Question 2"]}'
         mock_client.models.generate_content.return_value = mock_response
 
         # Mock the config types

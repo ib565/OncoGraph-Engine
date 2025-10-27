@@ -285,15 +285,11 @@ def query(body: QueryRequest, engine: Annotated[QueryEngine, Depends(get_engine)
             },
         )
 
-    return QueryResponse(
-        answer=result.answer, cypher=result.cypher, rows=result.rows, run_id=run_id
-    )
+    return QueryResponse(answer=result.answer, cypher=result.cypher, rows=result.rows, run_id=run_id)
 
 
 @app.get("/query/stream")
-def query_stream(
-    question: str, engine: Annotated[QueryEngine, Depends(get_engine)]
-) -> StreamingResponse:
+def query_stream(question: str, engine: Annotated[QueryEngine, Depends(get_engine)]) -> StreamingResponse:
     """Server-Sent Events: stream progress updates and final result.
 
     Events emitted:
@@ -430,9 +426,7 @@ def query_stream(
 
 
 @app.post("/query/feedback")
-def submit_feedback(
-    body: FeedbackRequest, engine: Annotated[QueryEngine, Depends(get_engine)]
-) -> dict[str, str]:
+def submit_feedback(body: FeedbackRequest, engine: Annotated[QueryEngine, Depends(get_engine)]) -> dict[str, str]:
     """Submit user feedback about Cypher query correctness."""
 
     # Get the trace sink from the engine
@@ -548,9 +542,7 @@ def get_gene_set(
         return GeneSetResponse(genes=genes, description=preset["description"])
 
     except Exception as exc:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to fetch gene set: {str(exc)}"
-        ) from exc
+        raise HTTPException(status_code=500, detail=f"Failed to fetch gene set: {str(exc)}") from exc
 
 
 @app.get("/analyze/genes/stream")
@@ -607,9 +599,7 @@ def analyze_genes_stream(
                         "gene_count": 0,
                         "error": "No valid gene symbols provided",
                         "error_step": "gene_parsing",
-                        "duration_ms": int(
-                            (__import__("time").perf_counter() - started_perf) * 1000
-                        ),
+                        "duration_ms": int((__import__("time").perf_counter() - started_perf) * 1000),
                     },
                 )
                 outcome["error"] = {
@@ -637,9 +627,7 @@ def analyze_genes_stream(
             except Exception as exc:
                 import traceback
 
-                normalization_duration = int(
-                    (__import__("time").perf_counter() - step_started) * 1000
-                )
+                normalization_duration = int((__import__("time").perf_counter() - step_started) * 1000)
                 contextual_trace.record(
                     "error",
                     {
@@ -663,8 +651,7 @@ def analyze_genes_stream(
             warnings = []
             if enrichment_result.invalid_genes:
                 warnings.append(
-                    f"Invalid gene symbols (excluded from analysis): "
-                    f"{', '.join(enrichment_result.invalid_genes)}"
+                    f"Invalid gene symbols (excluded from analysis): " f"{', '.join(enrichment_result.invalid_genes)}"
                 )
 
             if not enrichment_result.valid_genes:
@@ -724,9 +711,7 @@ def analyze_genes_stream(
                     "valid_genes_count": len(enrichment_result.valid_genes),
                     "enrichment_results_count": len(enrichment_result.enrichment_results),
                     "warnings_count": len(warnings),
-                    "has_plot_data": bool(
-                        enrichment_result.plot_data and enrichment_result.plot_data.get("data")
-                    ),
+                    "has_plot_data": bool(enrichment_result.plot_data and enrichment_result.plot_data.get("data")),
                     "followup_questions_count": len(summary_response.followUpQuestions),
                     "duration_ms": total_duration,
                 },
@@ -772,10 +757,7 @@ def analyze_genes_stream(
                 outcome["partial_emitted"] = True
                 yield f"event: partial\ndata: {json.dumps(partial_data)}\n\n"
                 # Update progress message
-                yield (
-                    f"event: progress\ndata: "
-                    f"{json.dumps({'message': 'Generating AI summary...'})}\n\n"
-                )
+                yield (f"event: progress\ndata: " f"{json.dumps({'message': 'Generating AI summary...'})}\n\n")
 
             # Check if we have summary results to emit
             if "summary" in outcome and "summary_emitted" not in outcome:
@@ -922,9 +904,7 @@ def analyze_genes(
         # Generate AI summary with follow-up questions
         step_started = __import__("time").perf_counter()
         try:
-            summary_response = summarizer.summarize_enrichment(
-                result.valid_genes, result.enrichment_results, top_n=7
-            )
+            summary_response = summarizer.summarize_enrichment(result.valid_genes, result.enrichment_results, top_n=7)
         except Exception as exc:
             import traceback
 
@@ -970,9 +950,7 @@ def analyze_genes(
         # Create warnings for invalid genes
         warnings = []
         if result.invalid_genes:
-            warnings.append(
-                f"Invalid gene symbols (excluded from analysis): {', '.join(result.invalid_genes)}"
-            )
+            warnings.append(f"Invalid gene symbols (excluded from analysis): {', '.join(result.invalid_genes)}")
 
         if not result.valid_genes:
             warnings.append("No valid gene symbols found for analysis")

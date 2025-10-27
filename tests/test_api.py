@@ -127,9 +127,7 @@ def test_feedback_success(app_client: TestClient) -> None:
         main.app.dependency_overrides[main.get_engine] = lambda: StubEngineWithTrace()
 
         # Submit feedback
-        response = app_client.post(
-            "/query/feedback", json={"run_id": "test-run-123", "cypher_correct": True}
-        )
+        response = app_client.post("/query/feedback", json={"run_id": "test-run-123", "cypher_correct": True})
 
         assert response.status_code == 200
         payload = response.json()
@@ -160,9 +158,7 @@ def test_feedback_no_trace_returns_400(app_client: TestClient) -> None:
 
     main.app.dependency_overrides[main.get_engine] = lambda: StubEngineNoTrace()
 
-    response = app_client.post(
-        "/query/feedback", json={"run_id": "test-run-123", "cypher_correct": True}
-    )
+    response = app_client.post("/query/feedback", json={"run_id": "test-run-123", "cypher_correct": True})
 
     assert response.status_code == 400
     payload = response.json()

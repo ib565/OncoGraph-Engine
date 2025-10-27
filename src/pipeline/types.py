@@ -49,18 +49,14 @@ class CypherValidator(Protocol):
 class CypherExecutor(Protocol):
     """Executes Cypher against Neo4j and returns rows as dictionaries."""
 
-    def execute_read(
-        self, cypher: str
-    ) -> list[dict[str, object]]:  # pragma: no cover - interface only
+    def execute_read(self, cypher: str) -> list[dict[str, object]]:  # pragma: no cover - interface only
         ...
 
 
 class Summarizer(Protocol):
     """Summarizes rows into a natural language answer."""
 
-    def summarize(
-        self, question: str, rows: list[dict[str, object]]
-    ) -> str:  # pragma: no cover - interface only
+    def summarize(self, question: str, rows: list[dict[str, object]]) -> str:  # pragma: no cover - interface only
         ...
 
 
@@ -75,9 +71,7 @@ class PipelineError(RuntimeError):
 class TraceSink(Protocol):
     """Receives step-wise trace data emitted during pipeline execution."""
 
-    def record(
-        self, step: str, data: dict[str, object]
-    ) -> None:  # pragma: no cover - interface only
+    def record(self, step: str, data: dict[str, object]) -> None:  # pragma: no cover - interface only
         ...
 
 

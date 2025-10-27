@@ -44,23 +44,13 @@ class OncoGraphBuilder:
         print("\nStep 2: Ingesting nodes...")
         # Note: switched to batch versions for performance (UNWIND)
         self.ingest_csv_data(os.path.join(DATA_DIR, "nodes/genes.csv"), self._create_genes_batch)
-        self.ingest_csv_data(
-            os.path.join(DATA_DIR, "nodes/variants.csv"), self._create_variants_batch
-        )
-        self.ingest_csv_data(
-            os.path.join(DATA_DIR, "nodes/therapies.csv"), self._create_therapies_batch
-        )
-        self.ingest_csv_data(
-            os.path.join(DATA_DIR, "nodes/diseases.csv"), self._create_diseases_batch
-        )
+        self.ingest_csv_data(os.path.join(DATA_DIR, "nodes/variants.csv"), self._create_variants_batch)
+        self.ingest_csv_data(os.path.join(DATA_DIR, "nodes/therapies.csv"), self._create_therapies_batch)
+        self.ingest_csv_data(os.path.join(DATA_DIR, "nodes/diseases.csv"), self._create_diseases_batch)
 
         print("\nStep 3: Ingesting relationships...")
-        self.ingest_csv_data(
-            os.path.join(DATA_DIR, "relationships/variant_of.csv"), self._create_variant_of_batch
-        )
-        self.ingest_csv_data(
-            os.path.join(DATA_DIR, "relationships/targets.csv"), self._create_targets_batch
-        )
+        self.ingest_csv_data(os.path.join(DATA_DIR, "relationships/variant_of.csv"), self._create_variant_of_batch)
+        self.ingest_csv_data(os.path.join(DATA_DIR, "relationships/targets.csv"), self._create_targets_batch)
         # affects_response requires special handling because biomarker_type controls the node label/property
         self.ingest_csv_data(
             os.path.join(DATA_DIR, "relationships/affects_response.csv"),
@@ -102,8 +92,7 @@ class OncoGraphBuilder:
 
         # Detect whether we're handling affects_response (bound method identity via __func__)
         is_affects_response = (
-            getattr(creation_func, "__func__", creation_func)
-            is self._create_affects_response_batch.__func__
+            getattr(creation_func, "__func__", creation_func) is self._create_affects_response_batch.__func__
         )
 
         # For affects_response we need to validate biomarker_type values ahead of time
@@ -111,10 +100,7 @@ class OncoGraphBuilder:
             invalid_rows = [
                 r
                 for r in records
-                if (
-                    r.get("biomarker_type") not in ALLOWED_BIOMARKER_TYPES
-                    and r.get("biomarker_type") is not None
-                )
+                if (r.get("biomarker_type") not in ALLOWED_BIOMARKER_TYPES and r.get("biomarker_type") is not None)
             ]
             if invalid_rows:
                 # preserve original behavior: raise ValueError if an unsupported biomarker_type is encountered
@@ -133,9 +119,7 @@ class OncoGraphBuilder:
                     if gene_rows:
                         session.execute_write(self._create_affects_response_batch_gene, gene_rows)
                     if variant_rows:
-                        session.execute_write(
-                            self._create_affects_response_batch_variant, variant_rows
-                        )
+                        session.execute_write(self._create_affects_response_batch_variant, variant_rows)
                 else:
                     session.execute_write(creation_func, batch)
 

@@ -27,9 +27,7 @@ class StaticGeminiClient:
         def __init__(self, parent: StaticGeminiClient) -> None:
             self._parent = parent
 
-        def generate_content(
-            self, *, model: str, contents: list[str], config=None
-        ):  # pragma: no cover - simple
+        def generate_content(self, *, model: str, contents: list[str], config=None):  # pragma: no cover - simple
             prompt = contents[0]
             self._parent.calls.append(
                 {
@@ -95,9 +93,7 @@ def test_pipeline_with_gemini_stubs(monkeypatch):
     generator = GeminiCypherGenerator(config=gemini_config, client=client)
     summarizer = GeminiSummarizer(config=gemini_config, client=client)
     validator = RuleBasedValidator(config=config)
-    executor = DummyExecutor(
-        uri="bolt://localhost", user="neo4j", password="password", config=config
-    )
+    executor = DummyExecutor(uri="bolt://localhost", user="neo4j", password="password", config=config)
 
     engine = QueryEngine(
         config=config,

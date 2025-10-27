@@ -30,9 +30,7 @@ class StubEnrichmentSummarizer:
     def summarize_enrichment(
         self, gene_list: list[str], enrichment_results: list[dict], top_n: int = 10
     ) -> EnrichmentSummaryResponse:
-        return EnrichmentSummaryResponse(
-            summary=self._summary, followUpQuestions=self._follow_up_questions
-        )
+        return EnrichmentSummaryResponse(summary=self._summary, followUpQuestions=self._follow_up_questions)
 
 
 @pytest.fixture
@@ -64,12 +62,8 @@ def test_analyze_genes_success(app_client: TestClient) -> None:
     )
 
     # Override dependencies
-    main.app.dependency_overrides[main.get_enrichment_analyzer] = lambda: StubEnrichmentAnalyzer(
-        mock_result
-    )
-    main.app.dependency_overrides[main.get_enrichment_summarizer] = (
-        lambda: StubEnrichmentSummarizer("Test summary")
-    )
+    main.app.dependency_overrides[main.get_enrichment_analyzer] = lambda: StubEnrichmentAnalyzer(mock_result)
+    main.app.dependency_overrides[main.get_enrichment_summarizer] = lambda: StubEnrichmentSummarizer("Test summary")
 
     response = app_client.post("/analyze/genes", json={"genes": "BRCA1, BRCA2, INVALID"})
 
@@ -113,12 +107,8 @@ def test_analyze_genes_parses_comma_separated(app_client: TestClient) -> None:
         plot_data={"data": [], "layout": {}},
     )
 
-    main.app.dependency_overrides[main.get_enrichment_analyzer] = lambda: StubEnrichmentAnalyzer(
-        mock_result
-    )
-    main.app.dependency_overrides[main.get_enrichment_summarizer] = (
-        lambda: StubEnrichmentSummarizer("Summary")
-    )
+    main.app.dependency_overrides[main.get_enrichment_analyzer] = lambda: StubEnrichmentAnalyzer(mock_result)
+    main.app.dependency_overrides[main.get_enrichment_summarizer] = lambda: StubEnrichmentSummarizer("Summary")
 
     response = app_client.post("/analyze/genes", json={"genes": "BRCA1, BRCA2"})
 
@@ -134,12 +124,8 @@ def test_analyze_genes_parses_newline_separated(app_client: TestClient) -> None:
         plot_data={"data": [], "layout": {}},
     )
 
-    main.app.dependency_overrides[main.get_enrichment_analyzer] = lambda: StubEnrichmentAnalyzer(
-        mock_result
-    )
-    main.app.dependency_overrides[main.get_enrichment_summarizer] = (
-        lambda: StubEnrichmentSummarizer("Summary")
-    )
+    main.app.dependency_overrides[main.get_enrichment_analyzer] = lambda: StubEnrichmentAnalyzer(mock_result)
+    main.app.dependency_overrides[main.get_enrichment_summarizer] = lambda: StubEnrichmentSummarizer("Summary")
 
     response = app_client.post("/analyze/genes", json={"genes": "BRCA1\nBRCA2"})
 
@@ -155,12 +141,8 @@ def test_analyze_genes_parses_mixed_separators(app_client: TestClient) -> None:
         plot_data={"data": [], "layout": {}},
     )
 
-    main.app.dependency_overrides[main.get_enrichment_analyzer] = lambda: StubEnrichmentAnalyzer(
-        mock_result
-    )
-    main.app.dependency_overrides[main.get_enrichment_summarizer] = (
-        lambda: StubEnrichmentSummarizer("Summary")
-    )
+    main.app.dependency_overrides[main.get_enrichment_analyzer] = lambda: StubEnrichmentAnalyzer(mock_result)
+    main.app.dependency_overrides[main.get_enrichment_summarizer] = lambda: StubEnrichmentSummarizer("Summary")
 
     response = app_client.post("/analyze/genes", json={"genes": "BRCA1, BRCA2\nTP53"})
 
@@ -176,12 +158,8 @@ def test_analyze_genes_no_valid_genes_warning(app_client: TestClient) -> None:
         plot_data={"data": [], "layout": {}},
     )
 
-    main.app.dependency_overrides[main.get_enrichment_analyzer] = lambda: StubEnrichmentAnalyzer(
-        mock_result
-    )
-    main.app.dependency_overrides[main.get_enrichment_summarizer] = (
-        lambda: StubEnrichmentSummarizer("Summary")
-    )
+    main.app.dependency_overrides[main.get_enrichment_analyzer] = lambda: StubEnrichmentAnalyzer(mock_result)
+    main.app.dependency_overrides[main.get_enrichment_summarizer] = lambda: StubEnrichmentSummarizer("Summary")
 
     response = app_client.post("/analyze/genes", json={"genes": "INVALID1, INVALID2"})
 
@@ -189,9 +167,7 @@ def test_analyze_genes_no_valid_genes_warning(app_client: TestClient) -> None:
     payload = response.json()
 
     assert "No valid gene symbols found for analysis" in payload["warnings"]
-    assert (
-        "Invalid gene symbols (excluded from analysis): INVALID1, INVALID2" in payload["warnings"]
-    )
+    assert "Invalid gene symbols (excluded from analysis): INVALID1, INVALID2" in payload["warnings"]
 
 
 def test_analyze_genes_analyzer_exception(app_client: TestClient) -> None:
@@ -202,9 +178,7 @@ def test_analyze_genes_analyzer_exception(app_client: TestClient) -> None:
             raise Exception("Analysis failed")
 
     main.app.dependency_overrides[main.get_enrichment_analyzer] = lambda: ErrorAnalyzer()
-    main.app.dependency_overrides[main.get_enrichment_summarizer] = (
-        lambda: StubEnrichmentSummarizer("Summary")
-    )
+    main.app.dependency_overrides[main.get_enrichment_summarizer] = lambda: StubEnrichmentSummarizer("Summary")
 
     response = app_client.post("/analyze/genes", json={"genes": "BRCA1"})
 
