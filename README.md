@@ -2,7 +2,7 @@
 
 **Knowledge-graph Q&A + pathway enrichment for oncology research**
 
-[Try the live deployment](https://onco-graph-engine.vercel.app/) | [Watch the 2-min demo](https://www.youtube.com/watch?v=4HtPS-SvBwk)
+[Try the live deployment](https://onco-graph-engine.vercel.app/) | [Watch the 2-min demo](https://www.youtube.com/watch?v=4HtPS-SvBwk) | [Technical Details for devs](docs/TECHNICAL_DETAILS.md)
 
 ---
 
@@ -328,6 +328,12 @@ python -m pytest
 - Over‑representation analysis via Enrichr (GSEApy).  
 - Libraries: Reactome 2022, GO Biological Process 2023, KEGG 2021 Human.  
 - Significance: adjusted p‑value (FDR). Plots show −log10(FDR).
+
+---
+
+## For Developers
+
+Want to understand the internals? See [**TECHNICAL_DETAILS.md**](docs/TECHNICAL_DETAILS.md)
 
 ---
 
