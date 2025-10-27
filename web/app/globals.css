@@ -214,6 +214,7 @@ body {
   min-height: 320px;
   background: #ffffff;
   border-radius: var(--radius);
+  height: 100%;
 }
 
 /* Bench Panel */
@@ -727,6 +728,8 @@ body {
   flex: 1;
   padding: 0;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Cypher scroll */

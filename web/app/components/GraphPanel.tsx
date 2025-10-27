@@ -417,7 +417,7 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
                   <div className="card-content">
                     <div className="graph-shell">
                       <div className="graph-container">
-                        <MiniGraph rows={result.rows} height={400} />
+                        <MiniGraph rows={result.rows} />
                       </div>
                     </div>
                   </div>

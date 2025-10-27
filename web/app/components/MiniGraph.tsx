@@ -6,7 +6,7 @@ type Row = Record<string, unknown>;
 
 type MiniGraphProps = {
   rows: Row[];
-  height?: number;
+  height?: number | string;
 };
 
 type CytoscapeModule = {
@@ -32,7 +32,7 @@ function inferEffectCategory(effect: string | undefined): "resistance" | "sensit
   return "unknown";
 }
 
-export function MiniGraph({ rows, height = 320 }: MiniGraphProps) {
+export function MiniGraph({ rows, height = "100%" }: MiniGraphProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const cyRef = useRef<any>(null);
   const becameVisibleRef = useRef<boolean>(false);
@@ -374,11 +374,13 @@ export function MiniGraph({ rows, height = 320 }: MiniGraphProps) {
     };
   }, []);
 
+  const heightStyle = typeof height === "number" ? `${height}px` : height;
+
   if (!rows || rows.length === 0) {
     return (
       <div
         style={{
-          height,
+          height: heightStyle,
           borderRadius: "0.5rem",
           border: "1px dashed #e5e7eb",
           display: "flex",
@@ -397,7 +399,7 @@ export function MiniGraph({ rows, height = 320 }: MiniGraphProps) {
     <div
       ref={containerRef}
       style={{
-        height,
+        height: heightStyle,
         width: "100%",
         background: "#ffffff",
       }}
