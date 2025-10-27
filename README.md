@@ -32,6 +32,43 @@ therapeutic options.
 
 ---
 
+## Complete Workflow: KRAS G12D Resistance in Colorectal Cancer
+
+This example demonstrates OncoGraph's end-to-end workflow for 
+understanding therapy resistance and finding alternatives.
+
+### Step 1: Identify Resistance Mechanisms
+**Query:** "Which genes predict resistance to cetuximab or panitumumab 
+in colorectal cancer?"
+
+**Result:** 13 genes including KRAS, NRAS, BRAF, ERBB2, PIK3CA, etc.  
+**Evidence:** 88 evidence items across 45 PMIDs
+
+### Step 2: Understand Biological Mechanism
+**Action:** Click "Move to Hypothesis Analyzer"  
+**Result:** Enrichment in ErbB signaling pathway (p < 1e-19)
+
+**AI Summary:** "These genes converge on receptor tyrosine kinase 
+signaling. Dysregulation allows tumor cells to maintain proliferative 
+signals despite EGFR blockade."
+
+### Step 3: Find Alternative Therapeutic Targets
+**Action:** Click suggested query "Which therapies target ERBB2, 
+MAP2K1, or PIK3CA?"
+
+**Result:** 
+- ERBB2 inhibitors: trastuzumab, pertuzumab, etc.
+- MEK inhibitors: trametinib, cobimetinib
+- PI3K inhibitors: alpelisib, copanlisib
+
+**Insight:** Patients with anti-EGFR resistance may benefit from 
+combination strategies targeting downstream pathways.
+
+**Time:** ~7 minutes from question to actionable hypothesis  
+**Manual equivalent:** 45-60 minutes
+
+---
+
 ## Why OncoGraph?
 
 | Task | Manual Approach | OncoGraph |
@@ -154,43 +191,6 @@ OncoGraph has been validated against established findings:
 **Validation:** Matches current NCCN guidelines for BRAF-mutant cancers
 
 *OncoGraph is a research tool. Validate all results against primary literature before clinical application.*
-
----
-
-## Complete Workflow: KRAS G12D Resistance in Colorectal Cancer
-
-This example demonstrates OncoGraph's end-to-end workflow for 
-understanding therapy resistance and finding alternatives.
-
-### Step 1: Identify Resistance Mechanisms
-**Query:** "Which genes predict resistance to cetuximab or panitumumab 
-in colorectal cancer?"
-
-**Result:** 13 genes including KRAS, NRAS, BRAF, ERBB2, PIK3CA, etc.  
-**Evidence:** 88 evidence items across 45 PMIDs
-
-### Step 2: Understand Biological Mechanism
-**Action:** Click "Move to Hypothesis Analyzer"  
-**Result:** Enrichment in ErbB signaling pathway (p < 1e-19)
-
-**AI Summary:** "These genes converge on receptor tyrosine kinase 
-signaling. Dysregulation allows tumor cells to maintain proliferative 
-signals despite EGFR blockade."
-
-### Step 3: Find Alternative Therapeutic Targets
-**Action:** Click suggested query "Which therapies target ERBB2, 
-MAP2K1, or PIK3CA?"
-
-**Result:** 
-- ERBB2 inhibitors: trastuzumab, pertuzumab, etc.
-- MEK inhibitors: trametinib, cobimetinib
-- PI3K inhibitors: alpelisib, copanlisib
-
-**Insight:** Patients with anti-EGFR resistance may benefit from 
-combination strategies targeting downstream pathways.
-
-**Time:** ~7 minutes from question to actionable hypothesis  
-**Manual equivalent:** 45-60 minutes
 
 ---
 
