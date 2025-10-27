@@ -118,7 +118,8 @@ therapeutic options.
 
 ### Relationships
 - `(Variant)-[:VARIANT_OF]->(Gene)`
-- `(Therapy)-[:TARGETS]->(Gene)`
+- `(Therapy)-[:TARGETS]->(Gene)`  
+  - **Properties:** `source`, `moa?`, `action_type?`, `ref_sources?`, `ref_ids?`, `ref_urls?`
 - `(Variant or Gene)-[AFFECTS_RESPONSE_TO]->(Therapy)`  
   - **Properties:**  
     - `effect (Sensitivity|Resistance)`  
