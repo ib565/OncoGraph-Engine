@@ -2,10 +2,9 @@
 
 **Knowledge-graph Q&A + pathway enrichment for oncology research**
 
-[![Live Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://onco-graph-engine.vercel.app/)
+[![Live Deployement](https://img.shields.io/badge/demo-live-brightgreen)](https://onco-graph-engine.vercel.app/)
+[![Watch the demo](https://img.shields.io/badge/watch--on-YouTube-red?logo=youtube&logoColor=white)]([https://youtu.be/<video_id>](https://www.youtube.com/watch?v=4HtPS-SvBwk))
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-
-**📺 90-second demo video:** `<add_url>`
 
 ---
 
