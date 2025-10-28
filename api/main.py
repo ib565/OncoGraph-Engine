@@ -184,6 +184,9 @@ app.add_middleware(
 def healthz() -> dict[str, str]:
     return {"status": "ok"}
 
+@app.head("/healthz")
+async def healthz_head():
+    return Response(status_code=200)
 
 @app.post("/query", response_model=QueryResponse)
 def query(body: QueryRequest, engine: Annotated[QueryEngine, Depends(get_engine)]) -> QueryResponse:
