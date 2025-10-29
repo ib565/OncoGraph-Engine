@@ -23,33 +23,39 @@ We will create a high-quality dataset of `(question, cypher)` pairs using a hybr
 
 ## 3. Query Families
 
-To ensure comprehensive coverage of the graph's capabilities, the dataset will be generated based on the following query patterns:
+To ensure comprehensive coverage of the graph's capabilities, the dataset will be generated based on the following query patterns. The families are structured from simple lookups to complex, multi-hop reasoning.
 
-#### F1: Simple Lookups (1-hop)
-- **F1.1 (Targets):** Therapies targeting a specific `Gene`.
+#### F1: Basic Entity Lookups (1-hop)
+- **F1.1 (Therapy -> Gene):** Therapies targeting a specific `Gene`.
   - *Example:* "What drugs target BRAF?"
-- **F1.2 (Targets with Properties):** Therapies targeting a `Gene`, requesting properties like `moa`.
-  - *Example:* "What is the mechanism of action of dabrafenib?"
-- **F1.3 (Biomarker Effect):** Effect of a specific `Variant` on a `Therapy` in a `Disease`.
-  - *Example:* "Does KRAS G12C predict resistance to Cetuximab in colorectal cancer?"
-- **F1.4 (Biomarker Discovery):** `Genes` or `Variants` predicting response to a `Therapy` for a `Disease`.
-  - *Example:* "Which genes are resistance biomarkers for immunotherapy in melanoma?"
+- **F1.2 (Gene -> Therapy):** Genes targeted by a specific `Therapy` (Symmetric pattern).
+  - *Example:* "Which genes does Dabrafenib target?"
+- **F1.3 (Variant -> Gene):** The `Gene` a specific `Variant` belongs to.
+  - *Example:* "Which gene is BRAF V600E a variant of?"
+- **F1.4 (Gene -> Variants):** All `Variants` of a specific `Gene`.
+  - *Example:* "List all known variants of the KRAS gene."
 
-#### F2: Set-based Queries
-- **F2.1 (Union):** Therapies targeting `Gene A` OR `Gene B`.
+#### F2: Property-Based & Evidential Queries
+- **F2.1 (TARGETS Properties):** Requesting properties from the `TARGETS` relationship.
+  - *Example:* "What is Dabrafenib's mechanism of action on BRAF?"
+- **F2.2 (AFFECTS_RESPONSE_TO Basic):** The effect of a `Biomarker` on a `Therapy`.
+  - *Example:* "How does EGFR T790M affect response to Osimertinib?"
+- **F2.3 (AFFECTS_RESPONSE_TO with Evidence):** Filtering based on evidence properties like the existence of PMIDs.
+  - *Example:* "Find resistance biomarkers for Cetuximab that have PubMed citations."
+
+#### F3: Set-Based & Comparative Queries
+- **F3.1 (Union):** Therapies targeting `Gene A` OR `Gene B`.
   - *Example:* "Find therapies for EGFR or ERBB2."
-- **F2.2 (Intersection):** Therapies targeting `Gene A` AND `Gene B`.
+- **F3.2 (Intersection):** Therapies targeting `Gene A` AND `Gene B`.
   - *Example:* "What therapies target both BRAF and MEK1?"
-
-#### F3: Comparative & Negative Queries
-- **F3.1 (Comparative Effect):** Therapies with biomarkers for both `Sensitivity` AND `Resistance`.
-  - *Example:* "Which therapies have conflicting evidence for biomarkers?"
-- **F3.2 (Negative Targeting):** Therapies targeting `Gene A` but NOT `Gene B`.
+- **F3.3 (Negative / Subtractive):** Therapies targeting `Gene A` but NOT `Gene B`.
   - *Example:* "Which drugs target KRAS but not NRAS?"
 
-#### F4: Multi-Hop Queries (2-hops)
-- **F4.1 (Biomarker to Alternative Therapy):** Find `Genes` that are resistance biomarkers for `Therapy A`, then find other therapies (`Therapy B`) that target those `Genes`.
-  - *Example:* "For anti-EGFR resistance, what other therapies target the involved genes?"
+#### F4: Multi-Hop & Validation Queries (High Value)
+- **F4.1 (Target Validation):** Find therapies that `TARGET` a specific `Gene` AND have known `AFFECTS_RESPONSE_TO` biomarker evidence in a `Disease`.
+  - *Example:* "Which therapies target BRAF and also have biomarker evidence in melanoma?"
+- **F4.2 (Alternative Therapy Discovery):** Find `Genes` that are resistance biomarkers for `Therapy A`, then find other therapies (`Therapy B`) that `TARGET` those `Genes`.
+  - *Example:* "For therapies causing resistance via KRAS mutations, what are some alternative drugs targeting KRAS?"
 
 ## 4. Development Workflow & Tooling
 
