@@ -13,7 +13,7 @@ The current system uses a two-step LLM chain (Instruction Expansion → Cypher G
 We will create a high-quality dataset of `(question, cypher)` pairs using a hybrid approach that combines systematic generation for coverage and manual curation for realism.
 
 ### Step 1: Systematic Generation
-- **Method:** We will write Python-based template generators for a comprehensive set of query "families" (see below). These templates will be populated with real entity data (genes, diseases, etc.) sampled from the project's existing CSV files. A variety of natural language questions will be generated for each "gold" Cypher query.
+- **Method:** We will write Python-based template generators for a comprehensive set of query "families" (see below). These templates will be populated with real entity data (genes, diseases, etc.) sampled from the project's existing CSV files. The generation script will leverage canonical entity names and their ingested synonyms (especially for diseases) to create a rich training set. For a single "gold" Cypher query targeting a canonical disease name (e.g., "Lung Non-small Cell Carcinoma"), the script will generate multiple varied questions using both the canonical name and its aliases (e.g., "non-small cell lung cancer"). This teaches the model to map diverse user phrasing to a single, robust query pattern.
 - **Output:** ~1000-2000 `(question, gold_cypher)` pairs. The Cypher is considered "gold" because it's generated from deterministic, correct templates, not an LLM.
 
 ### Step 2: Question Curation and Dataset Finalization
@@ -38,10 +38,12 @@ To ensure comprehensive coverage of the graph's capabilities, the dataset will b
 #### F2: Property-Based & Evidential Queries
 - **F2.1 (TARGETS Properties):** Requesting properties from the `TARGETS` relationship.
   - *Example:* "What is Dabrafenib's mechanism of action on BRAF?"
-- **F2.2 (AFFECTS_RESPONSE_TO Basic):** The effect of a `Biomarker` on a `Therapy`.
-  - *Example:* "How does EGFR T790M affect response to Osimertinib?"
-- **F2.3 (AFFECTS_RESPONSE_TO with Evidence):** Filtering based on evidence properties like the existence of PMIDs.
-  - *Example:* "Find resistance biomarkers for Cetuximab that have PubMed citations."
+- **F2.2 (AFFECTS_RESPONSE_TO Basic):** The effect of a `Biomarker` on a `Therapy`, often constrained by a `Disease`.
+  - *Example:* "How does EGFR T790M affect response to Osiminib in lung cancer?"
+- **F2.3 (Evidential Properties):** Requesting specific evidence details from the `AFFECTS_RESPONSE_TO` relationship.
+  - *Example:* "Provide PMIDs supporting that EGFR S492R confers resistance to cetuximab."
+- **F2.4 (Node Properties):** Requesting properties from a node itself, often combined with a lookup.
+    - *Example:* "What are the tags for therapies that target BRAF?"
 
 #### F3: Set-Based & Comparative Queries
 - **F3.1 (Union):** Therapies targeting `Gene A` OR `Gene B`.
@@ -57,7 +59,37 @@ To ensure comprehensive coverage of the graph's capabilities, the dataset will b
 - **F4.2 (Alternative Therapy Discovery):** Find `Genes` that are resistance biomarkers for `Therapy A`, then find other therapies (`Therapy B`) that `TARGET` those `Genes`.
   - *Example:* "For therapies causing resistance via KRAS mutations, what are some alternative drugs targeting KRAS?"
 
-## 4. Development Workflow & Tooling
+#### F5: Disease-Centric & Discovery Queries
+- **F5.1 (Disease -> Biomarkers):** Find all biomarkers (Genes or Variants) with evidence in a specific `Disease`.
+  - *Example:* "In colorectal cancer, which ERBB2 or EGFR variants have biomarker evidence?"
+- **F5.2 (Disease -> Therapies):** Find all therapies that have known biomarker evidence in a specific `Disease`.
+  - *Example:* "List therapies with variant-level biomarkers in non-small cell lung cancer."
+
+## 4. Key Generation Strategies
+
+To ensure the model is robust to variations in user phrasing, the dataset will be designed to teach the following specific Cypher generation patterns:
+
+### Disease Name Filtering
+
+The model will be trained to translate varied user phrasing for diseases into a single, canonical, token-based Cypher query.
+
+- **Training Data Process:**
+  1.  For a given disease in the graph (e.g., `disease_name: "Lung Non-small Cell Carcinoma"`), define its "gold" Cypher query by tokenizing its canonical name.
+  2.  Look up the disease's ingested aliases (e.g., "non-small cell lung cancer").
+  3.  Generate multiple `(question, gold_cypher)` training pairs. The questions will use both the canonical name and its aliases, but the target Cypher will always be the same canonical, token-based query.
+- **Inference-Time Goal:** This trains the model to act as a "translator." It learns that when a user asks about "non-small cell lung cancer," it must generate the precise Cypher query that filters for the canonical tokens: `['lung', 'non-small', 'cell', 'carcinoma']`.
+- **Example Gold Cypher:**
+  ```cypher
+  ...
+  WHERE toLower(rel.disease_name) CONTAINS toLower('lung')
+    AND toLower(rel.disease_name) CONTAINS toLower('non-small')
+    AND toLower(rel.disease_name) CONTAINS toLower('cell')
+    AND toLower(rel.disease_name) CONTAINS toLower('carcinoma')
+  ...
+  ```
+This makes the matching logic explicit in the training data, rather than relying on the model's implicit world knowledge.
+
+## 5. Development Workflow & Tooling
 
 All development will occur within this mono-repo to maintain tight integration with existing schema and validation logic.
 
@@ -87,7 +119,7 @@ All development will occur within this mono-repo to maintain tight integration w
 4.  Run `train_model.py` using the `train.jsonl` file.
 5.  Run `evaluate_model.py` on `test.jsonl` to benchmark the new model.
 
-## 5. Evaluation Plan
+## 6. Evaluation Plan
 
 Model performance will be assessed using a dedicated, held-out test set (~15-20% of the curated data). The evaluation script will be separate from the application's main tracing/logging system.
 
