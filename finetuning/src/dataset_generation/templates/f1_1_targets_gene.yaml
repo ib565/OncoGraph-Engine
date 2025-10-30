@@ -1,0 +1,13 @@
+template_id: f1_1_targets_gene
+family_id: F1.1
+question: "What drugs target {{ gene_symbol }}?"
+cypher: |
+  MATCH (g:Gene {symbol: '{{ gene_symbol }}'})<-[:TARGETS]-(t:Therapy)
+  RETURN t.name AS therapy_name, g.symbol AS gene_symbol
+  LIMIT 50
+placeholders:
+  gene_symbol:
+    from: civic.genes
+    sample: canonical_only
+
+
