@@ -77,6 +77,7 @@ class CivicEvidence:
     variant_hgvs_p: str | None
     disease_name: str | None
     disease_doid: str | None
+    disease_aliases: list[str]
     therapies: list[str]
     clinical_significance: str | None
     pmids: list[str]
@@ -132,7 +133,7 @@ def _fetch_civic_v2_graphql(api_url: str, page_size: int = 500, max_pages: int |
                 id
                 description
                 molecularProfile { name }
-                disease { name doid }
+                disease { name doid diseaseAliases }
                 therapies { name }
                 significance
                 evidenceDirection
@@ -268,6 +269,7 @@ def _to_evidence_items(raw_items: list[dict]) -> list[CivicEvidence]:
         # Disease (take first if list provided)
         disease_name = None
         disease_doid = None
+        disease_aliases: list[str] = []
         disease = obj.get("disease")
         if isinstance(disease, dict):
             disease_name = _safe_get(disease, ["name"]) or _safe_get(disease, ["display_name"])  # type: ignore[arg-type]
@@ -277,6 +279,10 @@ def _to_evidence_items(raw_items: list[dict]) -> list[CivicEvidence]:
                 disease_doid = raw_doid.split(":", 1)[1]
             else:
                 disease_doid = raw_doid
+            # v2 GraphQL: optional diseaseAliases array
+            aliases_val = disease.get("diseaseAliases")
+            if isinstance(aliases_val, list):
+                disease_aliases = [str(a).strip() for a in aliases_val if isinstance(a, (str, int)) and str(a).strip()]
         elif isinstance(disease, list) and disease:
             first = disease[0]
             if isinstance(first, dict):
@@ -326,6 +332,7 @@ def _to_evidence_items(raw_items: list[dict]) -> list[CivicEvidence]:
                 variant_hgvs_p=variant_hgvs_p.strip() if isinstance(variant_hgvs_p, str) else None,
                 disease_name=disease_name.strip() if isinstance(disease_name, str) else None,
                 disease_doid=disease_doid.strip() if isinstance(disease_doid, str) else None,
+                disease_aliases=disease_aliases,
                 therapies=[t for t in therapies if t],
                 clinical_significance=(
                     clinical_significance.strip() if isinstance(clinical_significance, str) else None
@@ -459,10 +466,17 @@ def run_civic_ingest(
 
         disease_name = ev.disease_name
         if disease_name:
-            disease_rows.setdefault(
-                disease_name,
-                {"name": disease_name, "doid": ev.disease_doid, "synonyms": None},
-            )
+            # Initialize disease row if new
+            if disease_name not in disease_rows:
+                disease_rows[disease_name] = {"name": disease_name, "doid": ev.disease_doid, "synonyms": None}
+            # Merge disease aliases into synonyms (semicolon-separated)
+            if ev.disease_aliases:
+                existing_syn = disease_rows[disease_name].get("synonyms")
+                existing_list = [
+                    s for s in (existing_syn.split(";") if isinstance(existing_syn, str) and existing_syn else []) if s
+                ]
+                merged = sorted({s.strip() for s in existing_list + ev.disease_aliases if s and s.strip()})
+                disease_rows[disease_name]["synonyms"] = ";".join(merged) if merged else None
 
         for therapy_name in ev.therapies:
             therapy_rows.setdefault(
