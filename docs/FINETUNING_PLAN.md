@@ -39,11 +39,11 @@ To ensure comprehensive coverage of the graph's capabilities, the dataset will b
 - **F2.1 (TARGETS Properties):** Requesting properties from the `TARGETS` relationship.
   - *Example:* "What is Dabrafenib's mechanism of action on BRAF?"
 - **F2.2 (AFFECTS_RESPONSE_TO Basic):** The effect of a `Biomarker` on a `Therapy`, often constrained by a `Disease`.
-  - *Example:* "How does EGFR T790M affect response to Osiminib in lung cancer?"
+  - *Example:* "How does EGFR T790M affect response to Osimertinib in lung cancer?"
 - **F2.3 (Evidential Properties):** Requesting specific evidence details from the `AFFECTS_RESPONSE_TO` relationship.
   - *Example:* "Provide PMIDs supporting that EGFR S492R confers resistance to cetuximab."
-- **F2.4 (Node Properties):** Requesting properties from a node itself, often combined with a lookup.
-    - *Example:* "What are the tags for therapies that target BRAF?"
+- **F2.4 (Node Properties):** Requesting properties from a node itself.
+    - *Example:* "What is the consequence of the BRAF V600E variant?"
 
 #### F3: Set-Based & Comparative Queries
 - **F3.1 (Union):** Therapies targeting `Gene A` OR `Gene B`.
@@ -64,6 +64,18 @@ To ensure comprehensive coverage of the graph's capabilities, the dataset will b
   - *Example:* "In colorectal cancer, which ERBB2 or EGFR variants have biomarker evidence?"
 - **F5.2 (Disease -> Therapies):** Find all therapies that have known biomarker evidence in a specific `Disease`.
   - *Example:* "List therapies with variant-level biomarkers in non-small cell lung cancer."
+
+#### F6: Compositional Queries (High Value)
+To ensure the model learns to handle complex, real-world questions, a dedicated family of compositional queries will be included. These queries explicitly combine patterns from the simpler families to help the model generalize.
+
+- **F6.1 (Evidence + Therapy Union + Disease Filter):** A combination of `F2.2`, `F3.1`, and `F5`.
+  - *Example:* "Which genes predict resistance to cetuximab or panitumumab in colorectal cancer?"
+- **F6.2 (Targeting + Negative Filter + Disease Evidence):** A combination of `F1.1`, `F3.3`, and `F4.1`.
+  - *Example:* "What therapies target BRAF but NOT KRAS, and have biomarker evidence in melanoma?"
+- **F6.3 (Targeting + Variant Evidence):** A combination of `F1.1`, `F2.2`, and `F5`.
+  - *Example:* "Find therapies that target EGFR for variants that cause resistance in lung cancer."
+ - **F6.4 (Alternative Therapy via Resistance Genes + Disease):** A combination of `F4.2` and `F5`.
+   - *Example:* "For resistance to cetuximab in colorectal cancer, which therapies target the resistance biomarkers?"
 
 ## 4. Key Generation Strategies
 
@@ -98,6 +110,48 @@ To provide an intuitive search experience for researchers, the system must handl
   ...
   ```
 This deterministic approach ensures that the logic is simple, testable, and robust, giving the LLM a clean and achievable learning task.
+
+### Canonical Rule Coverage (Alignment with prompts.py)
+
+The dataset must explicitly teach every canonical behavior encoded in `src/pipeline/prompts.py`.
+
+- Rules to teach (non‑exhaustive but mandatory):
+  - Gene‑only AFFECTS: collapse evidence to gene level; set `variant_name = NULL`; de‑duplicate by `(gene_symbol, therapy_name, disease_name)`; aggregate `pmids` across rows; return `pmids` as array (default `[]`).
+  - Variant‑specific AFFECTS: prefer equality on full variant name; if only a token (e.g., `G12C`), use guarded fallbacks: `Variant.name CONTAINS`, or `hgvs_p = 'p.<TOKEN>'`, or `synonyms CONTAINS`; always guard with `[:VARIANT_OF]` to the gene.
+  - Fusions: match both orientations (e.g., `EML4::ALK` and `ALK::EML4`).
+  - Alteration classes: handle tokens like `Amplification`, `Overexpression`, `Deletion`, `Loss-of-function`, `Fusion`, `Wildtype` with `VARIANT_OF` guard.
+  - TARGETS: project `r.moa AS targets_moa`; derive `pmids` from `r.ref_sources/r.ref_ids` where source contains `pubmed` or equals `pmid` (case‑insensitive); also return `ref_sources/ref_ids/ref_urls`.
+  - Therapy resolution: match by exact name; synonyms equality; `toLower(t.name) CONTAINS`; therapy class via `tags` or via explicit `[:TARGETS]` to the gene.
+  - Disease filters: umbrella terms use minimal anchor token(s); specific diseases use canonical tokens; apply the “Cancer Rule” from this plan; disease aliases expand question phrasing in training, not schema.
+  - Filter scoping: attach WHERE filters to the bindings they constrain; do not place relationship filters under `OPTIONAL MATCH`.
+  - Arrays: wrap with `coalesce(..., [])` before `any()/all()`; always return `pmids` as an array (default `[]`).
+  - Effects: compare case‑insensitively (`toLower(rel.effect) = 'resistance'|'sensitivity'`).
+  - Returns: include `therapy_name` and at least one of `variant_name` or `gene_symbol`; use minimal sufficient columns; set missing columns to `NULL`; include `LIMIT`; no parameters (no `$vars`).
+
+- Family coverage map:
+  - F1.1/F1.2: TARGETS lookups; therapy name/synonyms; tags‑based class; minimal returns.
+  - F1.3/F1.4: VARIANT_OF guard; variant/gene traversal; alteration class tokens.
+  - F2.1: MOA + reference‑derived pmids; include reference arrays.
+  - F2.2: AFFECTS gene‑only and variant‑specific; sensitivity/resistance; disease filters; pmids as array.
+  - F2.3: Evidence property extraction (e.g., PMIDs).
+  - F2.4: Node properties (e.g., variant `consequence`).
+  - F3: Union/intersection/negative on genes/therapies.
+  - F4.1: Target validation combining TARGETS + AFFECTS + disease; correct filter scoping; mixed return schema.
+  - F4.2: Alternative therapy via resistance genes; multi‑hop with disease.
+  - F5: Disease name handling with aliases and the deterministic Cancer Rule.
+  - F6: Compositional combinations of the above (generalization exemplars).
+
+- Dataset generation requirements (must include explicit examples for):
+  - Gene‑only AFFECTS with pmid aggregation and de‑duplication.
+  - Variant‑specific AFFECTS: full names, bare tokens (e.g., `G12C`), `hgvs_p`, synonyms.
+  - Fusion variants both orientations.
+  - Alteration‑class tokens with `VARIANT_OF` guard.
+  - TARGETS with reference‑derived pmids and returned reference arrays.
+  - Therapy class via `tags` (e.g., “anti‑EGFR”) and fallback via TARGETS.
+  - Disease broad vs specific for the same evidence (e.g., “Lung Cancer” vs “Lung Carcinoma” vs NSCLC) per Cancer Rule.
+  - Set ops: union, intersection, negative (e.g., “KRAS but not NRAS”).
+  - Mixed return schemas with NULL placeholders where fields are inapplicable.
+  - Usage of `coalesce(..., [])` in `any()/all()` over arrays; inclusion of `LIMIT`; no parameters.
 
 ## 5. Development Workflow & Tooling
 
