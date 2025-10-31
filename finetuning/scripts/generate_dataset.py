@@ -376,6 +376,15 @@ def main() -> None:
                 return " ".join(filtered) if filtered else name
             return name
 
+        def _escape_cypher_literal(value: str) -> str:
+            """Escape a Python string for safe inclusion in single-quoted Cypher string literals.
+
+            Rules:
+            - Backslashes first (\\ -> \\\\)
+            - Single quotes (') as \'
+            """
+            return value.replace("\\", "\\\\").replace("'", "\\'")
+
         with out_file.open("w", encoding="utf-8") as out_f:
             for i, combo in enumerate(all_combos, start=1):
                 placeholders = {k: v for k, v in zip(key_order, combo, strict=False)}
@@ -383,6 +392,10 @@ def main() -> None:
                 cypher_placeholders = placeholders.copy()
                 if "disease_name" in cypher_placeholders:
                     cypher_placeholders["disease_name"] = _apply_cancer_rule_simple(cypher_placeholders["disease_name"])
+                # Escape values for Cypher string literals (only strings are expected here)
+                for k, v in list(cypher_placeholders.items()):
+                    if isinstance(v, str):
+                        cypher_placeholders[k] = _escape_cypher_literal(v)
 
                 q_text = render_template(tpl["question"], placeholders)
                 cypher_text = render_template(tpl["cypher"], cypher_placeholders)
