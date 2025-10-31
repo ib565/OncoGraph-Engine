@@ -5,4 +5,3 @@ paraphrases:
 - Which therapies target {{ gene_symbol }}?
 - List treatments that target {{ gene_symbol }}.
 - What medications are known to target {{ gene_symbol }}?
-- Can you provide information on drugs that target {{ gene_symbol }}?

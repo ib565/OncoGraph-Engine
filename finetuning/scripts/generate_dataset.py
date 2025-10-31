@@ -6,10 +6,10 @@ from pathlib import Path
 
 import yaml
 
-from finetuning.src.dataset_generation.loaders.civic_loader import CivicIndex
+from oncograph_finetuning.dataset_generation.loaders.civic_loader import CivicIndex
 
 ROOT = Path(__file__).resolve().parents[1]
-TEMPLATES_DIR = ROOT / "src" / "dataset_generation" / "templates"
+TEMPLATES_DIR = ROOT / "oncograph_finetuning" / "dataset_generation" / "templates"
 DATASET_DIR = ROOT / "dataset"
 
 

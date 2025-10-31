@@ -32,7 +32,7 @@ except Exception:  # pragma: no cover
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TEMPLATES_DIR = ROOT / "src" / "dataset_generation" / "templates"
+TEMPLATES_DIR = ROOT / "oncograph_finetuning" / "dataset_generation" / "templates"
 
 
 class ParaphraseItem(BaseModel):

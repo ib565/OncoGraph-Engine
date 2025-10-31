@@ -96,3 +96,5 @@ class CivicIndex:
 
     def get_variant_names(self) -> list[str]:
         return self.variants
+
+
