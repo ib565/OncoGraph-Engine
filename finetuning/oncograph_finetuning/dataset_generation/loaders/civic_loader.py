@@ -5,6 +5,7 @@ DEFAULT_CIVIC_DIR = Path("data/civic/latest")
 GENES_CSV = DEFAULT_CIVIC_DIR / "nodes" / "genes.csv"
 THERAPIES_CSV = DEFAULT_CIVIC_DIR / "nodes" / "therapies.csv"
 VARIANTS_CSV = DEFAULT_CIVIC_DIR / "nodes" / "variants.csv"
+DISEASES_CSV = DEFAULT_CIVIC_DIR / "nodes" / "diseases.csv"
 
 
 def load_canonical_gene_symbols(genes_csv_path: Path | None = None) -> list[str]:
@@ -27,10 +28,12 @@ def load_canonical_gene_symbols(genes_csv_path: Path | None = None) -> list[str]
     return sorted(symbols)
 
 
-def load_therapy_names(therapies_csv_path: Path | None = None) -> list[str]:
+def load_therapy_names(therapies_csv_path: Path | None = None, require_chembl_id: bool = False) -> list[str]:
     """Load therapy names from CIViC nodes CSV.
 
-    Expects a CSV with a column named 'name'. Returns a sorted, de-duplicated list.
+    Expects a CSV with columns 'name' and optionally 'chembl_id'.
+    When require_chembl_id is True, only returns rows with non-empty chembl_id.
+    Returns a sorted, de-duplicated list.
     """
     path = Path(therapies_csv_path) if therapies_csv_path else THERAPIES_CSV
     print(f"[civic_loader] Reading therapies from: {path}")
@@ -41,9 +44,16 @@ def load_therapy_names(therapies_csv_path: Path | None = None) -> list[str]:
         for row in reader:
             row_count += 1
             name = (row.get("name") or "").strip()
-            if name:
-                names.add(name)
-    print(f"[civic_loader] Parsed {row_count} rows; collected {len(names)} unique therapy names")
+            if not name:
+                continue
+            if require_chembl_id:
+                chembl_id = (row.get("chembl_id") or "").strip()
+                if not chembl_id:
+                    continue
+            names.add(name)
+    print(
+        f"[civic_loader] Parsed {row_count} rows; collected {len(names)} unique therapy names (require_chembl_id={require_chembl_id})"
+    )
     return sorted(names)
 
 
@@ -67,6 +77,35 @@ def load_variant_names(variants_csv_path: Path | None = None) -> list[str]:
     return sorted(names)
 
 
+def load_disease_names(diseases_csv_path: Path | None = None, require_doid: bool = True) -> list[str]:
+    """Load disease names from CIViC nodes CSV.
+
+    Expects a CSV with columns 'name' and 'doid'.
+    When require_doid is True, only returns rows with non-empty DOID.
+    Returns a sorted, de-duplicated list.
+    """
+    path = Path(diseases_csv_path) if diseases_csv_path else DISEASES_CSV
+    print(f"[civic_loader] Reading diseases from: {path}")
+    names: set[str] = set()
+    with path.open(newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        row_count = 0
+        for row in reader:
+            row_count += 1
+            name = (row.get("name") or "").strip()
+            if not name:
+                continue
+            if require_doid:
+                doid = (row.get("doid") or "").strip()
+                if not doid:
+                    continue
+            names.add(name)
+    print(
+        f"[civic_loader] Parsed {row_count} rows; collected {len(names)} unique disease names (require_doid={require_doid})"
+    )
+    return sorted(names)
+
+
 class CivicIndex:
     """Minimal CIViC entity index used by dataset generation.
 
@@ -78,14 +117,18 @@ class CivicIndex:
         self.genes: list[str] = []
         self.therapies: list[str] = []
         self.variants: list[str] = []
+        self.diseases: list[str] = []
 
-    def build(self) -> None:
+    def build(self, require_chembl_id: bool = True, require_doid: bool = True) -> None:
         print(f"[civic_loader] Building index from base_dir: {self.base_dir}")
         self.genes = load_canonical_gene_symbols(self.base_dir / "nodes" / "genes.csv")
-        self.therapies = load_therapy_names(self.base_dir / "nodes" / "therapies.csv")
+        self.therapies = load_therapy_names(
+            self.base_dir / "nodes" / "therapies.csv", require_chembl_id=require_chembl_id
+        )
         self.variants = load_variant_names(self.base_dir / "nodes" / "variants.csv")
+        self.diseases = load_disease_names(self.base_dir / "nodes" / "diseases.csv", require_doid=require_doid)
         print(
-            f"[civic_loader] Index build complete: genes={len(self.genes)} therapies={len(self.therapies)} variants={len(self.variants)}"
+            f"[civic_loader] Index build complete: genes={len(self.genes)} therapies={len(self.therapies)} variants={len(self.variants)} diseases={len(self.diseases)}"
         )
 
     def get_gene_symbols(self) -> list[str]:
@@ -97,4 +140,5 @@ class CivicIndex:
     def get_variant_names(self) -> list[str]:
         return self.variants
 
-
+    def get_disease_names(self) -> list[str]:
+        return self.diseases
