@@ -1,11 +1,9 @@
 import json
 import random
 import sys
-from glob import glob
 from pathlib import Path
 
 import yaml
-
 from oncograph_finetuning.dataset_generation.loaders.civic_loader import CivicIndex
 
 ROOT = Path(__file__).resolve().parents[1]
