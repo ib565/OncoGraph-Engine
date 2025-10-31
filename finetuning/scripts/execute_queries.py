@@ -76,9 +76,9 @@ def main() -> None:
 
     per_file_env = os.environ.get("EXEC_SAMPLES_PER_FILE")
     try:
-        per_file = int(per_file_env) if per_file_env else 2
+        per_file = int(per_file_env) if per_file_env else 4
     except Exception:
-        per_file = 2
+        per_file = 4
 
     random.seed(42)
     records = load_sample_records(files, per_file=per_file)
