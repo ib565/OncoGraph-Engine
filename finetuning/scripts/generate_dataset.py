@@ -57,6 +57,224 @@ def _list_all_templates() -> list[Path]:
     return paths
 
 
+def _relationship_combos(index: CivicIndex, template_id: str, placeholder_keys: set[str]) -> list[dict[str, str]]:
+    """Derive placeholder combos from relationships for high hit-rate where possible.
+
+    Returns a list of dicts mapping placeholder -> value.
+    """
+    combos: list[dict[str, str]] = []
+    keys = placeholder_keys
+
+    # Common helpers
+    targets_pairs = index.get_targets_pairs()
+    targets_genes = index.get_targets_genes()
+    targets_therapies = index.get_targets_therapies()
+
+    # F1 / F2.1 patterns
+    if keys == {"gene_symbol", "therapy_name"}:
+        for tname, gsym in targets_pairs:
+            combos.append({"therapy_name": tname, "gene_symbol": gsym})
+        return combos
+    if keys == {"gene_symbol"}:
+        for gsym in targets_genes:
+            combos.append({"gene_symbol": gsym})
+        return combos
+    if keys == {"therapy_name"}:
+        for tname in targets_therapies:
+            combos.append({"therapy_name": tname})
+        return combos
+
+    # AFFECTS: gene-only by therapy+disease (general)
+    if keys == {"therapy_name", "disease_name"}:
+        effect: str | None = None
+        if "resistance" in template_id:
+            effect = "resistance"
+        elif "sensitivity" in template_id:
+            effect = "sensitivity"
+        for tname, dname in index.get_affects_pairs(effect=effect, require_variant=None):
+            combos.append({"therapy_name": tname, "disease_name": dname})
+        return combos
+
+    # AFFECTS: variant-specific
+    if keys == {"variant_name", "therapy_name", "disease_name"}:
+        effect = None
+        if "resistance" in template_id:
+            effect = "resistance"
+        elif "sensitivity" in template_id:
+            effect = "sensitivity"
+        for vname, tname, dname in index.get_affects_variant_triples(effect=effect):
+            combos.append({"variant_name": vname, "therapy_name": tname, "disease_name": dname})
+        return combos
+
+    # Evidence: variant + therapy (no disease filter)
+    if keys == {"variant_name", "therapy_name"}:
+        effect = None
+        if "resistance" in template_id:
+            effect = "resistance"
+        elif "sensitivity" in template_id:
+            effect = "sensitivity"
+        seen: set[tuple[str, str]] = set()
+        for vname, tname, _dname in index.get_affects_variant_triples(effect=effect):
+            pair = (vname, tname)
+            if pair in seen:
+                continue
+            seen.add(pair)
+            combos.append({"variant_name": vname, "therapy_name": tname})
+        return combos
+
+    # F5 disease centric (use diseases present in affects)
+    if keys == {"disease_name"}:
+        seen_d: set[str] = set()
+        for _v, tname, dname in index.get_affects_variant_triples(effect=None):
+            if dname not in seen_d:
+                seen_d.add(dname)
+                combos.append({"disease_name": dname})
+        # Fallback to any disease present in affects (gene-only rows)
+        for tname, dname in index.get_affects_pairs(effect=None, require_variant=None):
+            if dname not in seen_d:
+                seen_d.add(dname)
+                combos.append({"disease_name": dname})
+        return combos
+
+    # F3 set operations
+    if template_id == "f3_1_therapies_union_genes" and keys == {"gene_symbol_a", "gene_symbol_b"}:
+        genes = targets_genes
+        for i in range(0, min(len(genes), 200), 2):
+            if i + 1 < len(genes):
+                combos.append({"gene_symbol_a": genes[i], "gene_symbol_b": genes[i + 1]})
+        return combos
+
+    if template_id == "f3_2_therapies_intersection_genes" and keys == {"gene_symbol_a", "gene_symbol_b"}:
+        # Build gene -> set(therapies)
+        from collections import defaultdict
+
+        g2t: dict[str, set[str]] = defaultdict(set)
+        for tname, gsym in targets_pairs:
+            g2t[gsym].add(tname)
+        genes = list(g2t.keys())
+        for i in range(len(genes)):
+            for j in range(i + 1, len(genes)):
+                inter = g2t[genes[i]] & g2t[genes[j]]
+                if inter:
+                    combos.append({"gene_symbol_a": genes[i], "gene_symbol_b": genes[j]})
+                    if len(combos) >= 200:
+                        return combos
+        return combos
+
+    if template_id == "f3_3_therapies_target_a_not_b" and keys == {"gene_symbol_include", "gene_symbol_exclude"}:
+        from collections import defaultdict
+
+        g2t: dict[str, set[str]] = defaultdict(set)
+        for tname, gsym in targets_pairs:
+            g2t[gsym].add(tname)
+        genes = list(g2t.keys())
+        for gi in genes:
+            for gx in genes:
+                if gi == gx:
+                    continue
+                if g2t[gi] - g2t[gx]:
+                    combos.append({"gene_symbol_include": gi, "gene_symbol_exclude": gx})
+                    if len(combos) >= 200:
+                        return combos
+        return combos
+
+    # F4.2 / F6.4: alternative therapies from resistance genes
+    if template_id in {
+        "f4_2_alternative_therapies_from_resistance_genes",
+        "f6_4_alternative_therapies_for_resistance_in_disease",
+    } and keys == {"therapy_name", "disease_name"}:
+        for tname, dname in index.get_affects_pairs(effect="resistance", require_variant=None):
+            combos.append({"therapy_name": tname, "disease_name": dname})
+        return combos
+
+    # F4.1: target validation gene+disease (pick gene with a therapy that has affects in disease)
+    if template_id == "f4_1_target_validation_gene_disease" and keys == {"gene_symbol", "disease_name"}:
+        from collections import defaultdict
+
+        # therapy -> set(diseases with affects)
+        t2d: dict[str, set[str]] = defaultdict(set)
+        for tname, dname in index.get_affects_pairs(effect=None, require_variant=None):
+            t2d[tname].add(dname)
+        # gene -> set(therapies)
+        from itertools import groupby
+
+        g2t: dict[str, set[str]] = defaultdict(set)
+        for tname, gsym in targets_pairs:
+            g2t[gsym].add(tname)
+        for gsym, tset in g2t.items():
+            for tname in tset:
+                if tname in t2d:
+                    for dname in t2d[tname]:
+                        combos.append({"gene_symbol": gsym, "disease_name": dname})
+                        if len(combos) >= 200:
+                            return combos
+        return combos
+
+    # F6.1: resistance genes for union therapies in disease
+    if template_id == "f6_1_resistance_genes_for_union_therapies_in_disease" and keys == {
+        "therapy_name_a",
+        "therapy_name_b",
+        "disease_name",
+    }:
+        from collections import defaultdict
+
+        d2t: dict[str, set[str]] = defaultdict(set)
+        for tname, dname in index.get_affects_pairs(effect="resistance", require_variant=None):
+            d2t[dname].add(tname)
+        for dname, tset in d2t.items():
+            tlist = list(tset)
+            for i in range(0, len(tlist) - 1):
+                combos.append({"therapy_name_a": tlist[i], "therapy_name_b": tlist[i + 1], "disease_name": dname})
+                if len(combos) >= 200:
+                    return combos
+        return combos
+
+    # F6.2: therapies target include gene not other with disease evidence
+    if template_id == "f6_2_therapies_target_gene_not_other_with_disease_evidence" and keys == {
+        "gene_include",
+        "gene_exclude",
+        "disease_name",
+    }:
+        from collections import defaultdict
+
+        t2d: dict[str, set[str]] = defaultdict(set)
+        for tname, dname in index.get_affects_pairs(effect=None, require_variant=None):
+            t2d[tname].add(dname)
+        g2t: dict[str, set[str]] = defaultdict(set)
+        for tname, gsym in targets_pairs:
+            g2t[gsym].add(tname)
+        for gsym, tset in g2t.items():
+            for tname in tset:
+                if tname in t2d:
+                    for dname in t2d[tname]:
+                        # choose an exclude gene different from gsym
+                        for gx in g2t.keys():
+                            if gx != gsym:
+                                combos.append({"gene_include": gsym, "gene_exclude": gx, "disease_name": dname})
+                                if len(combos) >= 200:
+                                    return combos
+        return combos
+
+    # F6.3: therapies target gene with variant resistance in disease -> sample (gene, disease)
+    if template_id == "f6_3_therapies_target_gene_with_variant_resistance_in_disease" and keys == {
+        "gene_symbol",
+        "disease_name",
+    }:
+        from collections import defaultdict
+
+        # For each variant-resistance record, map therapy to its target genes
+        for vname, tname, dname in index.get_affects_variant_triples(effect="resistance"):
+            # find genes targeted by tname
+            for t_pair in targets_pairs:
+                if t_pair[0] == tname:
+                    combos.append({"gene_symbol": t_pair[1], "disease_name": dname})
+                    if len(combos) >= 200:
+                        return combos
+        return combos
+
+    return combos
+
+
 def main() -> None:
     if len(sys.argv) < 2:
         print("Usage: python generate_dataset.py <template_filename.yaml | --all>", file=sys.stderr)
@@ -127,15 +345,21 @@ def main() -> None:
             print(f"[generate_dataset] Skipping template due to unsupported placeholders: {sorted(unsupported)}")
             continue
 
-        # Build combinations with a cap to avoid explosion
-        from itertools import product
-
+        # Prefer relationship-driven combos for higher hit-rate
         key_order = [k for (k, _vals) in placeholders_list]
-        value_lists = [vals for (_k, vals) in placeholders_list]
+        rel_combos = _relationship_combos(index, tpl["template_id"], set(key_order))
+        if rel_combos:
+            # Convert dict combos to tuples in key_order
+            all_combos = [tuple(combo[k] for k in key_order) for combo in rel_combos]
+        else:
+            # Fallback to simple cartesian product over independently sampled entities
+            from itertools import product
+
+            value_lists = [vals for (_k, vals) in placeholders_list]
+            all_combos = list(product(*value_lists))
+
         # Limit combinations to ~200 per template deterministically
         max_records = 200
-        # Compute cartesian product and downsample if needed
-        all_combos = list(product(*value_lists))
         if len(all_combos) > max_records:
             random.shuffle(all_combos)
             all_combos = all_combos[:max_records]
