@@ -1,0 +1,15 @@
+template_id: f1_4_variants_of_gene
+family_id: F1.4
+question: "List all known variants of the {{ gene_symbol }} gene."
+cypher: |
+  MATCH (v:Variant)-[:VARIANT_OF]->(g:Gene {symbol: '{{ gene_symbol }}'})
+  RETURN v.name AS variant_name, g.symbol AS gene_symbol
+  LIMIT 50
+placeholders:
+  gene_symbol:
+    from: civic.genes
+    sample: canonical_only
+
+
+
+

@@ -1,7 +1,7 @@
 """LLM-driven template paraphrasing with structured JSON output.
 
 Usage:
-  python finetuning/scripts/paraphrase_templates_llm.py f1_1_targets_gene.yaml [more.yaml ...]
+  python finetuning/scripts/paraphrase_templates.py f1_1_targets_gene.yaml [more.yaml ...]
 
 Behavior:
   - Processes input template files in batches of 3 base questions.

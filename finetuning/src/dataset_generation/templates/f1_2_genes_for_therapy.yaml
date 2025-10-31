@@ -1,19 +1,21 @@
-template_id: f1_1_targets_gene
-family_id: F1.1
-question: "What drugs target {{ gene_symbol }}?"
+template_id: f1_2_genes_for_therapy
+family_id: F1.2
+question: "Which genes does {{ therapy_name }} target?"
 cypher: |
-  MATCH (t:Therapy)-[r:TARGETS]->(g:Gene {symbol: '{{ gene_symbol }}'})
+  MATCH (t:Therapy {name: '{{ therapy_name }}'})-[r:TARGETS]->(g:Gene)
   RETURN
-    t.name AS therapy_name,
     g.symbol AS gene_symbol,
+    t.name AS therapy_name,
     r.moa AS targets_moa,
     coalesce(r.ref_sources, []) AS ref_sources,
     coalesce(r.ref_ids, []) AS ref_ids,
     coalesce(r.ref_urls, []) AS ref_urls
   LIMIT 50
 placeholders:
-  gene_symbol:
-    from: civic.genes
+  therapy_name:
+    from: civic.therapies
     sample: canonical_only
+
+
 
 
