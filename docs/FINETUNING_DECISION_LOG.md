@@ -49,3 +49,19 @@ The most complex part of this process was designing a robust strategy for handli
 - For `"Lung Carcinoma"`, it correctly generates a high-precision query (`CONTAINS 'lung' AND CONTAINS 'carcinoma'`).
 - For `"Cancer"`, it correctly generates a precise query (`CONTAINS 'cancer'`).
 - This approach is not hacky because the logic is explicit in our code, not hoped for from the LLM. The model is given a much simpler, cleaner task, which will lead to a more reliable result.
+
+### Implementation Details: Order-Invariant Token Matching
+
+**Enhancement:** To handle disease name variations in the database (e.g., "Lung Non-small Cell Carcinoma" vs "Non-small Cell Lung Carcinoma"), queries use order-invariant token matching. All tokens from the canonical disease name are AND-ed together, ensuring matches regardless of word order.
+
+**Example:** For `"Non-small Cell Lung Carcinoma"`, the generator creates:
+```cypher
+WHERE (
+  toLower(rel.disease_name) CONTAINS 'lung' AND
+  toLower(rel.disease_name) CONTAINS 'non-small' AND
+  toLower(rel.disease_name) CONTAINS 'cell' AND
+  toLower(rel.disease_name) CONTAINS 'carcinoma'
+)
+```
+
+This matches both "Lung Non-small Cell Carcinoma" and "Non-small Cell Lung Carcinoma" in the database, maximizing recall while maintaining precision through multiple token requirements. Hyphens are preserved in tokens (e.g., "non-small" remains as a single token) to match dataset conventions.
