@@ -7,7 +7,6 @@ from typing import Any
 from dotenv import load_dotenv
 from neo4j import GraphDatabase
 
-
 ROOT = Path(__file__).resolve().parents[1]
 DATASET_DIR = ROOT / "dataset"
 
