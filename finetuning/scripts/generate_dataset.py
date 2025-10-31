@@ -321,6 +321,7 @@ def main() -> None:
     index.build(require_chembl_id=True, require_doid=True)
     DATASET_DIR.mkdir(parents=True, exist_ok=True)
 
+    total_records = 0
     for template_path in template_paths:
         print(f"[generate_dataset] Loading template: {template_path}")
         tpl = load_yaml_template(template_path)
@@ -570,6 +571,9 @@ def main() -> None:
                 if written % 50 == 0:
                     print(f"[generate_dataset] Wrote {written} records…")
         print(f"[generate_dataset] Done for {tpl['template_id']}. Total records written: {written}")
+        total_records += written
+
+    print(f"[generate_dataset] All templates processed. Total records across all templates: {total_records}")
 
 
 if __name__ == "__main__":
