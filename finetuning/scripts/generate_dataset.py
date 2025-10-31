@@ -78,7 +78,8 @@ def main() -> None:
     # Build CIViC index
     print("[generate_dataset] Building CIViC index…")
     index = CivicIndex()
-    index.build()
+    # Filter therapies by chembl_id and diseases by doid to prefer widely-used entities
+    index.build(require_chembl_id=True, require_doid=True)
     DATASET_DIR.mkdir(parents=True, exist_ok=True)
 
     for template_path in template_paths:
@@ -94,7 +95,8 @@ def main() -> None:
         # Curated lists per entity type
         curated_genes = ["BRAF", "EGFR", "KRAS", "ALK", "PIK3CA"]
         curated_therapies = ["Dabrafenib", "Osimertinib", "Cetuximab", "Trastuzumab", "Imatinib"]
-        curated_variants = ["BRAF V600E", "KRAS G12C", "EGFR Exon19del", "EGFR T790M", "ALK EML4-ALK"]
+        curated_variants = ["BRAF V600E", "KRAS G12C", "EGFR Exon19del", "EGFR T790M", "BCR BCR::ABL1 Fusion"]
+        curated_diseases = ["Colorectal Cancer", "Lung Cancer", "Skin Melanoma", "Breast Cancer"]
 
         if "gene_symbol" in placeholder_config:
             genes = index.get_gene_symbols()
@@ -108,28 +110,58 @@ def main() -> None:
             variants = index.get_variant_names()
             sampled = sample_entities("variant_name", variants, curated_variants)
             placeholders_list.append(("variant_name", sampled))
+        if "disease_name" in placeholder_config:
+            diseases = index.get_disease_names()
+            sampled = sample_entities("disease_name", diseases, curated_diseases)
+            placeholders_list.append(("disease_name", sampled))
 
-        # Generate values (support single placeholder now)
+        # Generate values (now supports multiple placeholders)
         if len(placeholders_list) == 0:
             print("[generate_dataset] Skipping: no placeholders in template")
             continue
-        elif len(placeholders_list) == 1:
-            entity_values = placeholders_list[0][1]
-            placeholder_key = placeholders_list[0][0]
-        else:
-            # Multiple placeholders - not yet supported
-            print(
-                f"[generate_dataset] Skipping multi-placeholder template for now: keys={[k for k,_ in placeholders_list]}"
-            )
+        # If template declares placeholders we do not support, skip to keep outputs clean
+        declared_keys = set(placeholder_config.keys())
+        supported_keys = set(k for (k, _vals) in placeholders_list)
+        unsupported = declared_keys - supported_keys
+        if unsupported:
+            print(f"[generate_dataset] Skipping template due to unsupported placeholders: {sorted(unsupported)}")
             continue
+
+        # Build combinations with a cap to avoid explosion
+        from itertools import product
+
+        key_order = [k for (k, _vals) in placeholders_list]
+        value_lists = [vals for (_k, vals) in placeholders_list]
+        # Limit combinations to ~200 per template deterministically
+        max_records = 200
+        # Compute cartesian product and downsample if needed
+        all_combos = list(product(*value_lists))
+        if len(all_combos) > max_records:
+            random.shuffle(all_combos)
+            all_combos = all_combos[:max_records]
 
         # Determine output file per template
         out_file = DATASET_DIR / f"generated_pairs.{tpl['template_id']}.jsonl"
         print(f"[generate_dataset] Writing output JSONL: {out_file}")
         written = 0
+
+        def _apply_cancer_rule_simple(name: str) -> str:
+            # If name like "XYZ cancer" (case-insensitive), return "XYZ"; otherwise return as-is
+            lower = name.lower()
+            tokens = [t for t in name.split() if t]
+            if len(tokens) >= 2 and "cancer" in lower:
+                # remove 'cancer' token(s)
+                filtered = [t for t in tokens if t.lower() != "cancer"]
+                return " ".join(filtered) if filtered else name
+            return name
+
         with out_file.open("w", encoding="utf-8") as out_f:
-            for i, entity_value in enumerate(entity_values, start=1):
-                placeholders = {placeholder_key: entity_value}
+            for i, combo in enumerate(all_combos, start=1):
+                placeholders = {k: v for k, v in zip(key_order, combo)}
+                # Apply simple Cancer Rule for disease_name placeholder
+                if "disease_name" in placeholders:
+                    placeholders["disease_name"] = _apply_cancer_rule_simple(placeholders["disease_name"])
+
                 q_text = render_template(tpl["question"], placeholders)
                 cypher_text = render_template(tpl["cypher"], placeholders)
                 record = {
