@@ -125,12 +125,12 @@ def _relationship_combos(index: CivicIndex, template_id: str, placeholder_keys: 
     # F5 disease centric (use diseases present in affects)
     if keys == {"disease_name"}:
         seen_d: set[str] = set()
-        for _v, tname, dname in index.get_affects_variant_triples(effect=None):
+        for _v, _tname, dname in index.get_affects_variant_triples(effect=None):
             if dname not in seen_d:
                 seen_d.add(dname)
                 combos.append({"disease_name": dname})
         # Fallback to any disease present in affects (gene-only rows)
-        for tname, dname in index.get_affects_pairs(effect=None, require_variant=None):
+        for _tname, dname in index.get_affects_pairs(effect=None, require_variant=None):
             if dname not in seen_d:
                 seen_d.add(dname)
                 combos.append({"disease_name": dname})
@@ -196,7 +196,6 @@ def _relationship_combos(index: CivicIndex, template_id: str, placeholder_keys: 
         for tname, dname in index.get_affects_pairs(effect=None, require_variant=None):
             t2d[tname].add(dname)
         # gene -> set(therapies)
-        from itertools import groupby
 
         g2t: dict[str, set[str]] = defaultdict(set)
         for tname, gsym in targets_pairs:
@@ -263,7 +262,7 @@ def _relationship_combos(index: CivicIndex, template_id: str, placeholder_keys: 
         from collections import defaultdict
 
         # For each variant-resistance record, map therapy to its target genes
-        for vname, tname, dname in index.get_affects_variant_triples(effect="resistance"):
+        for _vname, tname, dname in index.get_affects_variant_triples(effect="resistance"):
             # find genes targeted by tname
             for t_pair in targets_pairs:
                 if t_pair[0] == tname:
@@ -306,55 +305,50 @@ def main() -> None:
         print(f"[generate_dataset] Template loaded: family_id={tpl['family_id']} template_id={tpl['template_id']}")
         paraphrase_templates = try_load_paraphrase_templates(template_path)
 
-        # Determine placeholders and sample entities
+        # Determine placeholders
         placeholder_config = tpl.get("placeholders", {})
-        placeholders_list: list[tuple[str, list[str]]] = []
 
         # Curated lists per entity type
         curated_genes = ["BRAF", "EGFR", "KRAS", "ALK", "PIK3CA"]
         curated_therapies = ["Dabrafenib", "Osimertinib", "Cetuximab", "Trastuzumab", "Imatinib"]
         curated_variants = ["BRAF V600E", "KRAS G12C", "EGFR Exon19del", "EGFR T790M", "BCR BCR::ABL1 Fusion"]
         curated_diseases = ["Colorectal Cancer", "Lung Cancer", "Skin Melanoma", "Breast Cancer"]
-
-        if "gene_symbol" in placeholder_config:
-            genes = index.get_gene_symbols()
-            sampled = sample_entities("gene_symbol", genes, curated_genes)
-            placeholders_list.append(("gene_symbol", sampled))
-        if "therapy_name" in placeholder_config:
-            therapies = index.get_therapy_names()
-            sampled = sample_entities("therapy_name", therapies, curated_therapies)
-            placeholders_list.append(("therapy_name", sampled))
-        if "variant_name" in placeholder_config:
-            variants = index.get_variant_names()
-            sampled = sample_entities("variant_name", variants, curated_variants)
-            placeholders_list.append(("variant_name", sampled))
-        if "disease_name" in placeholder_config:
-            diseases = index.get_disease_names()
-            sampled = sample_entities("disease_name", diseases, curated_diseases)
-            placeholders_list.append(("disease_name", sampled))
-
-        # Generate values (now supports multiple placeholders)
-        if len(placeholders_list) == 0:
+        declared_keys = list(placeholder_config.keys())
+        if not declared_keys:
             print("[generate_dataset] Skipping: no placeholders in template")
             continue
-        # If template declares placeholders we do not support, skip to keep outputs clean
-        declared_keys = set(placeholder_config.keys())
-        supported_keys = set(k for (k, _vals) in placeholders_list)
-        unsupported = declared_keys - supported_keys
-        if unsupported:
-            print(f"[generate_dataset] Skipping template due to unsupported placeholders: {sorted(unsupported)}")
-            continue
 
-        # Prefer relationship-driven combos for higher hit-rate
-        key_order = [k for (k, _vals) in placeholders_list]
-        rel_combos = _relationship_combos(index, tpl["template_id"], set(key_order))
+        # First try relationship-driven combos using declared keys (supports multi-key templates)
+        rel_combos = _relationship_combos(index, tpl["template_id"], set(declared_keys))
         if rel_combos:
-            # Convert dict combos to tuples in key_order
+            key_order = declared_keys
             all_combos = [tuple(combo[k] for k in key_order) for combo in rel_combos]
         else:
-            # Fallback to simple cartesian product over independently sampled entities
+            # Fall back to sampling only for recognized single-key placeholders
+            placeholders_list: list[tuple[str, list[str]]] = []
+            if "gene_symbol" in placeholder_config:
+                genes = index.get_gene_symbols()
+                placeholders_list.append(("gene_symbol", sample_entities("gene_symbol", genes, curated_genes)))
+            if "therapy_name" in placeholder_config:
+                therapies = index.get_therapy_names()
+                placeholders_list.append(
+                    ("therapy_name", sample_entities("therapy_name", therapies, curated_therapies))
+                )
+            if "variant_name" in placeholder_config:
+                variants = index.get_variant_names()
+                placeholders_list.append(("variant_name", sample_entities("variant_name", variants, curated_variants)))
+            if "disease_name" in placeholder_config:
+                diseases = index.get_disease_names()
+                placeholders_list.append(("disease_name", sample_entities("disease_name", diseases, curated_diseases)))
+
+            if not placeholders_list:
+                print("[generate_dataset] Skipping: no supported placeholders and no relationship combos")
+                continue
+
+            # Simple cartesian product over independently sampled entities
             from itertools import product
 
+            key_order = [k for (k, _vals) in placeholders_list]
             value_lists = [vals for (_k, vals) in placeholders_list]
             all_combos = list(product(*value_lists))
 
@@ -381,7 +375,7 @@ def main() -> None:
 
         with out_file.open("w", encoding="utf-8") as out_f:
             for i, combo in enumerate(all_combos, start=1):
-                placeholders = {k: v for k, v in zip(key_order, combo)}
+                placeholders = {k: v for k, v in zip(key_order, combo, strict=False)}
                 # Apply simple Cancer Rule only to cypher placeholders
                 cypher_placeholders = placeholders.copy()
                 if "disease_name" in cypher_placeholders:
@@ -401,8 +395,6 @@ def main() -> None:
                 }
                 out_f.write(json.dumps(record, ensure_ascii=False) + "\n")
                 written += 1
-                if written % 5 == 0:
-                    print(f"[generate_dataset] Wrote {written} records…")
                 if paraphrase_templates:
                     for j, qtpl in enumerate(paraphrase_templates, start=1):
                         q_text_p = render_template(qtpl, placeholders)
@@ -415,8 +407,9 @@ def main() -> None:
                         }
                         out_f.write(json.dumps(new_rec, ensure_ascii=False) + "\n")
                         written += 1
-                        if written % 5 == 0:
-                            print(f"[generate_dataset] Wrote {written} records…")
+                # Print progress after writing all records for this combo (base + paraphrases)
+                if written % 50 == 0:
+                    print(f"[generate_dataset] Wrote {written} records…")
         print(f"[generate_dataset] Done for {tpl['template_id']}. Total records written: {written}")
 
 
