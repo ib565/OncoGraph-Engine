@@ -161,9 +161,7 @@ def main() -> None:
                 # Apply simple Cancer Rule only to cypher placeholders
                 cypher_placeholders = placeholders.copy()
                 if "disease_name" in cypher_placeholders:
-                    cypher_placeholders["disease_name"] = _apply_cancer_rule_simple(
-                        cypher_placeholders["disease_name"]
-                    )
+                    cypher_placeholders["disease_name"] = _apply_cancer_rule_simple(cypher_placeholders["disease_name"])
 
                 q_text = render_template(tpl["question"], placeholders)
                 cypher_text = render_template(tpl["cypher"], cypher_placeholders)
