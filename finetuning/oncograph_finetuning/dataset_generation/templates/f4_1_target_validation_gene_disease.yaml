@@ -6,7 +6,7 @@ cypher: |
   WHERE toLower(g.symbol) = toLower('{{ gene_symbol }}')
      OR any(s IN coalesce(g.synonyms, []) WHERE toLower(s) = toLower('{{ gene_symbol }}'))
   MATCH (b:Biomarker)-[rel:AFFECTS_RESPONSE_TO]->(t)
-  WHERE toLower(rel.disease_name) CONTAINS toLower('{{ disease_name }}')
+  {{ disease_filter }}
   OPTIONAL MATCH (b)-[:VARIANT_OF]->(bg:Gene)
   RETURN
     CASE WHEN b:Variant THEN b.name ELSE NULL END AS variant_name,

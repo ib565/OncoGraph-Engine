@@ -46,7 +46,8 @@ def sample_entities(placeholder_key: str, available: list[str], curated: list[st
     random_sample = random.sample(pool, k=remaining_needed) if remaining_needed > 0 else []
     result = curated_present + random_sample
     print(
-        f"[generate_dataset] Sampling complete for {placeholder_key}: curated={len(curated_present)} random={len(random_sample)} total={len(result)}"
+        f"[generate_dataset] Sampling complete for {placeholder_key}: "
+        f"curated={len(curated_present)} random={len(random_sample)} total={len(result)}"
     )
     return result
 
@@ -366,16 +367,6 @@ def main() -> None:
         print(f"[generate_dataset] Writing output JSONL: {out_file}")
         written = 0
 
-        def _apply_cancer_rule_simple(name: str) -> str:
-            # If name like "XYZ cancer" (case-insensitive), return "XYZ"; otherwise return as-is
-            lower = name.lower()
-            tokens = [t for t in name.split() if t]
-            if len(tokens) >= 2 and "cancer" in lower:
-                # remove 'cancer' token(s)
-                filtered = [t for t in tokens if t.lower() != "cancer"]
-                return " ".join(filtered) if filtered else name
-            return name
-
         def _escape_cypher_literal(value: str) -> str:
             """Escape a Python string for safe inclusion in single-quoted Cypher string literals.
 
@@ -385,16 +376,90 @@ def main() -> None:
             """
             return value.replace("\\", "\\\\").replace("'", "\\'")
 
+        def _is_umbrella_disease(name: str) -> bool:
+            """Check if disease name follows cancer rule (umbrella term like 'Lung Cancer')."""
+            lower = name.lower()
+            tokens = [t for t in name.split() if t]
+            return len(tokens) >= 2 and "cancer" in lower
+
+        def tokenize_disease(name: str, is_umbrella: bool = False) -> list[str]:
+            """Tokenize disease name, preserving hyphens.
+
+            Args:
+                name: Disease name (e.g., "Non-small Cell Lung Carcinoma")
+                is_umbrella: If True, return minimal anchor token(s). If False, return all tokens.
+
+            Returns:
+                List of lowercase tokens (e.g., ['lung'] for umbrella,
+                ['lung','non-small','cell','carcinoma'] for specific)
+            """
+            lower = name.lower()
+            tokens = [t.strip() for t in lower.split() if t.strip()]
+
+            if is_umbrella:
+                # For umbrella terms, return minimal anchor token(s)
+                # Remove 'cancer' token(s) if present, keep the rest
+                filtered = [t for t in tokens if t != "cancer"]
+                return filtered if filtered else tokens
+            else:
+                # For specific diseases, return all tokens (hyphens preserved)
+                return tokens
+
+        def build_disease_filter(tokens: list[str], aliases: list[str] | None = None, use_where: bool = False) -> str:
+            """Build Cypher WHERE clause fragment for disease filtering with order-invariant token matching.
+
+            Args:
+                tokens: List of lowercase tokens to match (e.g., ['lung','non-small','cell','carcinoma'])
+                aliases: Optional list of alias strings (e.g., ['nsclc'])
+                use_where: If True, start with WHERE instead of AND (for first condition after MATCH)
+
+            Returns:
+                Cypher fragment: "WHERE ( ... )" or "AND ( ... )" depending on use_where
+                With optional OR clause for aliases if provided.
+            """
+            if not tokens:
+                return ""
+
+            # Build AND clause for each token
+            token_clauses = [f"toLower(rel.disease_name) CONTAINS '{_escape_cypher_literal(t)}'" for t in tokens]
+            and_clause = " AND\n    ".join(token_clauses)
+
+            prefix = "WHERE" if use_where else "AND"
+
+            if aliases:
+                # Build OR clause for aliases
+                alias_clauses = [
+                    f"toLower(rel.disease_name) CONTAINS '{_escape_cypher_literal(alias)}'" for alias in aliases
+                ]
+                alias_or = " OR\n    ".join(alias_clauses)
+                return f"{prefix} (\n    {and_clause}\n    OR {alias_or}\n  )"
+            else:
+                return f"{prefix} (\n    {and_clause}\n  )"
+
         with out_file.open("w", encoding="utf-8") as out_f:
             for i, combo in enumerate(all_combos, start=1):
                 placeholders = {k: v for k, v in zip(key_order, combo, strict=False)}
-                # Apply simple Cancer Rule only to cypher placeholders
+                # Prepare cypher placeholders with tokenized disease filter
                 cypher_placeholders = placeholders.copy()
                 if "disease_name" in cypher_placeholders:
-                    cypher_placeholders["disease_name"] = _apply_cancer_rule_simple(cypher_placeholders["disease_name"])
+                    disease_name = cypher_placeholders["disease_name"]
+                    is_umbrella = _is_umbrella_disease(disease_name)
+                    tokens = tokenize_disease(disease_name, is_umbrella=is_umbrella)
+                    # Build disease filter fragment for templates that use {{ disease_filter }}
+                    # Check if template needs WHERE (first condition) or AND (continued condition)
+                    cypher_template = tpl.get("cypher", "")
+                    # Check if disease_filter appears after MATCH without WHERE before it
+                    disease_filter_pos = cypher_template.find("{{ disease_filter }}")
+                    has_where_before = "WHERE" in cypher_template and cypher_template.find("WHERE") < disease_filter_pos
+                    use_where = not has_where_before and disease_filter_pos > 0
+                    cypher_placeholders["disease_filter"] = build_disease_filter(
+                        tokens, aliases=None, use_where=use_where
+                    )
+                    # Keep original disease_name for question templates (escaped)
+                    cypher_placeholders["disease_name"] = _escape_cypher_literal(disease_name)
                 # Escape values for Cypher string literals (only strings are expected here)
                 for k, v in list(cypher_placeholders.items()):
-                    if isinstance(v, str):
+                    if isinstance(v, str) and k != "disease_filter":  # disease_filter is already formatted
                         cypher_placeholders[k] = _escape_cypher_literal(v)
 
                 q_text = render_template(tpl["question"], placeholders)

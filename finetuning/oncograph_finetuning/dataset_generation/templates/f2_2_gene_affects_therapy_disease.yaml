@@ -8,7 +8,7 @@ cypher: |
     OR any(s IN coalesce(t.synonyms, []) WHERE toLower(s) = toLower('{{ therapy_name }}'))
     OR toLower(t.name) CONTAINS toLower('{{ therapy_name }}')
   )
-  AND toLower(rel.disease_name) CONTAINS toLower('{{ disease_name }}')
+  {{ disease_filter }}
   OPTIONAL MATCH (b)-[:VARIANT_OF]->(g:Gene)
   WITH
     CASE WHEN b:Gene THEN b.symbol ELSE g.symbol END AS gene_symbol,

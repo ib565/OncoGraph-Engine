@@ -8,7 +8,7 @@ cypher: |
   MATCH (v:Variant)-[:VARIANT_OF]->(g)
   MATCH (v)-[rel:AFFECTS_RESPONSE_TO]->(t)
   WHERE toLower(rel.effect) = 'resistance'
-    AND toLower(rel.disease_name) CONTAINS toLower('{{ disease_name }}')
+    {{ disease_filter }}
   RETURN
     v.name AS variant_name,
     g.symbol AS gene_symbol,
