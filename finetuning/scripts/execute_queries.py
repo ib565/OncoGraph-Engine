@@ -69,21 +69,21 @@ def run_queries(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def main() -> None:
-    # Choose a few known generated files; user can extend this list ad-hoc
-    candidates = [
-        DATASET_DIR / "generated_pairs.f2_1_targets_properties.jsonl",
-        DATASET_DIR / "generated_pairs.f2_2_gene_affects_therapy_disease_resistance.jsonl",
-        DATASET_DIR / "generated_pairs.f2_2_gene_affects_therapy_disease_sensitivity.jsonl",
-        DATASET_DIR / "generated_pairs.f4_2_alternative_therapies_from_resistance_genes.jsonl",
-    ]
-    files = [p for p in candidates if p.exists()]
+    # Cover all generated family/template files
+    files = sorted(DATASET_DIR.glob("generated_pairs.*.jsonl"))
     if not files:
-        # Fallback: try any generated_pairs.*.jsonl
-        files = sorted(DATASET_DIR.glob("generated_pairs.*.jsonl"))[:4]
+        print(f"[execute] No generated files found under {DATASET_DIR}")
+        return
+
+    per_file_env = os.environ.get("EXEC_SAMPLES_PER_FILE")
+    try:
+        per_file = int(per_file_env) if per_file_env else 2
+    except Exception:
+        per_file = 2
 
     random.seed(42)
-    records = load_sample_records(files, per_file=2)
-    print(f"[execute] Loaded {len(records)} records from {len(files)} files")
+    records = load_sample_records(files, per_file=per_file)
+    print(f"[execute] Loaded {len(records)} records from {len(files)} files (per_file={per_file})")
 
     results = run_queries(records)
     out_path = DATASET_DIR / "executed_results.jsonl"
