@@ -158,12 +158,15 @@ def main() -> None:
         with out_file.open("w", encoding="utf-8") as out_f:
             for i, combo in enumerate(all_combos, start=1):
                 placeholders = {k: v for k, v in zip(key_order, combo)}
-                # Apply simple Cancer Rule for disease_name placeholder
-                if "disease_name" in placeholders:
-                    placeholders["disease_name"] = _apply_cancer_rule_simple(placeholders["disease_name"])
+                # Apply simple Cancer Rule only to cypher placeholders
+                cypher_placeholders = placeholders.copy()
+                if "disease_name" in cypher_placeholders:
+                    cypher_placeholders["disease_name"] = _apply_cancer_rule_simple(
+                        cypher_placeholders["disease_name"]
+                    )
 
                 q_text = render_template(tpl["question"], placeholders)
-                cypher_text = render_template(tpl["cypher"], placeholders)
+                cypher_text = render_template(tpl["cypher"], cypher_placeholders)
                 record = {
                     "id": f"{tpl['family_id']}-{i:06d}",
                     "family_id": tpl["family_id"],
