@@ -119,10 +119,19 @@ export function MiniGraph({ rows, height = "100%" }: MiniGraphProps) {
       const targetsMoa = normalizeString(
         getValueCI(row, ["targets_moa", "moa"]) as unknown
       );
-      const hasTargetsProjection = Object.prototype.hasOwnProperty.call(
-        row as Record<string, unknown>,
-        "targets_moa"
+      const relationshipHint = normalizeString(
+        getValueCI(row, ["relationship", "edge_type", "edge", "relationship_type"]) as unknown
       );
+      const hasTargetsProjection =
+        Object.prototype.hasOwnProperty.call(
+          row as Record<string, unknown>,
+          "targets_moa"
+        ) ||
+        Object.prototype.hasOwnProperty.call(
+          row as Record<string, unknown>,
+          "moa"
+        ) ||
+        !!(relationshipHint && relationshipHint.toLowerCase().includes("target"));
 
       // Support nested shapes: Biomarker, Therapy, and relationship objects/arrays
       const biomarkerVal = (row as Record<string, unknown>)["Biomarker"] as Record<string, unknown> | undefined;
