@@ -336,7 +336,10 @@ def main() -> None:
                 )
             if "variant_name" in placeholder_config:
                 variants = index.get_variant_names()
-                placeholders_list.append(("variant_name", sample_entities("variant_name", variants, curated_variants)))
+                # For variant-only templates (e.g., F1.3), sample a larger set for parity with other families
+                placeholders_list.append(
+                    ("variant_name", sample_entities("variant_name", variants, curated_variants, count=200))
+                )
             if "disease_name" in placeholder_config:
                 diseases = index.get_disease_names()
                 placeholders_list.append(("disease_name", sample_entities("disease_name", diseases, curated_diseases)))
