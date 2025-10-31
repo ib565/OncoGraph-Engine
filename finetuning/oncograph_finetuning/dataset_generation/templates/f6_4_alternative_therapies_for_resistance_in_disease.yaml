@@ -14,9 +14,11 @@ cypher: |
   WITH CASE WHEN b:Gene THEN b.symbol ELSE g.symbol END AS gene_symbol
   WHERE gene_symbol IS NOT NULL
   MATCH (t2:Therapy)-[r:TARGETS]->(tg:Gene)
-  WHERE toLower(tg.symbol) = toLower(gene_symbol)
-     OR any(s IN coalesce(tg.synonyms, []) WHERE toLower(s) = toLower(gene_symbol))
-  WHERE toLower(t2.name) <> toLower('{{ therapy_name }}')
+  WHERE (
+    toLower(tg.symbol) = toLower(gene_symbol)
+    OR any(s IN coalesce(tg.synonyms, []) WHERE toLower(s) = toLower(gene_symbol))
+  )
+    AND toLower(t2.name) <> toLower('{{ therapy_name }}')
   RETURN
     gene_symbol,
     t2.name AS therapy_name,
