@@ -3,8 +3,12 @@ family_id: F3.1
 question: "Find therapies for {{ gene_symbol_a }} or {{ gene_symbol_b }}."
 cypher: |
   MATCH (t:Therapy)-[r:TARGETS]->(g:Gene)
-  WHERE toLower(g.symbol) = toLower('{{ gene_symbol_a }}')
-     OR toLower(g.symbol) = toLower('{{ gene_symbol_b }}')
+  WHERE (
+    toLower(g.symbol) = toLower('{{ gene_symbol_a }}')
+    OR any(s IN coalesce(g.synonyms, []) WHERE toLower(s) = toLower('{{ gene_symbol_a }}'))
+    OR toLower(g.symbol) = toLower('{{ gene_symbol_b }}')
+    OR any(s IN coalesce(g.synonyms, []) WHERE toLower(s) = toLower('{{ gene_symbol_b }}'))
+  )
   RETURN
     g.symbol AS gene_symbol,
     t.name AS therapy_name,

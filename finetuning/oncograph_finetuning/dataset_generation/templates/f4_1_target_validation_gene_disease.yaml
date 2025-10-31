@@ -2,7 +2,9 @@ template_id: f4_1_target_validation_gene_disease
 family_id: F4.1
 question: "Which therapies target {{ gene_symbol }} and also have biomarker evidence in {{ disease_name }}?"
 cypher: |
-  MATCH (t:Therapy)-[:TARGETS]->(g:Gene {symbol: '{{ gene_symbol }}'})
+  MATCH (t:Therapy)-[:TARGETS]->(g:Gene)
+  WHERE toLower(g.symbol) = toLower('{{ gene_symbol }}')
+     OR any(s IN coalesce(g.synonyms, []) WHERE toLower(s) = toLower('{{ gene_symbol }}'))
   MATCH (b:Biomarker)-[rel:AFFECTS_RESPONSE_TO]->(t)
   WHERE toLower(rel.disease_name) CONTAINS toLower('{{ disease_name }}')
   OPTIONAL MATCH (b)-[:VARIANT_OF]->(bg:Gene)

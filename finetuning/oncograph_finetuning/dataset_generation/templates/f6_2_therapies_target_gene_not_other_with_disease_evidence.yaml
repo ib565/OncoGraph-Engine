@@ -2,8 +2,14 @@ template_id: f6_2_therapies_target_gene_not_other_with_disease_evidence
 family_id: F6.2
 question: "What therapies target {{ gene_include }} but NOT {{ gene_exclude }}, and have biomarker evidence in {{ disease_name }}?"
 cypher: |
-  MATCH (t:Therapy)-[:TARGETS]->(gi:Gene {symbol: '{{ gene_include }}'})
-  WHERE NOT (t)-[:TARGETS]->(:Gene {symbol: '{{ gene_exclude }}'})
+  MATCH (t:Therapy)-[:TARGETS]->(gi:Gene)
+  WHERE toLower(gi.symbol) = toLower('{{ gene_include }}')
+     OR any(s IN coalesce(gi.synonyms, []) WHERE toLower(s) = toLower('{{ gene_include }}'))
+  OPTIONAL MATCH (t)-[:TARGETS]->(gx:Gene)
+  WHERE toLower(gx.symbol) = toLower('{{ gene_exclude }}')
+     OR any(s IN coalesce(gx.synonyms, []) WHERE toLower(s) = toLower('{{ gene_exclude }}'))
+  WITH t, gi, gx
+  WHERE gx IS NULL
   MATCH (b:Biomarker)-[rel:AFFECTS_RESPONSE_TO]->(t)
   WHERE toLower(rel.disease_name) CONTAINS toLower('{{ disease_name }}')
   OPTIONAL MATCH (b)-[:VARIANT_OF]->(g:Gene)

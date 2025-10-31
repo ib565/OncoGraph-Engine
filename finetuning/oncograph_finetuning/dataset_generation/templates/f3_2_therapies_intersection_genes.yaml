@@ -2,8 +2,12 @@ template_id: f3_2_therapies_intersection_genes
 family_id: F3.2
 question: "What therapies target both {{ gene_symbol_a }} and {{ gene_symbol_b }}?"
 cypher: |
-  MATCH (t:Therapy)-[r1:TARGETS]->(g1:Gene {symbol: '{{ gene_symbol_a }}'})
-  MATCH (t)-[r2:TARGETS]->(g2:Gene {symbol: '{{ gene_symbol_b }}'})
+  MATCH (t:Therapy)-[r1:TARGETS]->(g1:Gene)
+  WHERE toLower(g1.symbol) = toLower('{{ gene_symbol_a }}')
+     OR any(s IN coalesce(g1.synonyms, []) WHERE toLower(s) = toLower('{{ gene_symbol_a }}'))
+  MATCH (t)-[r2:TARGETS]->(g2:Gene)
+  WHERE toLower(g2.symbol) = toLower('{{ gene_symbol_b }}')
+     OR any(s IN coalesce(g2.synonyms, []) WHERE toLower(s) = toLower('{{ gene_symbol_b }}'))
   RETURN
     g1.symbol AS gene_symbol,
     t.name AS therapy_name,

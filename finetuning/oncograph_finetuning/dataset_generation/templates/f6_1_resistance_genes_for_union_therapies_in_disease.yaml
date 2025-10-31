@@ -20,9 +20,8 @@ cypher: |
     rel.disease_name AS disease_name,
     coalesce(rel.pmids, []) AS pmids
   WHERE gene_symbol IS NOT NULL
-  WITH gene_symbol, therapy_name, disease_name, collect(pmids) AS pmid_lists
-  WITH gene_symbol, therapy_name, disease_name,
-       reduce(allp = [], lst IN pmid_lists | allp + lst) AS pmids
+  UNWIND pmids AS p
+  WITH gene_symbol, therapy_name, disease_name, collect(DISTINCT p) AS pmids
   RETURN
     NULL AS variant_name,
     gene_symbol,

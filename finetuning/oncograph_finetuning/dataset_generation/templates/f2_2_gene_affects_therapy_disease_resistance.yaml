@@ -1,6 +1,6 @@
-template_id: f2_2_gene_affects_therapy_disease
+template_id: f2_2_gene_affects_therapy_disease_resistance
 family_id: F2.2
-question: "Which genes affect response to {{ therapy_name }} in {{ disease_name }}?"
+question: "Which genes predict resistance to {{ therapy_name }} in {{ disease_name }}?"
 cypher: |
   MATCH (b:Biomarker)-[rel:AFFECTS_RESPONSE_TO]->(t:Therapy)
   WHERE (
@@ -8,6 +8,7 @@ cypher: |
     OR any(s IN coalesce(t.synonyms, []) WHERE toLower(s) = toLower('{{ therapy_name }}'))
     OR toLower(t.name) CONTAINS toLower('{{ therapy_name }}')
   )
+  AND toLower(rel.effect) = 'resistance'
   AND toLower(rel.disease_name) CONTAINS toLower('{{ disease_name }}')
   OPTIONAL MATCH (b)-[:VARIANT_OF]->(g:Gene)
   WITH
@@ -22,7 +23,7 @@ cypher: |
     NULL AS variant_name,
     gene_symbol,
     therapy_name,
-    NULL AS effect,
+    'resistance' AS effect,
     disease_name,
     pmids
   LIMIT 100

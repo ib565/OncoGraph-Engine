@@ -2,7 +2,9 @@ template_id: f1_1_targets_gene
 family_id: F1.1
 question: "What drugs target {{ gene_symbol }}?"
 cypher: |
-  MATCH (t:Therapy)-[r:TARGETS]->(g:Gene {symbol: '{{ gene_symbol }}'})
+  MATCH (t:Therapy)-[r:TARGETS]->(g:Gene)
+  WHERE toLower(g.symbol) = toLower('{{ gene_symbol }}')
+     OR any(s IN coalesce(g.synonyms, []) WHERE toLower(s) = toLower('{{ gene_symbol }}'))
   RETURN
     t.name AS therapy_name,
     g.symbol AS gene_symbol,

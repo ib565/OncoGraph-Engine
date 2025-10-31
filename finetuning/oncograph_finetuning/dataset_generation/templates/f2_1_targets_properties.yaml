@@ -3,8 +3,15 @@ family_id: F2.1
 question: "What is {{ therapy_name }}'s mechanism of action on {{ gene_symbol }}?"
 cypher: |
   MATCH (t:Therapy)-[r:TARGETS]->(g:Gene)
-  WHERE toLower(t.name) = toLower('{{ therapy_name }}')
-    AND toLower(g.symbol) = toLower('{{ gene_symbol }}')
+  WHERE (
+    toLower(t.name) = toLower('{{ therapy_name }}')
+    OR any(s IN coalesce(t.synonyms, []) WHERE toLower(s) = toLower('{{ therapy_name }}'))
+    OR toLower(t.name) CONTAINS toLower('{{ therapy_name }}')
+  )
+    AND (
+      toLower(g.symbol) = toLower('{{ gene_symbol }}')
+      OR any(s IN coalesce(g.synonyms, []) WHERE toLower(s) = toLower('{{ gene_symbol }}'))
+    )
   RETURN
     g.symbol AS gene_symbol,
     t.name AS therapy_name,
