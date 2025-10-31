@@ -25,6 +25,18 @@ export default function ClientWrapper({ children }: { children: React.ReactNode 
       <WakeUpPing />
       <div className="app-shell">
         <TopBar />
+        <div
+          style={{
+            background: "#3a2f09",
+            color: "#ffd666",
+            padding: "6px 12px",
+            textAlign: "center",
+            fontSize: "12px",
+            borderBottom: "1px solid rgba(255, 214, 102, 0.25)",
+          }}
+        >
+          Backend is temporarily down due to running out of free Render credits 😅. Will be back up shortly!
+        </div>
         <main className="workspace">
           {children}
         </main>
