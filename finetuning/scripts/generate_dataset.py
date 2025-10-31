@@ -448,10 +448,32 @@ def main() -> None:
                     # Build disease filter fragment for templates that use {{ disease_filter }}
                     # Check if template needs WHERE (first condition) or AND (continued condition)
                     cypher_template = tpl.get("cypher", "")
-                    # Check if disease_filter appears after MATCH without WHERE before it
                     disease_filter_pos = cypher_template.find("{{ disease_filter }}")
-                    has_where_before = "WHERE" in cypher_template and cypher_template.find("WHERE") < disease_filter_pos
-                    use_where = not has_where_before and disease_filter_pos > 0
+                    # Look at the text immediately before {{ disease_filter }}
+                    text_before = cypher_template[:disease_filter_pos].strip()
+                    # Check if it ends with MATCH or if there's a WHERE on the same line context
+                    # If disease_filter follows MATCH/OPTIONAL MATCH directly, need WHERE
+                    # If disease_filter is part of an existing WHERE clause, use AND
+                    use_where = False
+                    if text_before:
+                        # Find the last MATCH/OPTIONAL MATCH/WITH before disease_filter
+                        last_match = max(
+                            text_before.rfind("MATCH"),
+                            text_before.rfind("OPTIONAL MATCH"),
+                            text_before.rfind("WITH"),
+                        )
+                        if last_match >= 0:
+                            # Check if there's a WHERE between the last MATCH/WITH and disease_filter
+                            text_after_match = text_before[last_match:].strip()
+                            # If there's no WHERE after the last MATCH/WITH, need WHERE
+                            if "WHERE" not in text_after_match:
+                                use_where = True
+                            else:
+                                # There's a WHERE clause already, so use AND to continue it
+                                use_where = False
+                        else:
+                            # No MATCH/WITH found, default to WHERE for safety
+                            use_where = True
                     cypher_placeholders["disease_filter"] = build_disease_filter(
                         tokens, aliases=None, use_where=use_where
                     )
