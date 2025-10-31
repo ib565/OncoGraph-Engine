@@ -1,9 +1,10 @@
 """LLM-driven template paraphrasing with structured JSON output.
 
 Usage:
-  python finetuning/scripts/paraphrase_templates.py f1_1_targets_gene.yaml [more.yaml ...]
+  python finetuning/scripts/paraphrase_templates.py [--all | <template1.yaml> <template2.yaml> ...]
 
 Behavior:
+  - If --all (or no args) is provided, processes all templates in the templates directory.
   - Processes input template files in batches of 3 base questions.
   - Requests 2–5 natural paraphrases per base question (placeholders preserved).
   - Writes sibling .paraphrases.yaml next to each input template.
@@ -76,9 +77,8 @@ def _build_prompt(batch: list[tuple[str, str]]) -> str:
     batch: list of (template_id, question_template)
     """
     lines: list[str] = []
-    lines.append(
-        "Paraphrase question templates for a cancer knowledge graph. Preserve placeholders like {{ gene_symbol }} exactly."
-    )
+    lines.append("Paraphrase question templates for a cancer knowledge graph.")
+    lines.append("Preserve placeholders like {{ gene_symbol }} exactly.")
     lines.append("")
     lines.append(
         "Context: In oncology, 'drugs', 'therapies', 'treatments', and 'medications' are interchangeable terms."
@@ -93,7 +93,9 @@ def _build_prompt(batch: list[tuple[str, str]]) -> str:
     lines.append("Example:")
     lines.append('Base: "What drugs target {{ gene_symbol }}?"')
     lines.append(
-        'Paraphrases: ["Which therapies target {{ gene_symbol }}?", "List treatments that target {{ gene_symbol }}.", "What medications are known to target {{ gene_symbol }}?"]'
+        'Paraphrases: ["Which therapies target {{ gene_symbol }}?", '
+        '"List treatments that target {{ gene_symbol }}.", '
+        '"What medications are known to target {{ gene_symbol }}?"]'
     )
     lines.append("")
     lines.append('Respond with JSON: {"items":[{"template_id":str,"paraphrases":[str,...]},...]}')
@@ -132,20 +134,31 @@ def paraphrase_batch(client: Any, batch: list[tuple[str, str]]) -> dict[str, lis
     return result
 
 
+def _list_all_templates() -> list[Path]:
+    """Return all .yaml templates excluding generated .paraphrases.yaml files."""
+    return sorted(p for p in TEMPLATES_DIR.glob("*.yaml") if not str(p.name).endswith(".paraphrases.yaml"))
+
+
 def main(argv: list[str]) -> None:
-    if len(argv) < 2:
-        print("Usage: python paraphrase_templates_llm.py <template1.yaml> [template2.yaml ...]", file=sys.stderr)
-        raise SystemExit(1)
+    # Support: --all to process every template; default to all when no args
+    process_all = len(argv) < 2 or (len(argv) >= 2 and argv[1] in {"--all", "ALL", "all"})
 
     client = _get_client()
 
     # Load templates, then process in batches of 3
     template_paths: list[Path] = []
-    for name in argv[1:]:
-        p = (TEMPLATES_DIR / name).resolve()
-        if not p.exists():
-            raise FileNotFoundError(f"Template not found: {p}")
-        template_paths.append(p)
+    if process_all:
+        template_paths = _list_all_templates()
+        if not template_paths:
+            print(f"[paraphrase-llm] No templates found in {TEMPLATES_DIR}", file=sys.stderr)
+            raise SystemExit(1)
+        print(f"[paraphrase-llm] Processing ALL templates: {len(template_paths)} found")
+    else:
+        for name in argv[1:]:
+            p = (TEMPLATES_DIR / name).resolve()
+            if not p.exists():
+                raise FileNotFoundError(f"Template not found: {p}")
+            template_paths.append(p)
 
     # Collect (template_id, question, path)
     items: list[tuple[str, str, Path]] = []

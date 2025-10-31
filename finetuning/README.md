@@ -36,11 +36,14 @@ export GEMINI_API_KEY="<your-key>"
 ./venv/bin/python -m pip install google-genai
 ```
 
-Generate paraphrases for one or more templates (writes `<template>.paraphrases.yaml` next to each template):
+Generate paraphrases for one or more templates (writes `<template>.paraphrases.yaml` next to each template). Use `--all` or no args to process every template in the templates folder:
 
 Windows:
 
 ```
+./venv/Scripts/python.exe finetuning/scripts/paraphrase_templates.py --all
+
+# Or specify explicit files
 ./venv/Scripts/python.exe finetuning/scripts/paraphrase_templates.py \
   f1_1_targets_gene.yaml f1_2_genes_for_therapy.yaml
 ```
@@ -48,6 +51,9 @@ Windows:
 macOS/Linux:
 
 ```
+./venv/bin/python finetuning/scripts/paraphrase_templates.py --all
+
+# Or specify explicit files
 ./venv/bin/python finetuning/scripts/paraphrase_templates.py \
   f1_1_targets_gene.yaml f1_2_genes_for_therapy.yaml
 ```
