@@ -1,0 +1,9 @@
+template_id: f5_2_therapies_with_biomarker_evidence_in_disease
+family_id: F5.2
+base_question: List therapies with variant-level biomarkers in {{ disease_name }}.
+paraphrases:
+- Which therapies have variant biomarkers in {{ disease_name }}?
+- Show drugs with variant-based evidence in {{ disease_name }}.
+- List treatments supported by variant evidence in {{ disease_name }}.
+
+

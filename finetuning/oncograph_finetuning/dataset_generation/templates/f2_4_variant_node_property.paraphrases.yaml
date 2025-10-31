@@ -1,0 +1,9 @@
+template_id: f2_4_variant_node_property
+family_id: F2.4
+base_question: What is the consequence of the {{ variant_name }} variant?
+paraphrases:
+- What consequence does the variant {{ variant_name }} have?
+- Report the consequence for {{ variant_name }}.
+- What is the functional consequence of {{ variant_name }}?
+
+

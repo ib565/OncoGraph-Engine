@@ -1,0 +1,9 @@
+template_id: f4_1_target_validation_gene_disease
+family_id: F4.1
+base_question: Which therapies target {{ gene_symbol }} and also have biomarker evidence in {{ disease_name }}?
+paraphrases:
+- What drugs targeting {{ gene_symbol }} have biomarker evidence in {{ disease_name }}?
+- List therapies that target {{ gene_symbol }} with evidence in {{ disease_name }}.
+- Show treatments hitting {{ gene_symbol }} that have biomarker evidence in {{ disease_name }}.
+
+

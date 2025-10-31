@@ -1,0 +1,40 @@
+template_id: f2_2_variant_token_affects_therapy_disease
+family_id: F2.2
+question: "How does {{ gene_symbol }} {{ variant_token }} affect response to {{ therapy_name }} in {{ disease_name }}?"
+cypher: |
+  MATCH (v:Variant)-[:VARIANT_OF]->(g:Gene {symbol: '{{ gene_symbol }}'})
+  WHERE (
+    toLower(v.name) CONTAINS toLower('{{ variant_token }}')
+    OR toLower(coalesce(v.hgvs_p, '')) = toLower('p.{{ variant_token }}')
+    OR any(s IN coalesce(v.synonyms, []) WHERE toLower(s) CONTAINS toLower('{{ variant_token }}'))
+  )
+  MATCH (v)-[rel:AFFECTS_RESPONSE_TO]->(t:Therapy)
+  WHERE (
+    toLower(t.name) = toLower('{{ therapy_name }}')
+    OR any(s IN coalesce(t.synonyms, []) WHERE toLower(s) = toLower('{{ therapy_name }}'))
+    OR toLower(t.name) CONTAINS toLower('{{ therapy_name }}')
+  )
+  AND toLower(rel.disease_name) CONTAINS toLower('{{ disease_name }}')
+  RETURN
+    v.name AS variant_name,
+    g.symbol AS gene_symbol,
+    t.name AS therapy_name,
+    rel.effect AS effect,
+    rel.disease_name AS disease_name,
+    coalesce(rel.pmids, []) AS pmids
+  LIMIT 100
+placeholders:
+  gene_symbol:
+    from: civic.genes
+    sample: canonical_only
+  variant_token:
+    from: civic.variant_tokens
+    sample: canonical_only
+  therapy_name:
+    from: civic.therapies
+    sample: canonical_only
+  disease_name:
+    from: civic.diseases
+    sample: canonical_only
+
+

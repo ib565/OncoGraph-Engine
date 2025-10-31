@@ -1,0 +1,32 @@
+template_id: f2_2_variant_affects_therapy_disease
+family_id: F2.2
+question: "How does the variant {{ variant_name }} affect response to {{ therapy_name }} in {{ disease_name }}?"
+cypher: |
+  MATCH (v:Variant {name: '{{ variant_name }}'})-[:VARIANT_OF]->(g:Gene)
+  MATCH (v)-[rel:AFFECTS_RESPONSE_TO]->(t:Therapy)
+  WHERE (
+    toLower(t.name) = toLower('{{ therapy_name }}')
+    OR any(s IN coalesce(t.synonyms, []) WHERE toLower(s) = toLower('{{ therapy_name }}'))
+    OR toLower(t.name) CONTAINS toLower('{{ therapy_name }}')
+  )
+  AND toLower(rel.disease_name) CONTAINS toLower('{{ disease_name }}')
+  RETURN
+    v.name AS variant_name,
+    g.symbol AS gene_symbol,
+    t.name AS therapy_name,
+    rel.effect AS effect,
+    rel.disease_name AS disease_name,
+    coalesce(rel.pmids, []) AS pmids
+  LIMIT 100
+placeholders:
+  variant_name:
+    from: civic.variants
+    sample: canonical_only
+  therapy_name:
+    from: civic.therapies
+    sample: canonical_only
+  disease_name:
+    from: civic.diseases
+    sample: canonical_only
+
+

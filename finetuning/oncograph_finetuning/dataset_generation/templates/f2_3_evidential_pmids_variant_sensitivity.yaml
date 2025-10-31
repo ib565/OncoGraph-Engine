@@ -1,0 +1,29 @@
+template_id: f2_3_evidential_pmids_variant_sensitivity
+family_id: F2.3
+question: "Provide PMIDs supporting that {{ variant_name }} confers sensitivity to {{ therapy_name }}."
+cypher: |
+  MATCH (v:Variant {name: '{{ variant_name }}'})-[:VARIANT_OF]->(g:Gene)
+  MATCH (v)-[rel:AFFECTS_RESPONSE_TO]->(t:Therapy)
+  WHERE (
+    toLower(t.name) = toLower('{{ therapy_name }}')
+    OR any(s IN coalesce(t.synonyms, []) WHERE toLower(s) = toLower('{{ therapy_name }}'))
+    OR toLower(t.name) CONTAINS toLower('{{ therapy_name }}')
+  )
+  AND toLower(rel.effect) = 'sensitivity'
+  RETURN
+    v.name AS variant_name,
+    g.symbol AS gene_symbol,
+    t.name AS therapy_name,
+    'sensitivity' AS effect,
+    rel.disease_name AS disease_name,
+    coalesce(rel.pmids, []) AS pmids
+  LIMIT 100
+placeholders:
+  variant_name:
+    from: civic.variants
+    sample: canonical_only
+  therapy_name:
+    from: civic.therapies
+    sample: canonical_only
+
+

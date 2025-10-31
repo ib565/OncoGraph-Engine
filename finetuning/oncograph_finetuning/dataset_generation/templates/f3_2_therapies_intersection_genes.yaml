@@ -1,0 +1,23 @@
+template_id: f3_2_therapies_intersection_genes
+family_id: F3.2
+question: "What therapies target both {{ gene_symbol_a }} and {{ gene_symbol_b }}?"
+cypher: |
+  MATCH (t:Therapy)-[r1:TARGETS]->(g1:Gene {symbol: '{{ gene_symbol_a }}'})
+  MATCH (t)-[r2:TARGETS]->(g2:Gene {symbol: '{{ gene_symbol_b }}'})
+  RETURN
+    g1.symbol AS gene_symbol,
+    t.name AS therapy_name,
+    r1.moa AS targets_moa,
+    coalesce(r1.ref_sources, []) AS ref_sources,
+    coalesce(r1.ref_ids, []) AS ref_ids,
+    coalesce(r1.ref_urls, []) AS ref_urls
+  LIMIT 100
+placeholders:
+  gene_symbol_a:
+    from: civic.genes
+    sample: canonical_only
+  gene_symbol_b:
+    from: civic.genes
+    sample: canonical_only
+
+

@@ -1,0 +1,23 @@
+template_id: f3_3_therapies_target_a_not_b
+family_id: F3.3
+question: "Which drugs target {{ gene_symbol_include }} but not {{ gene_symbol_exclude }}?"
+cypher: |
+  MATCH (t:Therapy)-[r:TARGETS]->(g:Gene {symbol: '{{ gene_symbol_include }}'})
+  WHERE NOT (t)-[:TARGETS]->(:Gene {symbol: '{{ gene_symbol_exclude }}'})
+  RETURN
+    g.symbol AS gene_symbol,
+    t.name AS therapy_name,
+    r.moa AS targets_moa,
+    coalesce(r.ref_sources, []) AS ref_sources,
+    coalesce(r.ref_ids, []) AS ref_ids,
+    coalesce(r.ref_urls, []) AS ref_urls
+  LIMIT 100
+placeholders:
+  gene_symbol_include:
+    from: civic.genes
+    sample: canonical_only
+  gene_symbol_exclude:
+    from: civic.genes
+    sample: canonical_only
+
+

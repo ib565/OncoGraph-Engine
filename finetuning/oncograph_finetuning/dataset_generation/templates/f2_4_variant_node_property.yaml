@@ -1,0 +1,15 @@
+template_id: f2_4_variant_node_property
+family_id: F2.4
+question: "What is the consequence of the {{ variant_name }} variant?"
+cypher: |
+  MATCH (v:Variant {name: '{{ variant_name }}'})
+  RETURN
+    v.name AS variant_name,
+    v.consequence AS variant_consequence
+  LIMIT 50
+placeholders:
+  variant_name:
+    from: civic.variants
+    sample: canonical_only
+
+

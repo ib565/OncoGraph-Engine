@@ -1,0 +1,38 @@
+template_id: f2_2_gene_affects_therapy_disease
+family_id: F2.2
+question: "Which genes affect response to {{ therapy_name }} in {{ disease_name }}?"
+cypher: |
+  MATCH (b:Biomarker)-[rel:AFFECTS_RESPONSE_TO]->(t:Therapy)
+  WHERE (
+    toLower(t.name) = toLower('{{ therapy_name }}')
+    OR any(s IN coalesce(t.synonyms, []) WHERE toLower(s) = toLower('{{ therapy_name }}'))
+    OR toLower(t.name) CONTAINS toLower('{{ therapy_name }}')
+  )
+  AND toLower(rel.disease_name) CONTAINS toLower('{{ disease_name }}')
+  OPTIONAL MATCH (b)-[:VARIANT_OF]->(g:Gene)
+  WITH
+    CASE WHEN b:Gene THEN b.symbol ELSE g.symbol END AS gene_symbol,
+    t.name AS therapy_name,
+    rel.disease_name AS disease_name,
+    coalesce(rel.pmids, []) AS pmids
+  WHERE gene_symbol IS NOT NULL
+  WITH gene_symbol, therapy_name, disease_name, collect(pmids) AS pmid_lists
+  WITH gene_symbol, therapy_name, disease_name,
+       reduce(allp = [], lst IN pmid_lists | allp + lst) AS pmids
+  RETURN
+    NULL AS variant_name,
+    gene_symbol,
+    therapy_name,
+    NULL AS effect,
+    disease_name,
+    pmids
+  LIMIT 100
+placeholders:
+  therapy_name:
+    from: civic.therapies
+    sample: canonical_only
+  disease_name:
+    from: civic.diseases
+    sample: canonical_only
+
+

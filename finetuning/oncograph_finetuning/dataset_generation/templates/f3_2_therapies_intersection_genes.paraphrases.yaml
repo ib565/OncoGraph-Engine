@@ -1,0 +1,9 @@
+template_id: f3_2_therapies_intersection_genes
+family_id: F3.2
+base_question: What therapies target both {{ gene_symbol_a }} and {{ gene_symbol_b }}?
+paraphrases:
+- Which drugs target both {{ gene_symbol_a }} and {{ gene_symbol_b }}?
+- List therapies that hit {{ gene_symbol_a }} and {{ gene_symbol_b }}.
+- Show treatments targeting both {{ gene_symbol_a }} and {{ gene_symbol_b }}.
+
+

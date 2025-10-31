@@ -1,0 +1,9 @@
+template_id: f2_1_targets_properties
+family_id: F2.1
+base_question: What is {{ therapy_name }}'s mechanism of action on {{ gene_symbol }}?
+paraphrases:
+- What is the MOA of {{ therapy_name }} on {{ gene_symbol }}?
+- Describe how {{ therapy_name }} acts on {{ gene_symbol }}.
+- What is {{ therapy_name }}'s mechanism against {{ gene_symbol }}?
+
+

@@ -1,0 +1,9 @@
+template_id: f2_3_evidential_pmids_variant_sensitivity
+family_id: F2.3
+base_question: Provide PMIDs supporting that {{ variant_name }} confers sensitivity to {{ therapy_name }}.
+paraphrases:
+- Cite PMIDs showing {{ variant_name }} predicts sensitivity to {{ therapy_name }}.
+- What PubMed IDs support sensitivity of {{ therapy_name }} due to {{ variant_name }}?
+- Give PMIDs for {{ variant_name }}-mediated sensitivity to {{ therapy_name }}.
+
+

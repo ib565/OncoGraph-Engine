@@ -1,0 +1,9 @@
+template_id: f3_1_therapies_union_genes
+family_id: F3.1
+base_question: Find therapies for {{ gene_symbol_a }} or {{ gene_symbol_b }}.
+paraphrases:
+- Which therapies target {{ gene_symbol_a }} or {{ gene_symbol_b }}?
+- List drugs for {{ gene_symbol_a }} or {{ gene_symbol_b }}.
+- Show treatments that target {{ gene_symbol_a }} or {{ gene_symbol_b }}.
+
+

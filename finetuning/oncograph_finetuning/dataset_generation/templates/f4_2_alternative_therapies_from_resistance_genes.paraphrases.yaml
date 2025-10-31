@@ -1,0 +1,9 @@
+template_id: f4_2_alternative_therapies_from_resistance_genes
+family_id: F4.2
+base_question: For resistance to {{ therapy_name }} in {{ disease_name }}, which therapies target the resistance biomarkers?
+paraphrases:
+- In {{ disease_name }}, what therapies target genes causing resistance to {{ therapy_name }}?
+- Which drugs target biomarkers of resistance to {{ therapy_name }} in {{ disease_name }}?
+- Find therapies that target resistance genes for {{ therapy_name }} in {{ disease_name }}.
+
+
