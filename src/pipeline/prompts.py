@@ -26,20 +26,18 @@ SCHEMA_SNIPPET = dedent(
       disease_name, pmids, and de-duplicate by gene_symbol, therapy_name,
       disease_name. Aggregate pmids across evidence rows into a single array.
     - TARGETS queries (mechanism/targeting): project
-      gene_symbol, therapy_name, r.moa AS targets_moa, and also return pmids
-      derived from r.ref_sources/r.ref_ids when available. Include
+      gene_symbol, therapy_name, r.moa AS targets_moa. Include
       r.ref_sources, r.ref_ids, r.ref_urls for transparency.
     - Always include therapy_name and at least one of gene_symbol or variant_name.
     - For mixed queries, set missing columns to NULL; include pmids only when
       available (AFFECTS) or derived from references (TARGETS).
 
-    Always include evidence (pmids):
+    Always include evidence (pmids) where applicable:
     - For AFFECTS queries, use rel.pmids (coalesce to []).
     - For gene-only AFFECTS, aggregate pmids across all evidence rows that
       contribute to a gene–therapy–disease tuple.
-    - For TARGETS queries, derive pmids from references:
-      filter r.ref_sources/r.ref_ids to PMIDs where the source contains
-      'pubmed' or equals 'pmid' (case-insensitive); default to [].
+    - For TARGETS queries, include reference arrays (r.ref_sources, r.ref_ids,
+      r.ref_urls) if present.
 
     Canonical example (AFFECTS; gene-only with pmid aggregation; adapt values):
       MATCH (b:Biomarker)-[rel:AFFECTS_RESPONSE_TO]->(t:Therapy)
@@ -96,20 +94,12 @@ SCHEMA_SNIPPET = dedent(
     Canonical example (TARGETS; adapt values as needed):
       MATCH (t:Therapy)-[r:TARGETS]->(g:Gene)
       WHERE toLower(g.symbol) = toLower('KRAS')
-      WITH t, g, r,
-        CASE
-          WHEN r.ref_sources IS NULL OR r.ref_ids IS NULL THEN []
-          ELSE [i IN range(0, size(r.ref_sources) - 1)
-                WHERE toLower(r.ref_sources[i]) CONTAINS 'pubmed' OR toLower(r.ref_sources[i]) = 'pmid'
-                | r.ref_ids[i]]
-        END AS pmids
       RETURN
         NULL AS variant_name,
         g.symbol AS gene_symbol,
         t.name AS therapy_name,
         NULL AS effect,
         NULL AS disease_name,
-        pmids,
         r.moa AS targets_moa,
         coalesce(r.ref_sources, []) AS ref_sources,
         coalesce(r.ref_ids, []) AS ref_ids,
@@ -197,8 +187,8 @@ INSTRUCTION_PROMPT_TEMPLATE = dedent(
       case-insensitive name equality and allow synonyms/CONTAINS as fallbacks.
     - When the question asks which therapies target a gene or requests mechanisms of
       action (MOA), include a bullet to match (t:Therapy)-[r:TARGETS]->(g:Gene) for the
-      gene (consider synonyms) and to project r.moa AS targets_moa. Also instruct to
-      derive pmids from references as described above.
+      gene (consider synonyms) and to project r.moa AS targets_moa. Include reference
+      arrays (r.ref_sources, r.ref_ids, r.ref_urls) if present.
 
     User question: {question}
     """
@@ -228,22 +218,22 @@ CYPHER_PROMPT_TEMPLATE = dedent(
     - Do NOT use parameters (no $variables); inline single-quoted literals from
       the instruction text.
 
-    Always include evidence (pmids):
+    Always include evidence (pmids) where applicable:
+    Always include evidence (pmids) where applicable:
     - For AFFECTS queries, project pmids from rel.pmids as an array
       (use coalesce(rel.pmids, [])).
     - If the question asks for genes (not variants), collapse evidence to the
       gene level: map Variant->Gene via VARIANT_OF, return NULL AS variant_name,
       de-duplicate rows by gene_symbol, therapy_name, disease_name, and aggregate
       pmids across evidence rows into a single array (collect + reduce).
-    - For TARGETS queries, derive pmids from r.ref_sources/r.ref_ids by selecting
-      PubMed/PMID references (case-insensitive) and return them as pmids
-      (default to [] if none).
+    - For TARGETS queries, include reference arrays (r.ref_sources, r.ref_ids, r.ref_urls)
+      if present.
 
     Return the minimally sufficient set of columns for the question:
     - For AFFECTS queries, project variant_name, gene_symbol, therapy_name, effect,
       disease_name, pmids (pmids must be an array; default []).
     - For TARGETS queries, project gene_symbol, therapy_name, r.moa AS targets_moa,
-      and pmids as derived above. Also return r.ref_sources, r.ref_ids, r.ref_urls.
+      and include r.ref_sources, r.ref_ids, r.ref_urls.
     - Always include therapy_name and at least one of variant_name or gene_symbol.
     - When mixing patterns, set missing columns to NULL (and pmids to []) for
       stability.
@@ -302,7 +292,8 @@ ENRICHMENT_SUMMARY_PROMPT_TEMPLATE = dedent(
 
     PART 2: Follow-up Questions
 
-    Based on your biological summary, suggest 1-3 actionable and simple follow-up questions that can be answered using the OncoGraph knowledge graph.
+    Based on your biological summary, suggest 1-3 actionable and simple follow-up questions
+    that can be answered using the OncoGraph knowledge graph.
     - The questions must be highly relevant to the biological themes you identified.
     - The questions should explore therapeutic options, biomarkers, or resistance mechanisms.
     - Refer to specific genes or pathways from the analysis.
