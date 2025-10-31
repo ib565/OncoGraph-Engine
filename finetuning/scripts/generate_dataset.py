@@ -1,4 +1,5 @@
 import json
+import os
 import random
 import sys
 from pathlib import Path
@@ -291,7 +292,27 @@ def main() -> None:
             raise FileNotFoundError(f"Template not found: {template_path}")
         template_paths = [template_path]
 
-    random.seed(42)
+    # Environment variable configuration
+    max_disease_synonyms_env = os.environ.get("GEN_DS_MAX_DISEASE_SYNONYMS")
+    try:
+        max_disease_synonyms = int(max_disease_synonyms_env) if max_disease_synonyms_env else 3
+    except ValueError:
+        max_disease_synonyms = 3
+        print(f"[generate_dataset] Invalid GEN_DS_MAX_DISEASE_SYNONYMS, using default: {max_disease_synonyms}")
+
+    seed_env = os.environ.get("GEN_DS_SEED")
+    if seed_env and seed_env.lower() != "none":
+        try:
+            seed_value = int(seed_env)
+            random.seed(seed_value)
+            print(f"[generate_dataset] Using seed: {seed_value}")
+        except ValueError:
+            random.seed(42)
+            print("[generate_dataset] Invalid GEN_DS_SEED, using default: 42")
+    elif seed_env and seed_env.lower() == "none":
+        print("[generate_dataset] Seed disabled (GEN_DS_SEED=none)")
+    else:
+        random.seed(42)
 
     # Build CIViC index
     print("[generate_dataset] Building CIViC index…")
@@ -484,33 +505,68 @@ def main() -> None:
                     if isinstance(v, str) and k != "disease_filter":  # disease_filter is already formatted
                         cypher_placeholders[k] = _escape_cypher_literal(v)
 
-                q_text = render_template(tpl["question"], placeholders)
-                cypher_text = render_template(tpl["cypher"], cypher_placeholders)
-                record = {
-                    "id": f"{tpl['family_id']}-{i:06d}",
-                    "family_id": tpl["family_id"],
-                    "template_id": tpl["template_id"],
-                    "question": q_text,
-                    "cypher": cypher_text,
-                    "placeholders": placeholders,
-                    "source": "base",
-                    "paraphrase_of": None,
-                }
-                out_f.write(json.dumps(record, ensure_ascii=False) + "\n")
-                written += 1
-                if paraphrase_templates:
-                    for j, qtpl in enumerate(paraphrase_templates, start=1):
-                        q_text_p = render_template(qtpl, placeholders)
-                        new_rec = {
-                            **record,
-                            "id": f"{tpl['family_id']}-{i:06d}-P{j}",
-                            "question": q_text_p,
-                            "source": "paraphrase",
-                            "paraphrase_of": record["id"],
-                        }
-                        out_f.write(json.dumps(new_rec, ensure_ascii=False) + "\n")
-                        written += 1
-                # Print progress after writing all records for this combo (base + paraphrases)
+                # Determine disease name variants (canonical + synonyms)
+                disease_variants = []
+                if "disease_name" in placeholders:
+                    disease_name = placeholders["disease_name"]
+                    # Always include canonical name as first variant
+                    disease_variants.append(disease_name)
+                    # Add synonym variants if available
+                    synonyms = index.get_disease_synonyms(disease_name)
+                    if synonyms:
+                        # Sample random number of synonyms (1 to min(max_disease_synonyms, len(synonyms)))
+                        num_synonyms = random.randint(1, min(max_disease_synonyms, len(synonyms)))
+                        sampled_synonyms = random.sample(synonyms, num_synonyms)
+                        disease_variants.extend(sampled_synonyms)
+                else:
+                    # No disease in this combo, just use canonical placeholder
+                    disease_variants = [None]
+
+                # Generate records for each disease variant (canonical + synonyms)
+                for s_idx, disease_display_name in enumerate(disease_variants):
+                    # Create question placeholders (may use synonym)
+                    q_placeholders = placeholders.copy()
+                    if disease_display_name is not None:
+                        q_placeholders["disease_name"] = disease_display_name
+
+                    # Cypher placeholders always use canonical disease name (from original placeholders)
+                    q_text = render_template(tpl["question"], q_placeholders)
+                    cypher_text = render_template(tpl["cypher"], cypher_placeholders)
+
+                    # Build record ID: canonical gets base ID, synonyms get -S<N> suffix
+                    if s_idx == 0:
+                        base_id = f"{tpl['family_id']}-{i:06d}"
+                    else:
+                        base_id = f"{tpl['family_id']}-{i:06d}-S{s_idx}"
+
+                    record = {
+                        "id": base_id,
+                        "family_id": tpl["family_id"],
+                        "template_id": tpl["template_id"],
+                        "question": q_text,
+                        "cypher": cypher_text,
+                        "placeholders": placeholders,  # Always canonical for ground truth
+                        "source": "base",
+                        "paraphrase_of": None,
+                    }
+                    out_f.write(json.dumps(record, ensure_ascii=False) + "\n")
+                    written += 1
+
+                    # Generate paraphrases for this variant
+                    if paraphrase_templates:
+                        for j, qtpl in enumerate(paraphrase_templates, start=1):
+                            q_text_p = render_template(qtpl, q_placeholders)
+                            new_rec = {
+                                **record,
+                                "id": f"{base_id}-P{j}",
+                                "question": q_text_p,
+                                "source": "paraphrase",
+                                "paraphrase_of": record["id"],
+                            }
+                            out_f.write(json.dumps(new_rec, ensure_ascii=False) + "\n")
+                            written += 1
+
+                # Print progress after writing all records for this combo (base + synonyms + paraphrases)
                 if written % 50 == 0:
                     print(f"[generate_dataset] Wrote {written} records…")
         print(f"[generate_dataset] Done for {tpl['template_id']}. Total records written: {written}")

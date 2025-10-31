@@ -93,8 +93,37 @@ Outputs are written to:
 finetuning/dataset/generated_pairs.<template_id>.jsonl
 ```
 
+### 4) Environment Variables (Optional)
+
+The dataset generator supports optional environment variables to control behavior:
+
+**`GEN_DS_MAX_DISEASE_SYNONYMS`** (default: `3`)
+- Maximum number of disease synonym variants to generate per combo.
+- When a disease has synonyms in CIViC data, the generator creates question variants using randomly sampled synonyms while keeping Cypher queries canonical.
+- Set to `0` to disable synonym variants entirely.
+
+**`GEN_DS_SEED`** (default: `42`)
+- Random seed for reproducible dataset generation.
+- Set to `none` to disable seeding and allow fully non-deterministic generation.
+
+**Example:**
+```powershell
+# Windows PowerShell
+$env:GEN_DS_MAX_DISEASE_SYNONYMS = "5"
+$env:GEN_DS_SEED = "123"
+./venv/Scripts/python.exe finetuning/scripts/generate_dataset.py --all
+```
+
+```bash
+# macOS/Linux
+export GEN_DS_MAX_DISEASE_SYNONYMS=5
+export GEN_DS_SEED=123
+./venv/bin/python finetuning/scripts/generate_dataset.py --all
+```
+
 ### Notes
 
 - CIViC data is read from `data/civic/latest/...` in the repo by default.
 - The package name is `oncograph-finetuning`; the import namespace is `oncograph_finetuning`.
+- **Disease Synonym Variants:** For diseases with synonyms in CIViC data, the generator automatically creates question variants using synonyms (e.g., "Non-small Cell Lung Carcinoma" vs "Lung Non-small Cell Carcinoma") while keeping Cypher queries consistent. This teaches the model that multiple disease name phrasings map to the same canonical entity. See `docs/FINETUNING_DECISION_LOG.md` for details.
 

@@ -65,3 +65,31 @@ WHERE (
 ```
 
 This matches both "Lung Non-small Cell Carcinoma" and "Non-small Cell Lung Carcinoma" in the database, maximizing recall while maintaining precision through multiple token requirements. Hyphens are preserved in tokens (e.g., "non-small" remains as a single token) to match dataset conventions.
+
+### Iteration 4: Teaching Synonym Recognition Through Data Augmentation
+
+**Problem:** While the model learns to map user queries to canonical disease names, real-world queries often use alternative disease name phrasings (synonyms). For example, users might ask about "Non-small Cell Lung Carcinoma" or "Lung Non-small Cell Carcinoma" interchangeably, or use clinical synonyms like "NSCLC" for the same disease entity.
+
+**Decision:** Augment the training dataset with question variants that use disease synonyms from the CIViC data source, while keeping the Cypher queries unchanged (always using canonical names). This teaches the model that multiple disease name variations map to the same ground truth canonical entity.
+
+**Implementation Strategy:**
+1. Load disease synonyms from CIViC's `diseases.csv` file during dataset generation.
+2. For each generated record containing a disease name:
+   - Always generate the canonical question (as baseline).
+   - Randomly sample 1 to N synonyms (configurable, default: 3) and generate additional question variants.
+   - Questions use synonyms in natural language, but Cypher queries always reference the canonical disease name.
+3. Maintain consistent ID scheme: canonical records use base IDs (e.g., `F1-000123`), synonym variants use `-S<N>` suffix (e.g., `F1-000123-S1`).
+4. Paraphrase templates apply to both canonical and synonym variants, ensuring comprehensive coverage.
+
+**Rationale:**
+- **Separation of Concerns:** The model learns synonym mapping (user phrasing → canonical name) while Cypher generation remains deterministic and consistent.
+- **Data Augmentation:** This naturally expands the training dataset with realistic variations users might employ.
+- **Ground Truth Consistency:** By keeping `placeholders` in records as canonical names, we maintain a single source of truth while training on diverse question phrasings.
+- **Controlled Growth:** The number of synonym variants per disease is configurable via environment variable to balance dataset size with training diversity.
+
+**Example:** For a disease with canonical name "Lung Non-small Cell Carcinoma" and synonyms ["Non-small Cell Lung Carcinoma", "NSCLC"], the generator creates:
+- Canonical question: "What genes are associated with Lung Non-small Cell Carcinoma?"
+- Synonym variant 1: "What genes are associated with Non-small Cell Lung Carcinoma?"
+- Synonym variant 2: "What genes are associated with NSCLC?"
+
+All three use the same Cypher query filtering on the canonical disease name, teaching the model that these phrasings are equivalent.

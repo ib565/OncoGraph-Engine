@@ -125,6 +125,8 @@ class CivicIndex:
         self.targets: list[dict[str, str]] = []
         self.affects: list[dict[str, str]] = []
         self.variant_of: dict[str, str] = {}
+        # Disease synonyms: canonical name -> list of synonym strings
+        self.disease_synonyms: dict[str, list[str]] = {}
 
     def build(self, require_chembl_id: bool = True, require_doid: bool = True) -> None:
         print(f"[civic_loader] Building index from base_dir: {self.base_dir}")
@@ -138,8 +140,16 @@ class CivicIndex:
         self.targets = self._load_targets(TARGETS_CSV)
         self.affects = self._load_affects(AFFECTS_CSV)
         self.variant_of = self._load_variant_of(VARIANT_OF_CSV)
+        # Load disease synonyms
+        self.disease_synonyms = self._load_disease_synonyms(
+            self.base_dir / "nodes" / "diseases.csv", require_doid=require_doid
+        )
+        syn_count_total = sum(len(s) for s in self.disease_synonyms.values())
         print(
-            f"[civic_loader] Index build complete: genes={len(self.genes)} therapies={len(self.therapies)} variants={len(self.variants)} diseases={len(self.diseases)} targets={len(self.targets)} affects={len(self.affects)}"
+            f"[civic_loader] Index build complete: "
+            f"genes={len(self.genes)} therapies={len(self.therapies)} variants={len(self.variants)} "
+            f"diseases={len(self.diseases)} targets={len(self.targets)} affects={len(self.affects)} "
+            f"synonyms={syn_count_total}"
         )
 
     def get_gene_symbols(self) -> list[str]:
@@ -199,6 +209,41 @@ class CivicIndex:
                     mapping[v] = g
         return mapping
 
+    def _load_disease_synonyms(self, diseases_csv_path: Path, require_doid: bool = True) -> dict[str, list[str]]:
+        """Load disease synonyms from CIViC nodes CSV.
+
+        Expects a CSV with columns 'name', 'doid', and 'synonyms'.
+        When require_doid is True, only processes rows with non-empty DOID.
+        Returns a dict mapping canonical disease name -> list of synonym strings.
+        """
+        print(f"[civic_loader] Reading disease synonyms from: {diseases_csv_path}")
+        synonyms_map: dict[str, list[str]] = {}
+        with diseases_csv_path.open(newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            row_count = 0
+            syn_count = 0
+            for row in reader:
+                row_count += 1
+                name = (row.get("name") or "").strip()
+                if not name:
+                    continue
+                if require_doid:
+                    doid = (row.get("doid") or "").strip()
+                    if not doid:
+                        continue
+                # Parse synonyms (semicolon-separated)
+                raw = (row.get("synonyms") or "").strip()
+                if raw:
+                    syns = [s.strip() for s in raw.split(";") if s.strip()]
+                    if syns:
+                        synonyms_map[name] = syns
+                        syn_count += len(syns)
+        print(
+            f"[civic_loader] Parsed {row_count} disease rows; "
+            f"collected {len(synonyms_map)} diseases with synonyms ({syn_count} total synonyms)"
+        )
+        return synonyms_map
+
     def get_targets_pairs(self) -> list[tuple[str, str]]:
         return [(r["therapy_name"], r["gene_symbol"]) for r in self.targets]
 
@@ -208,7 +253,9 @@ class CivicIndex:
     def get_targets_therapies(self) -> list[str]:
         return sorted({r["therapy_name"] for r in self.targets})
 
-    def get_affects_pairs(self, effect: str | None = None, require_variant: bool | None = None) -> list[tuple[str, str]]:
+    def get_affects_pairs(
+        self, effect: str | None = None, require_variant: bool | None = None
+    ) -> list[tuple[str, str]]:
         pairs: list[tuple[str, str]] = []
         for r in self.affects:
             if effect and r["effect"].lower() != effect.lower():
@@ -244,3 +291,14 @@ class CivicIndex:
 
     def map_variant_to_gene(self, variant_name: str) -> str | None:
         return self.variant_of.get(variant_name)
+
+    def get_disease_synonyms(self, disease_name: str) -> list[str]:
+        """Return list of synonyms for a canonical disease name.
+
+        Returns empty list if disease has no synonyms or is not found.
+        """
+        return self.disease_synonyms.get(disease_name, [])
+
+    def get_disease_synonyms_map(self) -> dict[str, list[str]]:
+        """Return the full mapping of canonical disease name -> list of synonyms."""
+        return self.disease_synonyms.copy()
