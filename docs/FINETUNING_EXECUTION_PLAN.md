@@ -26,10 +26,10 @@ finetuning/
 │   ├── checkpoints/                  # (Output) Intermediate training checkpoints
 │   └── qwen_oncograph_v1/            # (Output) Final trained model adapters (LoRA)
 ├── scripts/
-│   ├── 01_prepare_dataset.py         # (New) Creates the subset and splits
-│   ├── 02_evaluate_baselines.py      # (New) Evals Gemini and base Qwen
-│   ├── 03_finetune.py                # (New) Runs Unsloth fine-tuning
-│   └── 04_evaluate_finetuned.py      # (New) Evals the fine-tuned Qwen model
+│   ├── prepare_dataset.py         # (New) Creates the subset and splits
+│   ├── evaluate_baselines.py      # (New) Evals Gemini and base Qwen
+│   ├── finetune.py                # (New) Runs Unsloth fine-tuning
+│   └── evaluate_finetuned.py      # (New) Evals the fine-tuned Qwen model
 └── requirements-finetune.txt         # (New) Specific Python packages for this workflow
 ```
 
@@ -37,7 +37,7 @@ finetuning/
 
 ## Part 2: Step-by-Step Workflow
 
-### Step 1: Create a Diverse Data Subset (`01_prepare_dataset.py`)
+### Step 1: Create a Diverse Data Subset (`prepare_dataset.py`)
 
 To balance training efficiency with data quality, we will create a smaller, representative subset of the full 32k+ records. This avoids simple random sampling, which could miss rare query patterns.
 
@@ -47,7 +47,7 @@ To balance training efficiency with data quality, we will create a smaller, repr
 3.  **Train-Test Split:** The resulting subset will be split again (e.g., 85% train, 15% test) into `train_sample.jsonl` and `test_sample.jsonl`.
 4.  **Save to `splits/`:** The final, smaller datasets will be saved to `finetuning/dataset/splits/`.
 
-### Step 2: Evaluate Baselines for Comparison (`02_evaluate_baselines.py`)
+### Step 2: Evaluate Baselines for Comparison (`evaluate_baselines.py`)
 
 A robust evaluation requires comparing our new model against existing solutions. This script establishes the performance benchmarks.
 
@@ -61,7 +61,7 @@ A robust evaluation requires comparing our new model against existing solutions.
 3.  **Evaluate Base Qwen Model:** Load the untuned `Qwen3-4B-Instruct-2507` model using Unsloth. For each question in the test set, generate a Cypher query and evaluate it with the same harness.
 4.  **Log Results:** Store the aggregated metrics for both baselines in `finetuning/eval/evaluation_results.json`.
 
-### Step 3: Fine-Tune the Qwen Model (`03_finetune.py`)
+### Step 3: Fine-Tune the Qwen Model (`finetune.py`)
 
 This is the core training script, designed for flexibility between local execution (for quick tests) and Google Colab (for full runs).
 
@@ -85,7 +85,7 @@ This is the core training script, designed for flexibility between local executi
 4.  **Run Training:** Start the training process. The script should support a `resume_from_checkpoint` flag.
 5.  **Save Adapters:** Upon completion, the script will save the final LoRA adapters to `finetuning/models/qwen_oncograph_v1/`.
 
-### Step 4: Evaluate the Fine-Tuned Model (`04_evaluate_finetuned.py`)
+### Step 4: Evaluate the Fine-Tuned Model (`evaluate_finetuned.py`)
 
 This final step measures the success of our fine-tuning effort against the established baselines.
 
