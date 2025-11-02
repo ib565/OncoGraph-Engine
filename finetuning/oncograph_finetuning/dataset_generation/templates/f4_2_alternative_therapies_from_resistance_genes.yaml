@@ -1,0 +1,38 @@
+template_id: f4_2_alternative_therapies_from_resistance_genes
+family_id: F4.2
+question: "For resistance to {{ therapy_name }} in {{ disease_name }}, which therapies target the resistance biomarkers?"
+cypher: |
+  MATCH (b:Biomarker)-[rel:AFFECTS_RESPONSE_TO]->(t1:Therapy)
+  WHERE (
+    toLower(t1.name) = toLower('{{ therapy_name }}')
+    OR any(s IN coalesce(t1.synonyms, []) WHERE toLower(s) = toLower('{{ therapy_name }}'))
+    OR toLower(t1.name) CONTAINS toLower('{{ therapy_name }}')
+  )
+    AND toLower(rel.effect) = 'resistance'
+    {{ disease_filter }}
+  OPTIONAL MATCH (b)-[:VARIANT_OF]->(g:Gene)
+  WITH CASE WHEN b:Gene THEN b.symbol ELSE g.symbol END AS gene_symbol
+  WHERE gene_symbol IS NOT NULL
+  MATCH (t2:Therapy)-[r:TARGETS]->(tg:Gene)
+  WHERE (
+    toLower(tg.symbol) = toLower(gene_symbol)
+    OR any(s IN coalesce(tg.synonyms, []) WHERE toLower(s) = toLower(gene_symbol))
+  )
+    AND toLower(t2.name) <> toLower('{{ therapy_name }}')
+  RETURN
+    gene_symbol,
+    t2.name AS therapy_name,
+    r.moa AS targets_moa,
+    coalesce(r.ref_sources, []) AS ref_sources,
+    coalesce(r.ref_ids, []) AS ref_ids,
+    coalesce(r.ref_urls, []) AS ref_urls
+  LIMIT 100
+placeholders:
+  therapy_name:
+    from: civic.therapies
+    sample: canonical_only
+  disease_name:
+    from: civic.diseases
+    sample: canonical_only
+
+

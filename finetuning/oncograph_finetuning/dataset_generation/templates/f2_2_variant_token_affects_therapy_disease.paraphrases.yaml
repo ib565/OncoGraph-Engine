@@ -1,0 +1,9 @@
+template_id: f2_2_variant_token_affects_therapy_disease
+family_id: F2.2
+base_question: How does the variant {{ variant_name }} affect response to {{ therapy_name }} in {{ disease_name }}?
+paraphrases:
+- What is the effect of {{ variant_name }} on {{ therapy_name }} in {{ disease_name }}?
+- Does {{ variant_name }} predict response to {{ therapy_name }} in {{ disease_name }}?
+- How does {{ variant_name }} influence response to {{ therapy_name }} for {{ disease_name }}?
+
+

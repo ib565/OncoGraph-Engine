@@ -1,0 +1,9 @@
+template_id: f1_4_variants_of_gene
+family_id: F1.4
+base_question: List all known variants of the {{ gene_symbol }} gene.
+paraphrases:
+- What variants are known for the {{ gene_symbol }} gene?
+- Show the variants associated with {{ gene_symbol }}.
+- Which variants belong to the gene {{ gene_symbol }}?
+- Enumerate the variants linked to {{ gene_symbol }}.
+

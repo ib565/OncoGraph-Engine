@@ -1,0 +1,9 @@
+template_id: f6_3_therapies_target_gene_with_variant_resistance_in_disease
+family_id: F6.3
+base_question: Find therapies that target {{ gene_symbol }} for variants that cause resistance in {{ disease_name }}.
+paraphrases:
+- Which therapies targeting {{ gene_symbol }} have variant-level resistance in {{ disease_name }}?
+- List drugs targeting {{ gene_symbol }} with resistant variants in {{ disease_name }}.
+- Show therapies for {{ gene_symbol }} where variants cause resistance in {{ disease_name }}.
+
+

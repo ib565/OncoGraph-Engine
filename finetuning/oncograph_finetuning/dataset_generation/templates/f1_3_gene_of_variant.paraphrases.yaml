@@ -1,0 +1,9 @@
+template_id: f1_3_gene_of_variant
+family_id: F1.3
+base_question: Which gene is {{ variant_name }} a variant of?
+paraphrases:
+- "{{ variant_name }} belongs to which gene?"
+- "{{ variant_name }} is a variant of what gene?"
+- Identify the gene for the variant {{ variant_name }}.
+- Which gene does the variant {{ variant_name }} map to?
+

@@ -14,3 +14,4 @@ __pycache__/
 *.pyz
 logs/
 *.egg-info/
+unsloth_compiled_cache/

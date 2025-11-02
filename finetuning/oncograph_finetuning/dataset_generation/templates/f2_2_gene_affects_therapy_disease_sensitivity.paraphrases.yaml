@@ -1,0 +1,9 @@
+template_id: f2_2_gene_affects_therapy_disease_sensitivity
+family_id: F2.2
+base_question: Which genes predict sensitivity to {{ therapy_name }} in {{ disease_name }}?
+paraphrases:
+- Which genes confer sensitivity to {{ therapy_name }} in {{ disease_name }}?
+- List genes associated with sensitivity to {{ therapy_name }} in {{ disease_name }}.
+- What genes are sensitivity biomarkers for {{ therapy_name }} in {{ disease_name }}?
+
+

@@ -1,0 +1,31 @@
+template_id: f2_1_targets_properties
+family_id: F2.1
+question: "What is {{ therapy_name }}'s mechanism of action on {{ gene_symbol }}?"
+cypher: |
+  MATCH (t:Therapy)-[r:TARGETS]->(g:Gene)
+  WHERE (
+    toLower(t.name) = toLower('{{ therapy_name }}')
+    OR any(s IN coalesce(t.synonyms, []) WHERE toLower(s) = toLower('{{ therapy_name }}'))
+    OR toLower(t.name) CONTAINS toLower('{{ therapy_name }}')
+  )
+    AND (
+      toLower(g.symbol) = toLower('{{ gene_symbol }}')
+      OR any(s IN coalesce(g.synonyms, []) WHERE toLower(s) = toLower('{{ gene_symbol }}'))
+    )
+  RETURN
+    g.symbol AS gene_symbol,
+    t.name AS therapy_name,
+    r.moa AS targets_moa,
+    coalesce(r.ref_sources, []) AS ref_sources,
+    coalesce(r.ref_ids, []) AS ref_ids,
+    coalesce(r.ref_urls, []) AS ref_urls
+  LIMIT 100
+placeholders:
+  therapy_name:
+    from: civic.therapies
+    sample: canonical_only
+  gene_symbol:
+    from: civic.genes
+    sample: canonical_only
+
+

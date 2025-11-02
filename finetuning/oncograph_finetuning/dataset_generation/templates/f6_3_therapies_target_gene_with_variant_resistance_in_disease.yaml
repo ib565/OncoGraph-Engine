@@ -1,0 +1,28 @@
+template_id: f6_3_therapies_target_gene_with_variant_resistance_in_disease
+family_id: F6.3
+question: "Find therapies that target {{ gene_symbol }} for variants that cause resistance in {{ disease_name }}."
+cypher: |
+  MATCH (t:Therapy)-[:TARGETS]->(g:Gene)
+  WHERE toLower(g.symbol) = toLower('{{ gene_symbol }}')
+     OR any(s IN coalesce(g.synonyms, []) WHERE toLower(s) = toLower('{{ gene_symbol }}'))
+  MATCH (v:Variant)-[:VARIANT_OF]->(g)
+  MATCH (v)-[rel:AFFECTS_RESPONSE_TO]->(t)
+  WHERE toLower(rel.effect) = 'resistance'
+    {{ disease_filter }}
+  RETURN
+    v.name AS variant_name,
+    g.symbol AS gene_symbol,
+    t.name AS therapy_name,
+    'resistance' AS effect,
+    rel.disease_name AS disease_name,
+    coalesce(rel.pmids, []) AS pmids
+  LIMIT 100
+placeholders:
+  gene_symbol:
+    from: civic.genes
+    sample: canonical_only
+  disease_name:
+    from: civic.diseases
+    sample: canonical_only
+
+

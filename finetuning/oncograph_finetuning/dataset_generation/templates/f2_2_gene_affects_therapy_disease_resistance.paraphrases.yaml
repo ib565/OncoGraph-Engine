@@ -1,0 +1,9 @@
+template_id: f2_2_gene_affects_therapy_disease_resistance
+family_id: F2.2
+base_question: Which genes predict resistance to {{ therapy_name }} in {{ disease_name }}?
+paraphrases:
+- Which genes confer resistance to {{ therapy_name }} in {{ disease_name }}?
+- List genes associated with resistance to {{ therapy_name }} in {{ disease_name }}.
+- What genes are resistance biomarkers for {{ therapy_name }} in {{ disease_name }}?
+
+

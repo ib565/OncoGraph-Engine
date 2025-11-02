@@ -1,0 +1,9 @@
+template_id: f5_1_biomarkers_in_disease
+family_id: F5.1
+base_question: In {{ disease_name }}, which biomarkers have evidence?
+paraphrases:
+- Which biomarkers show evidence in {{ disease_name }}?
+- List biomarkers with AFFECTS evidence in {{ disease_name }}.
+- What biomarkers have therapy response evidence in {{ disease_name }}?
+
+

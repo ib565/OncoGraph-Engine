@@ -1,0 +1,9 @@
+template_id: f6_1_resistance_genes_for_union_therapies_in_disease
+family_id: F6.1
+base_question: Which genes predict resistance to {{ therapy_name_a }} or {{ therapy_name_b }} in {{ disease_name }}?
+paraphrases:
+- In {{ disease_name }}, which genes confer resistance to {{ therapy_name_a }} or {{ therapy_name_b }}?
+- List resistance genes for {{ therapy_name_a }} or {{ therapy_name_b }} in {{ disease_name }}.
+- What genes are resistance biomarkers for {{ therapy_name_a }} or {{ therapy_name_b }} in {{ disease_name }}?
+
+

@@ -1,0 +1,21 @@
+template_id: f5_2_therapies_with_biomarker_evidence_in_disease
+family_id: F5.2
+question: "List therapies with variant-level biomarkers in {{ disease_name }}."
+cypher: |
+  MATCH (v:Variant)-[rel:AFFECTS_RESPONSE_TO]->(t:Therapy)
+  {{ disease_filter }}
+  OPTIONAL MATCH (v)-[:VARIANT_OF]->(g:Gene)
+  RETURN
+    v.name AS variant_name,
+    g.symbol AS gene_symbol,
+    t.name AS therapy_name,
+    rel.effect AS effect,
+    rel.disease_name AS disease_name,
+    coalesce(rel.pmids, []) AS pmids
+  LIMIT 100
+placeholders:
+  disease_name:
+    from: civic.diseases
+    sample: canonical_only
+
+

@@ -1,0 +1,7 @@
+template_id: f1_1_targets_gene
+family_id: F1.1
+base_question: What drugs target {{ gene_symbol }}?
+paraphrases:
+- Which therapies target {{ gene_symbol }}?
+- List treatments that target {{ gene_symbol }}.
+- What medications are known to target {{ gene_symbol }}?

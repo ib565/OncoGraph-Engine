@@ -1,0 +1,35 @@
+template_id: f6_2_therapies_target_gene_not_other_with_disease_evidence
+family_id: F6.2
+question: "What therapies target {{ gene_include }} but NOT {{ gene_exclude }}, and have biomarker evidence in {{ disease_name }}?"
+cypher: |
+  MATCH (t:Therapy)-[:TARGETS]->(gi:Gene)
+  WHERE toLower(gi.symbol) = toLower('{{ gene_include }}')
+     OR any(s IN coalesce(gi.synonyms, []) WHERE toLower(s) = toLower('{{ gene_include }}'))
+  OPTIONAL MATCH (t)-[:TARGETS]->(gx:Gene)
+  WHERE toLower(gx.symbol) = toLower('{{ gene_exclude }}')
+     OR any(s IN coalesce(gx.synonyms, []) WHERE toLower(s) = toLower('{{ gene_exclude }}'))
+  WITH t, gi, gx
+  WHERE gx IS NULL
+  MATCH (b:Biomarker)-[rel:AFFECTS_RESPONSE_TO]->(t)
+  {{ disease_filter }}
+  OPTIONAL MATCH (b)-[:VARIANT_OF]->(g:Gene)
+  RETURN
+    CASE WHEN b:Variant THEN b.name ELSE NULL END AS variant_name,
+    CASE WHEN b:Gene THEN b.symbol ELSE g.symbol END AS gene_symbol,
+    t.name AS therapy_name,
+    rel.effect AS effect,
+    rel.disease_name AS disease_name,
+    coalesce(rel.pmids, []) AS pmids
+  LIMIT 100
+placeholders:
+  gene_include:
+    from: civic.genes
+    sample: canonical_only
+  gene_exclude:
+    from: civic.genes
+    sample: canonical_only
+  disease_name:
+    from: civic.diseases
+    sample: canonical_only
+
+

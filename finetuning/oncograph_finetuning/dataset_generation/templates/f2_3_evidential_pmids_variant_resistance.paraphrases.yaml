@@ -1,0 +1,9 @@
+template_id: f2_3_evidential_pmids_variant_resistance
+family_id: F2.3
+base_question: Provide PMIDs supporting that {{ variant_name }} confers resistance to {{ therapy_name }}.
+paraphrases:
+- Cite PubMed IDs showing {{ variant_name }} causes resistance to {{ therapy_name }}.
+- What PMIDs support resistance of {{ therapy_name }} due to {{ variant_name }}?
+- Give PMIDs for {{ variant_name }}-mediated resistance to {{ therapy_name }}.
+
+

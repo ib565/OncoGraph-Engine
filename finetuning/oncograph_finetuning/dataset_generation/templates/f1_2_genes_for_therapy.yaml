@@ -1,0 +1,27 @@
+template_id: f1_2_genes_for_therapy
+family_id: F1.2
+question: "Which genes does {{ therapy_name }} target?"
+cypher: |
+  MATCH (t:Therapy)-[r:TARGETS]->(g:Gene)
+  WHERE (
+    toLower(t.name) = toLower('{{ therapy_name }}')
+    OR any(s IN coalesce(t.synonyms, []) WHERE toLower(s) = toLower('{{ therapy_name }}'))
+    OR toLower(t.name) CONTAINS toLower('{{ therapy_name }}')
+  )
+  RETURN
+    g.symbol AS gene_symbol,
+    t.name AS therapy_name,
+    r.moa AS targets_moa,
+    coalesce(r.ref_sources, []) AS ref_sources,
+    coalesce(r.ref_ids, []) AS ref_ids,
+    coalesce(r.ref_urls, []) AS ref_urls
+  LIMIT 100
+placeholders:
+  therapy_name:
+    from: civic.therapies
+    sample: canonical_only
+
+
+
+
+

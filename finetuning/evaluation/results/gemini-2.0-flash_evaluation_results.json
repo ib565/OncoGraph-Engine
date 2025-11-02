@@ -1,0 +1,20 @@
+{
+  "timestamp": "2025-11-03T00:30:26.706513",
+  "test_set_size": 80,
+  "models": {
+    "gemini-2.0-flash": {
+      "metrics": {
+        "total": 80,
+        "syntactic_validity_pct": 100.0,
+        "execution_success_pct": 90.0,
+        "semantic_accuracy_pct": 55.55555555555556,
+        "avg_latency_ms": 928.8759162503993,
+        "avg_input_tokens": 7165.4125,
+        "avg_output_tokens": 238.05,
+        "total_input_tokens": 573233,
+        "total_output_tokens": 19044
+      },
+      "result_count": 80
+    }
+  }
+}

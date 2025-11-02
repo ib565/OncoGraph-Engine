@@ -1,0 +1,9 @@
+template_id: f3_3_therapies_target_a_not_b
+family_id: F3.3
+base_question: Which drugs target {{ gene_symbol_include }} but not {{ gene_symbol_exclude }}?
+paraphrases:
+- What therapies hit {{ gene_symbol_include }} but exclude {{ gene_symbol_exclude }}?
+- List treatments targeting {{ gene_symbol_include }} and not {{ gene_symbol_exclude }}.
+- Show therapies for {{ gene_symbol_include }} but not for {{ gene_symbol_exclude }}.
+
+

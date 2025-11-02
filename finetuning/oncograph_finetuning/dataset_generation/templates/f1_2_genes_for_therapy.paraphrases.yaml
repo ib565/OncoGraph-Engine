@@ -1,0 +1,8 @@
+template_id: f1_2_genes_for_therapy
+family_id: F1.2
+base_question: Which genes does {{ therapy_name }} target?
+paraphrases:
+- What genes does {{ therapy_name }} target?
+- List genes that {{ therapy_name }} targets.
+- Which genes are targeted by {{ therapy_name }}?
+- What genes does {{ therapy_name }} affect?

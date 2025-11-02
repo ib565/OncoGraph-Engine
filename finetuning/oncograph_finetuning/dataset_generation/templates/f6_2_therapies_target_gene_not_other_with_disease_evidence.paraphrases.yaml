@@ -1,0 +1,9 @@
+template_id: f6_2_therapies_target_gene_not_other_with_disease_evidence
+family_id: F6.2
+base_question: What therapies target {{ gene_include }} but NOT {{ gene_exclude }}, and have biomarker evidence in {{ disease_name }}?
+paraphrases:
+- Which drugs hit {{ gene_include }} but not {{ gene_exclude }} with evidence in {{ disease_name }}?
+- List therapies targeting {{ gene_include }} (not {{ gene_exclude }}) with evidence in {{ disease_name }}.
+- Show treatments for {{ gene_include }} excluding {{ gene_exclude }} that have biomarker evidence in {{ disease_name }}.
+
+

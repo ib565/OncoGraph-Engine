@@ -1,0 +1,9 @@
+template_id: f6_4_alternative_therapies_for_resistance_in_disease
+family_id: F6.4
+base_question: For resistance to {{ therapy_name }} in {{ disease_name }}, which therapies target the resistance biomarkers?
+paraphrases:
+- In {{ disease_name }}, what therapies target genes linked to resistance to {{ therapy_name }}?
+- Which treatments target resistance biomarkers for {{ therapy_name }} in {{ disease_name }}?
+- Find alternative therapies targeting resistance genes for {{ therapy_name }} in {{ disease_name }}.
+
+
