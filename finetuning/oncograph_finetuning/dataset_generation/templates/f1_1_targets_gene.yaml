@@ -12,7 +12,7 @@ cypher: |
     coalesce(r.ref_sources, []) AS ref_sources,
     coalesce(r.ref_ids, []) AS ref_ids,
     coalesce(r.ref_urls, []) AS ref_urls
-  LIMIT 50
+  LIMIT 100
 placeholders:
   gene_symbol:
     from: civic.genes

@@ -4,7 +4,7 @@ question: "Which gene is {{ variant_name }} a variant of?"
 cypher: |
   MATCH (v:Variant {name: '{{ variant_name }}'})-[:VARIANT_OF]->(g:Gene)
   RETURN g.symbol AS gene_symbol, v.name AS variant_name
-  LIMIT 50
+  LIMIT 100
 placeholders:
   variant_name:
     from: civic.variants

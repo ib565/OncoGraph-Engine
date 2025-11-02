@@ -60,9 +60,8 @@ SCHEMA_SNIPPET = dedent(
         rel.disease_name AS disease_name,
         coalesce(rel.pmids, []) AS pmids
       WHERE gene_symbol IS NOT NULL
-      WITH gene_symbol, therapy_name, disease_name, collect(pmids) AS pmid_lists
-      WITH gene_symbol, therapy_name, disease_name,
-           reduce(allp = [], lst IN pmid_lists | allp + lst) AS pmids
+      UNWIND pmids AS p
+      WITH gene_symbol, therapy_name, disease_name, collect(DISTINCT p) AS pmids
       RETURN
         NULL AS variant_name,
         gene_symbol,
@@ -94,6 +93,7 @@ SCHEMA_SNIPPET = dedent(
     Canonical example (TARGETS; adapt values as needed):
       MATCH (t:Therapy)-[r:TARGETS]->(g:Gene)
       WHERE toLower(g.symbol) = toLower('KRAS')
+         OR any(s IN coalesce(g.synonyms, []) WHERE toLower(s) = toLower('KRAS'))
       RETURN
         NULL AS variant_name,
         g.symbol AS gene_symbol,
@@ -106,13 +106,45 @@ SCHEMA_SNIPPET = dedent(
         coalesce(r.ref_urls, []) AS ref_urls
       LIMIT 100
 
+    Canonical example (Variant lookup; simple query):
+      MATCH (v:Variant)-[:VARIANT_OF]->(g:Gene)
+      WHERE toLower(g.symbol) = toLower('RRM1')
+         OR any(s IN coalesce(g.synonyms, []) WHERE toLower(s) = toLower('RRM1'))
+      RETURN v.name AS variant_name, g.symbol AS gene_symbol
+      LIMIT 100
+
+    Canonical example (Exclusion pattern: therapies targeting G1 but NOT G2 with evidence):
+      MATCH (t:Therapy)-[:TARGETS]->(gi:Gene)
+      WHERE toLower(gi.symbol) = toLower('G1')
+         OR any(s IN coalesce(gi.synonyms, []) WHERE toLower(s) = toLower('G1'))
+      OPTIONAL MATCH (t)-[:TARGETS]->(gx:Gene)
+      WHERE toLower(gx.symbol) = toLower('G2')
+         OR any(s IN coalesce(gx.synonyms, []) WHERE toLower(s) = toLower('G2'))
+      WITH t, gi, gx
+      WHERE gx IS NULL
+      MATCH (b:Biomarker)-[rel:AFFECTS_RESPONSE_TO]->(t)
+      WHERE toLower(rel.disease_name) CONTAINS toLower('disease')
+      OPTIONAL MATCH (b)-[:VARIANT_OF]->(g:Gene)
+      RETURN
+        CASE WHEN b:Variant THEN b.name ELSE NULL END AS variant_name,
+        CASE WHEN b:Gene THEN b.symbol ELSE g.symbol END AS gene_symbol,
+        t.name AS therapy_name,
+        rel.effect AS effect,
+        rel.disease_name AS disease_name,
+        coalesce(rel.pmids, []) AS pmids
+      LIMIT 100
+
     Canonical rules:
+    - Case sensitivity: ALWAYS use toLower() for all string comparisons (gene symbols,
+      synonyms, therapy names, disease names, effects, variant names). Never compare
+      strings directly without toLower() as database values may vary in case.
     - Gene-only: match biomarker as the Gene OR any Variant VARIANT_OF that Gene.
       For gene-only questions, collapse to gene-level in the RETURN:
         • return NULL AS variant_name,
         • return gene_symbol (from b:Gene or via VARIANT_OF),
         • de-duplicate by gene_symbol, therapy_name, disease_name,
-        • aggregate pmids across evidence rows into a single array.
+        • aggregate pmids across evidence rows: use UNWIND pmids AS p, then
+          collect(DISTINCT p) AS pmids to ensure no duplicates.
     - Specific variant:
       - Always require VARIANT_OF to the named gene.
       - Prefer equality on Variant.name for full names like 'KRAS G12C' or
@@ -124,23 +156,43 @@ SCHEMA_SNIPPET = dedent(
       - For alteration-class tokens ('Amplification', 'Overexpression',
         'Deletion', 'Loss-of-function', 'Fusion', 'Wildtype'), use
         toLower(Variant.name) CONTAINS toLower('<TOKEN>') together with VARIANT_OF.
-    - Gene synonyms: allow equality on symbol OR equality on any synonyms (case-insensitive).
+    - Gene synonyms: ALWAYS use case-insensitive matching with toLower():
+      toLower(g.symbol) = toLower('<SYMBOL>') OR
+      any(s IN coalesce(g.synonyms, []) WHERE toLower(s) = toLower('<SYMBOL>')).
     - Therapy class: match via tags (case-insensitive contains) OR via TARGETS to the gene.
-    - Therapy name: when a specific therapy is named, prefer case-insensitive equality on
-      t.name; allow fallbacks to synonyms equality (case-insensitive) or toLower(t.name)
-      CONTAINS when needed.
-    - Disease filters: for umbrella terms (e.g., "lung cancer"), prefer a single minimal
-      anchor token match on rel.disease_name (case-insensitive), e.g.,
-      toLower(rel.disease_name) CONTAINS toLower('lung'). Avoid requiring additional tokens
-      like 'cancer'/'carcinoma' to maximize recall. Use case-insensitive equality only when
-      the question names a specific disease entity.
+    - Therapy name: when a specific therapy is named, ALWAYS use case-insensitive equality
+      with toLower(t.name); allow fallbacks to synonyms equality (case-insensitive) or
+      toLower(t.name) CONTAINS when needed.
+    - Disease filters: CRITICAL - Extract individual tokens from disease names and match
+      each token separately. For "Non-small Cell Lung Carcinoma", use separate CONTAINS
+      clauses: toLower(rel.disease_name) CONTAINS toLower('lung') AND
+      toLower(rel.disease_name) CONTAINS toLower('non-small') AND
+      toLower(rel.disease_name) CONTAINS toLower('cell') AND
+      toLower(rel.disease_name) CONTAINS toLower('carcinoma'). NEVER use phrase matching
+      like CONTAINS 'non-small cell lung' as this will fail. For umbrella terms (e.g.,
+      "lung cancer"), prefer a single minimal anchor token match on rel.disease_name
+      (case-insensitive), e.g., toLower(rel.disease_name) CONTAINS toLower('lung').
+      Avoid requiring additional tokens like 'cancer'/'carcinoma' to maximize recall.
+    - Exclusion patterns: When query asks for "therapies targeting G1 excluding G2", use:
+      MATCH (t:Therapy)-[:TARGETS]->(gi:Gene) WHERE gi matches G1,
+      OPTIONAL MATCH (t)-[:TARGETS]->(gx:Gene) WHERE gx matches G2,
+      WITH t, gi, gx WHERE gx IS NULL (therapy does NOT target excluded gene).
+      Then continue with biomarker matching. Never use NOT t.name = 'G2' as G2 is a gene,
+      not a therapy name.
+    - Return columns: Return ONLY the columns needed for the question. For simple variant
+      lookups (e.g., "What variants are known for gene X?"), return only variant_name and
+      gene_symbol. Do NOT add unnecessary NULL columns (therapy_name, effect, disease_name,
+      pmids) unless the query requires them. Always match return columns to query type:
+      AFFECTS queries return variant_name, gene_symbol, therapy_name, effect, disease_name,
+      pmids; TARGETS queries return gene_symbol, therapy_name, targets_moa, ref_sources.
     - Filter scoping: place WHERE filters that constrain (b)-[rel:AFFECTS_RESPONSE_TO]->(t)
       immediately after introducing those bindings. Do not attach such filters to OPTIONAL MATCH.
-    - Effect filtering: compare case-insensitively, e.g., toLower(rel.effect) = 'resistance'
+    - Effect filtering: ALWAYS compare case-insensitively: toLower(rel.effect) = 'resistance'
       or 'sensitivity'.
     - Array usage: wrap arrays with coalesce(..., []) before any()/all() checks.
     - Do not assume the biomarker equals the therapy's target gene unless explicitly named
       as the biomarker.
+    - LIMIT: ALWAYS use LIMIT 100 for all queries. Never use a different limit value.
     """
 ).strip()
 
@@ -180,15 +232,20 @@ INSTRUCTION_PROMPT_TEMPLATE = dedent(
     + synonyms CONTAINS). If a full variant name (e.g., "KRAS G12C") appears,
     prefer exact equality on Variant.name together with the VARIANT_OF guard.
 
-    - When the question uses an umbrella disease term (e.g., "lung cancer"), include a
-      bullet instructing minimal anchor filtering: require only 'lung' (case-insensitive)
-      to appear in rel.disease_name. Do not require 'cancer'/'carcinoma' to maximize recall.
+    - Disease tokenization: CRITICAL - When a disease is mentioned, extract individual
+      tokens and require each token to appear separately. For "Non-small Cell Lung Carcinoma",
+      instruct to match all tokens: 'lung', 'non-small', 'cell', 'carcinoma' using separate
+      CONTAINS clauses with AND. NEVER use phrase matching like CONTAINS 'non-small cell lung'
+      as this will fail. For umbrella terms (e.g., "lung cancer"), use minimal anchor filtering:
+      require only 'lung' (case-insensitive) to appear in rel.disease_name. Do not require
+      'cancer'/'carcinoma' to maximize recall.
     - Disease name awareness: Users may phrase diseases using alternative names, synonyms,
       or variant spellings (e.g., "Chronic Myelogenous Leukaemia" vs "Chronic Myeloid Leukemia",
       "NSCLC" vs "Non-small Cell Lung Carcinoma"). When a disease is mentioned, map the user's
-      phrasing to the canonical disease name used in the database. For disease filtering, use
-      token-based matching (CONTAINS) on rel.disease_name with the canonical tokens, applying
-      the minimal anchor rule for umbrella terms.
+      phrasing to canonical disease tokens for filtering. Use token-based matching with each
+      token as a separate CONTAINS condition.
+    - Case sensitivity: Always instruct to use toLower() for all string comparisons (gene
+      symbols, synonyms, therapy names, disease names, effects).
     - When a therapy is explicitly named, include a bullet to match Therapy by
       case-insensitive name equality and allow synonyms/CONTAINS as fallbacks.
     - When the question asks which therapies target a gene or requests mechanisms of
@@ -210,11 +267,13 @@ CYPHER_PROMPT_TEMPLATE = dedent(
     - Use the instruction text exactly once to decide filters, MATCH clauses,
       and RETURN columns.
     - Produce a single Cypher query only (no commentary or fences).
-    - Include a RETURN clause and a LIMIT.
+    - Include a RETURN clause and ALWAYS use LIMIT 100 (never a different limit).
     - Keep queries simple: prefer MATCH/OPTIONAL MATCH, WHERE, WITH, RETURN.
     - Follow the canonical rules above (gene‑or‑variant, VARIANT_OF for variants,
       therapy class via tags or TARGETS, case-insensitive disease handling,
       filter scoping, and no parameters).
+    - Case sensitivity: ALWAYS use toLower() for ALL string comparisons (gene symbols,
+      synonyms, therapy names, disease names, effects). Never compare strings directly.
     - For tokenized variants (e.g., "G12C") or alteration classes ("Amplification",
       "Overexpression", "Deletion", "Loss-of-function", "Fusion", "Wildtype"),
       prefer equality on Variant.name when a full name is known, otherwise use
@@ -225,38 +284,57 @@ CYPHER_PROMPT_TEMPLATE = dedent(
       the instruction text.
 
     Always include evidence (pmids) where applicable:
-    Always include evidence (pmids) where applicable:
     - For AFFECTS queries, project pmids from rel.pmids as an array
       (use coalesce(rel.pmids, [])).
     - If the question asks for genes (not variants), collapse evidence to the
       gene level: map Variant->Gene via VARIANT_OF, return NULL AS variant_name,
       de-duplicate rows by gene_symbol, therapy_name, disease_name, and aggregate
-      pmids across evidence rows into a single array (collect + reduce).
+      pmids using UNWIND pmids AS p, then collect(DISTINCT p) AS pmids to ensure
+      no duplicates.
     - For TARGETS queries, include reference arrays (r.ref_sources, r.ref_ids, r.ref_urls)
       if present.
 
     Return the minimally sufficient set of columns for the question:
+    - Return ONLY the columns needed for the specific query type. Do NOT add
+      unnecessary NULL columns for simple queries (e.g., variant lookup queries
+      should return only variant_name and gene_symbol, not therapy_name, effect, etc.).
     - For AFFECTS queries, project variant_name, gene_symbol, therapy_name, effect,
       disease_name, pmids (pmids must be an array; default []).
     - For TARGETS queries, project gene_symbol, therapy_name, r.moa AS targets_moa,
       and include r.ref_sources, r.ref_ids, r.ref_urls.
-    - Always include therapy_name and at least one of variant_name or gene_symbol.
+    - For simple variant lookups (e.g., "What variants are known for gene X?"),
+      return ONLY variant_name and gene_symbol.
+    - Always include therapy_name and at least one of variant_name or gene_symbol
+      ONLY when the query involves therapies (AFFECTS or TARGETS patterns).
     - When mixing patterns, set missing columns to NULL (and pmids to []) for
       stability.
 
     Robust fallbacks:
     - Variant: equality on full name; OR name CONTAINS token; OR hgvs_p equality
       to 'p.<TOKEN>'; OR synonyms CONTAINS token; always guard with VARIANT_OF
-      to the gene when variant-specific.
-    - Therapy: equality on t.name; OR synonyms equality; OR toLower(t.name)
-      CONTAINS; wrap arrays with coalesce(..., []).
-    - Disease filtering: Users may phrase diseases using alternative names, synonyms, or
-      variant spellings. Map the user's phrasing to canonical disease tokens for filtering.
-      For umbrella terms (e.g., "lung cancer"), use minimal anchor filtering (e.g.,
-      toLower(rel.disease_name) CONTAINS toLower('lung')). For specific diseases, use
-      token-based matching with all canonical tokens (e.g., for "Non-small Cell Lung Carcinoma",
-      match all tokens: 'lung', 'non-small', 'cell', 'carcinoma').
-    - Effect: compare case-insensitively (e.g., toLower(rel.effect) = 'resistance').
+      to the gene when variant-specific. Always use toLower() for case-insensitive matching.
+    - Gene matching: ALWAYS use toLower(g.symbol) = toLower('<SYMBOL>') OR
+      any(s IN coalesce(g.synonyms, []) WHERE toLower(s) = toLower('<SYMBOL>'))
+      for case-insensitive matching. Never compare gene symbols directly.
+    - Therapy: ALWAYS use case-insensitive matching: toLower(t.name) = toLower('<NAME>');
+      OR synonyms equality with toLower(); OR toLower(t.name) CONTAINS; wrap arrays
+      with coalesce(..., []).
+    - Disease filtering: CRITICAL - Extract individual tokens from disease names and
+      match each token separately with AND conditions. For "Non-small Cell Lung Carcinoma",
+      use: toLower(rel.disease_name) CONTAINS toLower('lung') AND
+      toLower(rel.disease_name) CONTAINS toLower('non-small') AND
+      toLower(rel.disease_name) CONTAINS toLower('cell') AND
+      toLower(rel.disease_name) CONTAINS toLower('carcinoma'). NEVER use phrase matching
+      like CONTAINS 'non-small cell lung' as this will fail to match. Users may phrase
+      diseases using alternative names, synonyms, or variant spellings. Map the user's
+      phrasing to canonical disease tokens for filtering. For umbrella terms (e.g.,
+      "lung cancer"), use minimal anchor filtering (e.g., toLower(rel.disease_name)
+      CONTAINS toLower('lung')).
+    - Exclusion patterns: When excluding a gene (e.g., "targeting G1 excluding G2"),
+      use OPTIONAL MATCH to check for the excluded gene: OPTIONAL MATCH (t)-[:TARGETS]->(gx:Gene)
+      WHERE toLower(gx.symbol) = toLower('G2'), then WITH t, gi, gx WHERE gx IS NULL.
+      The excluded entity is a gene, not a therapy name.
+    - Effect: ALWAYS compare case-insensitively: toLower(rel.effect) = 'resistance' or 'sensitivity'.
     - Arrays: when using any()/all() over arrays (e.g., synonyms, tags), wrap with
       coalesce(property, []) to avoid null issues.
 

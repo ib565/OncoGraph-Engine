@@ -6,7 +6,7 @@ cypher: |
   WHERE toLower(g.symbol) = toLower('{{ gene_symbol }}')
      OR any(s IN coalesce(g.synonyms, []) WHERE toLower(s) = toLower('{{ gene_symbol }}'))
   RETURN v.name AS variant_name, g.symbol AS gene_symbol
-  LIMIT 50
+  LIMIT 100
 placeholders:
   gene_symbol:
     from: civic.genes
