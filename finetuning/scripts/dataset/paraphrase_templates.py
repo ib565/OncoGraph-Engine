@@ -32,7 +32,7 @@ except Exception:  # pragma: no cover
     genai_types = None  # type: ignore
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 TEMPLATES_DIR = ROOT / "oncograph_finetuning" / "dataset_generation" / "templates"
 
 

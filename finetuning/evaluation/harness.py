@@ -7,15 +7,13 @@ from typing import Any
 
 from tqdm import tqdm
 
-from finetuning.eval.model_adapters import ModelAdapter
+from finetuning.evaluation.model_adapters import ModelAdapter
 from src.pipeline.executor import Neo4jExecutor
 from src.pipeline.types import PipelineError
 from src.pipeline.validator import RuleBasedValidator
 
 
-def evaluate_cypher_syntax(
-    cypher: str, validator: RuleBasedValidator
-) -> tuple[bool, str | None]:
+def evaluate_cypher_syntax(cypher: str, validator: RuleBasedValidator) -> tuple[bool, str | None]:
     """Check if Cypher passes syntactic validation.
 
     Args:
@@ -34,9 +32,7 @@ def evaluate_cypher_syntax(
         return False, f"Unexpected error: {type(e).__name__}: {e}"
 
 
-def evaluate_cypher_execution(
-    cypher: str, executor: Neo4jExecutor
-) -> tuple[bool, list[dict[str, Any]], str | None]:
+def evaluate_cypher_execution(cypher: str, executor: Neo4jExecutor) -> tuple[bool, list[dict[str, Any]], str | None]:
     """Execute Cypher and return results.
 
     Args:
@@ -101,12 +97,8 @@ def compare_results(gold_rows: list[dict], generated_rows: list[dict]) -> bool:
         filtered_gen_rows.append(filtered_row)
 
     # Normalize and sort rows for comparison
-    gold_normalized = sorted(
-        [tuple(sorted(normalize_result_row(row).items())) for row in gold_rows]
-    )
-    gen_normalized = sorted(
-        [tuple(sorted(normalize_result_row(row).items())) for row in filtered_gen_rows]
-    )
+    gold_normalized = sorted([tuple(sorted(normalize_result_row(row).items())) for row in gold_rows])
+    gen_normalized = sorted([tuple(sorted(normalize_result_row(row).items())) for row in filtered_gen_rows])
 
     return gold_normalized == gen_normalized
 
@@ -158,9 +150,7 @@ class Evaluator:
         output_tokens = self.model_adapter.count_tokens(generated_cypher)
 
         # Syntactic validation
-        syntactic_valid, syntax_error = evaluate_cypher_syntax(
-            generated_cypher, self.validator
-        )
+        syntactic_valid, syntax_error = evaluate_cypher_syntax(generated_cypher, self.validator)
 
         # Execution (only if syntactically valid)
         execution_success = False
@@ -219,14 +209,10 @@ class Evaluator:
             "total": total,
             "syntactic_validity_pct": (syntactic_valid_count / total) * 100,
             "execution_success_pct": (
-                (execution_success_count / syntactic_valid_count) * 100
-                if syntactic_valid_count > 0
-                else 0.0
+                (execution_success_count / syntactic_valid_count) * 100 if syntactic_valid_count > 0 else 0.0
             ),
             "semantic_accuracy_pct": (
-                (result_match_count / execution_success_count) * 100
-                if execution_success_count > 0
-                else 0.0
+                (result_match_count / execution_success_count) * 100 if execution_success_count > 0 else 0.0
             ),
             "avg_latency_ms": total_latency_ms / total,
             "avg_input_tokens": total_input_tokens / total,
@@ -336,4 +322,3 @@ def run_evaluation(
 
     print(f"\n{model_id} evaluation complete: {len(results)} records")
     return results
-

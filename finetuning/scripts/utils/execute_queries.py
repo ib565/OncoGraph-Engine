@@ -7,8 +7,8 @@ from typing import Any
 from dotenv import load_dotenv
 from neo4j import GraphDatabase
 
-ROOT = Path(__file__).resolve().parents[1]
-DATASET_DIR = ROOT / "dataset"
+ROOT = Path(__file__).resolve().parents[2]
+DATASET_DIR = ROOT / "data" / "raw"
 
 
 def load_sample_records(files: list[Path], per_file: int = 2) -> list[dict[str, Any]]:
@@ -85,7 +85,8 @@ def main() -> None:
     print(f"[execute] Loaded {len(records)} records from {len(files)} files (per_file={per_file})")
 
     results = run_queries(records)
-    out_path = DATASET_DIR / "executed_results.jsonl"
+    out_path = ROOT / "data" / "executed" / "executed_results.jsonl"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("w", encoding="utf-8") as f:
         for row in results:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")

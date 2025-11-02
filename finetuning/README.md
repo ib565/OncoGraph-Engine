@@ -41,20 +41,20 @@ Generate paraphrases for one or more templates (writes `<template>.paraphrases.y
 Windows:
 
 ```
-./venv/Scripts/python.exe finetuning/scripts/paraphrase_templates.py --all
+./venv/Scripts/python.exe finetuning/scripts/dataset/paraphrase_templates.py --all
 
 # Or specify explicit files
-./venv/Scripts/python.exe finetuning/scripts/paraphrase_templates.py \
+./venv/Scripts/python.exe finetuning/scripts/dataset/paraphrase_templates.py \
   f1_1_targets_gene.yaml f1_2_genes_for_therapy.yaml
 ```
 
 macOS/Linux:
 
 ```
-./venv/bin/python finetuning/scripts/paraphrase_templates.py --all
+./venv/bin/python finetuning/scripts/dataset/paraphrase_templates.py --all
 
 # Or specify explicit files
-./venv/bin/python finetuning/scripts/paraphrase_templates.py \
+./venv/bin/python finetuning/scripts/dataset/paraphrase_templates.py \
   f1_1_targets_gene.yaml f1_2_genes_for_therapy.yaml
 ```
 
@@ -72,13 +72,13 @@ The generator reads templates and automatically includes paraphrases if a siblin
 Windows:
 
 ```
-./venv/Scripts/python.exe finetuning/scripts/generate_dataset.py --all
+./venv/Scripts/python.exe finetuning/scripts/dataset/generate_dataset.py --all
 ```
 
 Single template:
 
 ```
-./venv/Scripts/python.exe finetuning/scripts/generate_dataset.py f1_2_genes_for_therapy.yaml
+./venv/Scripts/python.exe finetuning/scripts/dataset/generate_dataset.py f1_2_genes_for_therapy.yaml
 ```
 
 macOS/Linux:
@@ -90,7 +90,7 @@ macOS/Linux:
 Outputs are written to:
 
 ```
-finetuning/dataset/generated_pairs.<template_id>.jsonl
+finetuning/data/raw/generated_pairs.<template_id>.jsonl
 ```
 
 ### 4) Environment Variables (Optional)
@@ -111,7 +111,7 @@ The dataset generator supports optional environment variables to control behavio
 # Windows PowerShell
 $env:GEN_DS_MAX_DISEASE_SYNONYMS = "5"
 $env:GEN_DS_SEED = "123"
-./venv/Scripts/python.exe finetuning/scripts/generate_dataset.py --all
+./venv/Scripts/python.exe finetuning/scripts/dataset/generate_dataset.py --all
 ```
 
 ```bash

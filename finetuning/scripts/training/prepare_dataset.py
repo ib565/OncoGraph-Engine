@@ -104,13 +104,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--input_dir",
         type=Path,
-        default=ROOT / "finetuning" / "dataset",
+        default=ROOT / "finetuning" / "data" / "raw",
         help="Directory containing the full generated_pairs.*.jsonl files.",
     )
     parser.add_argument(
         "--output_dir",
         type=Path,
-        default=ROOT / "finetuning" / "dataset" / "splits",
+        default=ROOT / "finetuning" / "data" / "processed" / "splits",
         help="Directory where the train and test splits will be saved.",
     )
     parser.add_argument(

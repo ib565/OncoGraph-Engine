@@ -2,17 +2,17 @@ import json
 import os
 import random
 import sys
-from dotenv import load_dotenv
 from pathlib import Path
 
 import yaml
+from dotenv import load_dotenv
 from oncograph_finetuning.dataset_generation.loaders.civic_loader import CivicIndex
 
 load_dotenv()
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 TEMPLATES_DIR = ROOT / "oncograph_finetuning" / "dataset_generation" / "templates"
-DATASET_DIR = ROOT / "dataset"
+DATASET_DIR = ROOT / "data" / "raw"
 
 
 def render_template(text: str, placeholders: dict[str, str]) -> str:
