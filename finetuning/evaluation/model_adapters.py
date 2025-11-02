@@ -109,7 +109,7 @@ class GeminiModelAdapter:
                 pass
         return None
 
-    def _call_with_retry(self, func, max_attempts: int = 5, base_delay: float = 2.0):
+    def _call_with_retry(self, func, max_attempts: int = 7, base_delay: float = 2.0):
         """Call function with exponential backoff, respecting API RetryInfo if available."""
         import random
 
@@ -244,6 +244,14 @@ class QwenModelAdapter:
             load_in_4bit=True,
         )
         FastLanguageModel.for_inference(self.model)  # Enable inference optimizations
+        # Ensure the tokenizer uses the correct Qwen3 instruct chat template
+        try:
+            from unsloth.chat_templates import get_chat_template
+
+            self.tokenizer = get_chat_template(self.tokenizer, chat_template="qwen3-instruct")
+        except Exception:
+            # Fall back silently if chat template helper isn't available
+            pass
         print("Qwen model loaded successfully")
 
         # Qwen prompt template
@@ -273,14 +281,20 @@ class QwenModelAdapter:
 
     def _format_prompt(self, question: str) -> str:
         """Format question using Qwen chat template."""
-        return f"""<|im_start|>system
-                {self.system_prompt}
-                <|im_end|>
-                <|im_start|>user
-                {question}
-                <|im_end|>
-                <|im_start|>assistant
-            """
+        # Try to use tokenizer's apply_chat_template if available (recommended)
+        if hasattr(self.tokenizer, "apply_chat_template"):
+            messages = [{"role": "system", "content": self.system_prompt}, {"role": "user", "content": question}]
+            return self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        else:
+            # Fallback to manual formatting
+            return f"""<|im_start|>system
+{self.system_prompt}
+<|im_end|>
+<|im_start|>user
+{question}
+<|im_end|>
+<|im_start|>assistant
+"""
 
     def get_full_prompt(self, question: str) -> str:
         """Get the full prompt text that would be sent to the model."""
@@ -288,37 +302,32 @@ class QwenModelAdapter:
 
     def generate_cypher(self, question: str) -> str:
         """Generate Cypher query using Qwen model."""
-        import torch
-
         prompt_text = self._format_prompt(question)
 
-        inputs = self.tokenizer(prompt_text, return_tensors="pt").to("cuda" if torch.cuda.is_available() else "cpu")
+        # Generate: inline tokenization and move to model's device (matches Unsloth docs)
         outputs = self.model.generate(
-            **inputs,
+            **self.tokenizer(prompt_text, return_tensors="pt").to(next(self.model.parameters()).device),
             max_new_tokens=self.max_new_tokens,
             temperature=self.temperature,
-            do_sample=True,
-            pad_token_id=self.tokenizer.eos_token_id,
             top_p=self.top_p,
             top_k=self.top_k,
         )
-        generated_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-        # Extract Cypher from response (after assistant tag)
-        if "<|im_start|>assistant" in generated_text:
-            generated_cypher = generated_text.split("<|im_start|>assistant")[-1].strip()
-        else:
-            # If no tag, assume the model output is the Cypher
-            generated_cypher = generated_text.split("<|im_end|>")[0].strip()
+        print(f"Generated outputs: {outputs}")
+
+        # Decode only the newly generated tokens (skip input tokens)
+        input_length = self.tokenizer(prompt_text, return_tensors="pt")["input_ids"].shape[1]
+        generated_tokens = outputs[0][input_length:]
+        generated_text = self.tokenizer.decode(generated_tokens, skip_special_tokens=True)
 
         # Clean up markdown code fences if present
-        if "```" in generated_cypher:
-            lines = generated_cypher.split("\n")
+        if "```" in generated_text:
+            lines = generated_text.split("\n")
             # Remove code fence lines
             cleaned = [line for line in lines if not line.strip().startswith("```")]
-            generated_cypher = "\n".join(cleaned).strip()
+            generated_text = "\n".join(cleaned).strip()
 
-        return generated_cypher
+        return generated_text.strip()
 
     def count_tokens(self, text: str) -> int:
         """Count tokens using Qwen's tokenizer."""
