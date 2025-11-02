@@ -227,7 +227,7 @@ def run_evaluation(
     test_records: list[dict[str, Any]],
     checkpoint_file: Path,
     evaluator: Evaluator,
-    checkpoint_interval: int = 50,
+    checkpoint_interval: int = 5,
 ) -> list[dict[str, Any]]:
     """Run evaluation for a model adapter over test records with checkpointing.
 
