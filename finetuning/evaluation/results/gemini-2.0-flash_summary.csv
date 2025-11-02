@@ -1,0 +1,97 @@
+id,question,syntactic_valid,execution_success,result_match,gold_rows,gen_rows,error
+F3.2-000162-P1,Which drugs target both HDAC8 and HDAC9?,✓,✓,✗,3,3,
+F3.2-000005-P1,Which drugs target both ALK and EML4?,✓,✓,✗,4,4,
+F3.1-000046-P3,Show treatments that target FGFR2 or FGFR3.,✓,✓,✗,24,9,
+F4.2-000016-P2,Which drugs target biomarkers of resistance to Platinum Compound in Ovarian Serous Carcinoma?,✓,✓,✗,2,1,
+F4.2-000184-P3,Find therapies that target resistance genes for Imatinib in Melanoma.,✓,✓,✗,85,16,
+F4.2-000171-S1-P2,Which drugs target biomarkers of resistance to Dasatinib in Naevocarcinoma?,✓,✓,✗,35,0,
+F4.2-000042-P3,Find therapies that target resistance genes for Gemcitabine in Pancreatic Adenocarcinoma.,✓,✓,✗,3,2,
+F4.1-000033-S1-P3,Show treatments hitting ALK that have biomarker evidence in Non-small Cell Lung Carcinoma.,✓,✓,✓,90,90,
+F4.1-000047-P1,What drugs targeting ALK have biomarker evidence in Diffuse Large B-cell Lymphoma?,✓,✓,✓,1,1,
+F4.1-000072-S1-P3,Show treatments hitting ALK that have biomarker evidence in Stromal Tumour Of Gastrointestinal Tract.,✓,✓,✗,1,0,
+F4.1-000096,Which therapies target ALK and also have biomarker evidence in Glioblastoma?,✓,✓,✗,5,10,
+F2.2-000116-P3,How does SMARCB1 Deletion influence response to Tazemetostat for Epithelioid Sarcoma?,✓,✓,✓,1,1,
+F2.2-000185-S1,How does the variant RPS6 PHOSPHORYLATION affect response to Everolimus in Adenocarcinoma Of Stomach?,✓,✗,✗,1,0,"PipelineError: Neo4j execution failed: CypherSyntaxError: {neo4j_code: Neo.ClientError.Statement.SyntaxError} {message: Invalid input 'WHERE': expected an expression, 'ORDER BY', 'CALL', 'CREATE', 'LOAD CSV', 'DELETE', 'DETACH', 'FINISH', 'FOREACH', 'INSERT', 'LIMIT', 'MATCH', 'MERGE', 'NODETACH', 'OFFSET', 'OPTIONAL', 'REMOVE', 'RETURN', 'SET', 'SKIP', 'UNION', 'UNWIND', 'USE', 'WITH' or <EOF> (line 11, column 1 (offset: 423))
+""WHERE toLower(b.name) CONTAINS toLower('phosphorylation')""
+ ^} {gql_status: 42001} {gql_status_description: error: syntax error or access rule violation - invalid syntax}"
+F2.2-000010-S1-P1,What is the effect of RET G810S on Selpercatinib in Thyroid Gland Medullary Carcinoma?,✓,✓,✗,1,0,
+F2.2-000017-S1-P2,Does TP53 Mutation predict response to Eprenetapopt in Malignant Tumor?,✓,✓,✗,2,0,
+F1.3-000028,Which gene is BRAF Wildtype a variant of?,✓,✓,✓,1,1,
+F1.3-000120-P1,PIK3CA H1047R OR PIK3CA H1047Y OR PIK3CA H1047L OR PIK3CA H1047D OR PIK3CA H1047I OR PIK3CA H1047N OR PIK3CA H1047P OR PIK3CA H1047Q OR PIK3CA H1047T belongs to which gene?,✓,✓,✗,1,3,
+F2.2-000180-P3,What genes are resistance biomarkers for Erlotinib in Lung Cancer?,✓,✓,✗,16,1,
+F2.2-000101-P3,What genes are resistance biomarkers for Foretinib in Lung Non-small Cell Carcinoma?,✓,✓,✓,1,1,
+F2.2-000165,Which genes predict resistance to Docetaxel in Stomach Cancer?,✓,✓,✓,1,1,
+F2.2-000166-P2,List genes associated with resistance to Imatinib Mesylate in Acute Myeloid Leukemia.,✓,✓,✓,1,1,
+F2.4-000056-P2,Report the consequence for VHL c.340+770T>C.,✓,✓,✗,1,0,
+F2.4-000035,What is the consequence of the EGFR R705K variant?,✓,✓,✗,1,1,
+F6.2-000012-S1-P3,Show treatments for TOP1 excluding HDAC1 that have biomarker evidence in Ureteral Small Cell Carcinoma.,✓,✓,✗,1,0,
+F6.2-000094,"What therapies target TOP1 but NOT PSMA1, and have biomarker evidence in Ureter Small Cell Carcinoma?",✓,✓,✓,1,1,
+F6.2-000027-P1,Which drugs hit TOP1 but not SRD5A3 with evidence in Ureter Small Cell Carcinoma?,✓,✓,✓,1,1,
+F6.2-000167-P3,Show treatments for TOP1 excluding POLD3 that have biomarker evidence in Ureter Small Cell Carcinoma.,✓,✓,✓,1,1,
+F5.2-000017-P3,List treatments supported by variant evidence in Malignant Pleural Mesothelioma.,✓,✓,✓,8,8,
+F5.2-000096-P2,Show drugs with variant-based evidence in T-cell Acute Lymphoblastic Leukemia.,✓,✓,✓,24,24,
+F5.2-000015-S1-P1,Which therapies have variant biomarkers in Squamous Cell Carcinomas Of Head And Neck?,✓,✓,✗,60,0,
+F5.2-000082,List therapies with variant-level biomarkers in Diffuse Large B-cell Lymphoma.,✓,✓,✓,16,16,
+F2.2-000074-P3,How does PXDNL P1460T influence response to Pembrolizumab for Lung Adenocarcinoma?,✓,✓,✓,1,1,
+F2.2-000200-P3,How does KRAS Mutation influence response to Refametinib for Colorectal Cancer?,✓,✓,✓,1,1,
+F2.2-000159,How does the variant PIK3CA Mutation affect response to Ribociclib in Breast Cancer?,✓,✓,✓,1,1,
+F2.2-000159-P2,Does PIK3CA Mutation predict response to Ribociclib in Breast Cancer?,✓,✓,✓,1,1,
+F6.3-000117-S1-P3,Show therapies for TOP2A where variants cause resistance in Acute Myelogenous Leukemia.,✓,✗,✗,0,0,"PipelineError: Neo4j execution failed: CypherSyntaxError: {neo4j_code: Neo.ClientError.Statement.SyntaxError} {message: Variable `g` not defined (line 13, column 3 (offset: 491))
+""  g.symbol AS gene_symbol,""
+   ^} {gql_status: 42001} {gql_status_description: error: syntax error or access rule violation - invalid syntax}"
+F6.3-000102-P3,Show therapies for ABL1 where variants cause resistance in Chronic Myeloid Leukemia.,✓,✓,✓,13,13,
+F6.3-000178-P3,Show therapies for KIT where variants cause resistance in Acute Myeloid Leukemia.,✓,✓,✓,1,1,
+F6.3-000155-P1,Which therapies targeting POLD3 have variant-level resistance in Pancreatic Adenocarcinoma?,✓,✓,✗,0,2,
+F1.1-000036-P1,Which therapies target TUBA3C?,✓,✓,✓,9,9,
+F1.1-000156-P3,What medications are known to target DDR2?,✓,✓,✓,3,3,
+F2.1-000090-P2,Describe how Ripretinib acts on KIT.,✓,✗,✗,1,0,"PipelineError: Neo4j execution failed: CypherSyntaxError: {neo4j_code: Neo.ClientError.Statement.SyntaxError} {message: Invalid input 'WHERE': expected an expression, 'ORDER BY', 'CALL', 'CREATE', 'LOAD CSV', 'DELETE', 'DETACH', 'FINISH', 'FOREACH', 'INSERT', 'LIMIT', 'MATCH', 'MERGE', 'NODETACH', 'OFFSET', 'OPTIONAL', 'REMOVE', 'RETURN', 'SET', 'SKIP', 'UNION', 'UNWIND', 'USE', 'WITH' or <EOF> (line 5, column 1 (offset: 221))
+""WHERE toLower(g.symbol) = toLower('KIT')""
+ ^} {gql_status: 42001} {gql_status_description: error: syntax error or access rule violation - invalid syntax}"
+F2.1-000095-P1,What is the MOA of Afimoxifene on ESRRG?,✓,✗,✗,1,0,"PipelineError: Neo4j execution failed: CypherSyntaxError: {neo4j_code: Neo.ClientError.Statement.SyntaxError} {message: Invalid input 'WHERE': expected an expression, 'ORDER BY', 'CALL', 'CREATE', 'LOAD CSV', 'DELETE', 'DETACH', 'FINISH', 'FOREACH', 'INSERT', 'LIMIT', 'MATCH', 'MERGE', 'NODETACH', 'OFFSET', 'OPTIONAL', 'REMOVE', 'RETURN', 'SET', 'SKIP', 'UNION', 'UNWIND', 'USE', 'WITH' or <EOF> (line 5, column 1 (offset: 224))
+""WHERE toLower(g.symbol) = toLower('ESRRG')""
+ ^} {gql_status: 42001} {gql_status_description: error: syntax error or access rule violation - invalid syntax}"
+F5.1-000158-P1,Which biomarkers show evidence in Glioblastoma?,✓,✓,✓,76,76,
+F5.1-000175,"In Malignant Anus Melanoma, which biomarkers have evidence?",✓,✓,✓,1,1,
+F5.1-000018-P3,What biomarkers have therapy response evidence in B-cell Non-Hodgkin Lymphoma?,✓,✓,✓,2,2,
+F6.1-000125-S1-P1,"In Naevocarcinoma, which genes confer resistance to Vemurafenib or Dabrafenib?",✓,✓,✗,46,0,
+F6.1-000024-P1,"In Lung Non-small Cell Carcinoma, which genes confer resistance to Ceritinib or ALK Inhibitor TAE684?",✓,✓,✓,5,5,
+F6.1-000014-S1-P2,List resistance genes for Platinum Doublet or Dacomitinib in Non-small Cell Lung Cancer.,✓,✓,✗,2,0,
+F6.1-000049-S1-P1,"In Non-small Cell Lung Carcinoma, which genes confer resistance to Crizotinib or Cabozantinib?",✓,✓,✓,9,9,
+F6.4-000195-S1,"For resistance to Dasatinib in Myeloid And Lymphoid Neoplasms With Eosinophilia And Abnormalities Of Platelet-derived Growth Factor Receptor Alpha (PDGFRA), Platelet-derived Growth Factor Receptor Beta (PDGFRB), And Fibroblast Growth Factor Receptor-1 (FGFR1) Are A Group Of Hematologic Neoplasms, which therapies target the resistance biomarkers?",✓,✓,✓,0,0,
+F6.4-000002-P2,Which treatments target resistance biomarkers for Pemetrexed in Lung Non-small Cell Carcinoma?,✓,✓,✗,4,1,
+F6.4-000173-S1,"For resistance to MUC1-targeted Peptide GO-203-2C in Non-small Cell Lung Carcinoma, which therapies target the resistance biomarkers?",✓,✓,✗,3,100,
+F6.4-000094,"For resistance to Cetuximab in Ovarian Cancer, which therapies target the resistance biomarkers?",✓,✓,✗,3,0,
+F2.3-000195,Provide PMIDs supporting that ERBB2 Amplification confers sensitivity to Margetuximab.,✓,✓,✓,1,1,
+F2.3-000182-P2,What PubMed IDs support sensitivity of Epidermal Growth Factor Receptor Tyrosine Kinase Inhibitor due to KRAS G12C?,✓,✓,✓,1,1,
+F2.2-000147-P2,List genes associated with sensitivity to Mocetinostat in Breast Cancer.,✓,✓,✓,1,1,
+F2.2-000187-S2-P3,What genes are sensitivity biomarkers for Ponatinib in Acute Myeloblastic Leukaemia?,✓,✓,✗,4,0,
+F2.2-000019-S1-P3,What genes are sensitivity biomarkers for Pictilisib in Malignant Neoplasm Of Breast?,✓,✓,✗,6,0,
+F2.2-000054,Which genes predict sensitivity to RG7112 in Glioblastoma?,✓,✓,✓,1,1,
+F2.2-000095,Which genes affect response to Onartuzumab in Gastric Adenocarcinoma?,✓,✓,✗,1,1,
+F2.2-000134,Which genes affect response to Chemotherapy in Acute Myeloid Leukemia?,✓,✗,✗,1,0,"PipelineError: Neo4j execution failed: CypherSyntaxError: {neo4j_code: Neo.ClientError.Statement.SyntaxError} {message: Variable `rel` not defined (line 19, column 3 (offset: 665))
+""  rel.effect AS effect,""
+   ^} {gql_status: 42001} {gql_status_description: error: syntax error or access rule violation - invalid syntax}"
+F2.2-000064-P2,Which genes influence response to MTOR Kinase Inhibitor AZD8055 for Breast Cancer?,✓,✓,✗,1,1,
+F2.2-000038-S1-P2,Which genes influence response to Vemurafenib for Childhood Ganglioglioma?,✓,✓,✗,1,0,
+F3.3-000140,Which drugs target TOP1 but not TUBA4A?,✓,✗,✗,5,0,"PipelineError: Neo4j execution failed: CypherSyntaxError: {neo4j_code: Neo.ClientError.Statement.SyntaxError} {message: Variable `r` not defined (line 12, column 3 (offset: 421))
+""  r.moa AS targets_moa,""
+   ^} {gql_status: 42001} {gql_status_description: error: syntax error or access rule violation - invalid syntax}"
+F3.3-000188-P2,List treatments targeting TOP1 and not EPHA3.,✓,✓,✓,5,5,
+F1.4-000118-P4,Enumerate the variants linked to PDCD1.,✓,✓,✓,0,0,
+F1.4-000135,List all known variants of the PARP2 gene.,✓,✓,✓,0,0,
+F2.3-000121-P3,Give PMIDs for PRPS1 D183E-mediated resistance to Thioguanine.,✓,✗,✗,1,0,"PipelineError: Neo4j execution failed: CypherSyntaxError: {neo4j_code: Neo.ClientError.Statement.SyntaxError} {message: Invalid input 'WHERE': expected an expression, 'ORDER BY', 'CALL', 'CREATE', 'LOAD CSV', 'DELETE', 'DETACH', 'FINISH', 'FOREACH', 'INSERT', 'LIMIT', 'MATCH', 'MERGE', 'NODETACH', 'OFFSET', 'OPTIONAL', 'REMOVE', 'RETURN', 'SET', 'SKIP', 'UNION', 'UNWIND', 'USE', 'WITH' or <EOF> (line 11, column 1 (offset: 465))
+""WHERE toLower(b.name) CONTAINS toLower('D183E')""
+ ^} {gql_status: 42001} {gql_status_description: error: syntax error or access rule violation - invalid syntax}"
+F2.3-000165-P2,What PMIDs support resistance of Axitinib due to BCR BCR::ABL1 Fusion AND ABL1 F311I?,✓,✓,✗,1,0,
+F1.2-000166-P2,List genes that Fedratinib targets.,✓,✓,✓,2,2,
+F1.2-000035,Which genes does Decitabine target?,✓,✓,✓,2,2,
+F2.2-000112-S1,Which genes predict sensitivity to Fexagratinib in Squamous Cell Carcinoma Of The Cervix Uteri?,✓,✓,✗,1,0,
+F6.2-000056-P1,Which drugs hit TOP1 but not KDR with evidence in Ureter Small Cell Carcinoma?,✓,✓,✓,1,1,
+F2.2-000095-P3,How does FLT3 S574Δ influence response to Midostaurin for Acute Myeloid Leukemia?,✓,✓,✗,1,14,
+F2.2-000080-P2,Which genes influence response to Imatinib Mesylate for Dermatofibrosarcoma Protuberans?,✓,✗,✗,2,0,"PipelineError: Neo4j execution failed: CypherSyntaxError: {neo4j_code: Neo.ClientError.Statement.SyntaxError} {message: Variable `rel` not defined (line 23, column 3 (offset: 819))
+""  rel.effect AS effect,""
+   ^} {gql_status: 42001} {gql_status_description: error: syntax error or access rule violation - invalid syntax}"
+F6.4-000148-P3,Find alternative therapies targeting resistance genes for Capivasertib in Prostate Cancer.,✓,✓,✓,0,0,
+F1.2-000189,Which genes does Tarloxotinib target?,✓,✓,✓,4,4,
+F6.2-000127,"What therapies target TOP1 but NOT PSMD6, and have biomarker evidence in Ureter Small Cell Carcinoma?",✓,✓,✓,1,1,
+F2.2-000090-S2-P2,Does PTEN Loss predict response to Everolimus in Mammary Tumor?,✓,✓,✗,2,0,
