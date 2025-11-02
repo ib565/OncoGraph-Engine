@@ -2,10 +2,13 @@ import json
 import os
 import random
 import sys
+from dotenv import load_dotenv
 from pathlib import Path
 
 import yaml
 from oncograph_finetuning.dataset_generation.loaders.civic_loader import CivicIndex
+
+load_dotenv()
 
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES_DIR = ROOT / "oncograph_finetuning" / "dataset_generation" / "templates"
@@ -294,12 +297,13 @@ def main() -> None:
 
     # Environment variable configuration
     max_disease_synonyms_env = os.environ.get("GEN_DS_MAX_DISEASE_SYNONYMS")
+    print(f"[generate_dataset] max_disease_synonyms_env: {max_disease_synonyms_env}")
     try:
         max_disease_synonyms = int(max_disease_synonyms_env) if max_disease_synonyms_env else 3
     except ValueError:
         max_disease_synonyms = 3
         print(f"[generate_dataset] Invalid GEN_DS_MAX_DISEASE_SYNONYMS, using default: {max_disease_synonyms}")
-
+    print(f"[generate_dataset] max_disease_synonyms: {max_disease_synonyms}")
     seed_env = os.environ.get("GEN_DS_SEED")
     if seed_env and seed_env.lower() != "none":
         try:
