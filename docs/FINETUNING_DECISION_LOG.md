@@ -93,3 +93,49 @@ This matches both "Lung Non-small Cell Carcinoma" and "Non-small Cell Lung Carci
 - Synonym variant 2: "What genes are associated with NSCLC?"
 
 All three use the same Cypher query filtering on the canonical disease name, teaching the model that these phrasings are equivalent.
+
+## 5. Evaluation Architecture: Model-Agnostic Design with Protocol-Based Adapters
+
+**Problem:** The initial evaluation notebook (`02_evaluate_baselines.ipynb`) had hardcoded logic for Gemini and Qwen models, making it difficult to:
+- Evaluate multiple models in a single run
+- Add new models without duplicating code
+- Reuse evaluation logic for fine-tuned models
+- Maintain consistent checkpointing and results analysis across models
+
+**Decision:** Implement a **model-agnostic evaluation architecture** using Python's `Protocol`-based design pattern.
+
+**Architecture Components:**
+
+1. **`ModelAdapter` Protocol** (`finetuning/eval/model_adapters.py`):
+   - Defines a structural interface (`Protocol` with `@runtime_checkable`) that any model adapter must implement
+   - Required methods: `generate_cypher()`, `count_tokens()`, `get_model_id()`, `get_full_prompt()`
+   - Benefits: Type-safe, enables duck typing, no inheritance hierarchy needed
+
+2. **Concrete Adapter Implementations**:
+   - `GeminiModelAdapter`: Wraps Gemini 2-step pipeline (instruction expansion + Cypher generation), handles rate limiting (15 RPM), supports multiple Gemini models (`gemini-2.0-flash`, `gemini-2.5-flash-lite`)
+   - `QwenModelAdapter`: Wraps Unsloth FastLanguageModel, handles Qwen chat template formatting, supports base and fine-tuned models
+
+3. **Unified Evaluation Harness** (`finetuning/eval/harness.py`):
+   - `Evaluator` class: Takes any `ModelAdapter`, performs syntactic validation, execution, and result comparison
+   - `run_evaluation()` function: Orchestrates evaluation loop with checkpointing, progress tracking, and error handling
+   - Model-specific checkpoint files: `{model_id}_checkpoint.jsonl` enables independent resumption per model
+
+4. **Notebook as Orchestration Layer** (`02_evaluate_baselines.ipynb`):
+   - Configuration cell: `MODELS_TO_RUN = ["gemini-2.0-flash", "gemini-2.5-flash-lite", "qwen3-4b-base"]`
+   - Factory function: `create_model_adapter()` automatically instantiates the correct adapter based on model ID
+   - Single evaluation loop: Iterates through models, calls `run_evaluation()` for each
+   - Unified results analysis: Loads checkpoints from all evaluated models, generates comparison tables
+
+**Rationale:**
+- **Separation of Concerns:** Model-specific logic (inference, token counting, prompt formatting) encapsulated in adapters; evaluation logic (validation, execution, comparison) centralized in harness
+- **Extensibility:** Adding a new model requires only creating a new adapter class implementing the `ModelAdapter` protocol
+- **Reusability:** Same harness works for baseline and fine-tuned models; `04_evaluate_finetuned.ipynb` can reuse the same code
+- **Checkpointing:** Model-specific checkpoint files allow independent resumption and flexible post-analysis
+- **Type Safety:** Protocol ensures adapters implement required interface, catching errors at development time
+
+**Benefits Realized:**
+- Single notebook can evaluate 1-N models with identical code
+- Easy to add new models (e.g., Claude, GPT-4) by creating new adapter
+- Consistent metrics and checkpointing across all models
+- Notebook can be interrupted and resumed seamlessly
+- Fine-tuned model evaluation reuses the same harness (no code duplication)
