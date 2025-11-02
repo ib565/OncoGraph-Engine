@@ -209,10 +209,12 @@ class QwenModelAdapter:
 
     def __init__(
         self,
-        model_name: str = "Qwen/Qwen1.5-4B-Instruct",
-        model_id: str = "qwen3-4b-base",
+        model_name: str = "unsloth/Qwen3-4B-Instruct-2507",
+        model_id: str = "qwen3-4b-it-2507-base",
         max_seq_length: int = 2048,
-        temperature: float = 0.1,
+        temperature: float = 0.7,
+        top_p: float = 0.8,
+        top_k: int = 20,
         max_new_tokens: int = 512,
     ):
         """Initialize the Qwen model adapter.
@@ -222,21 +224,23 @@ class QwenModelAdapter:
             model_id: Unique identifier for this model (used in checkpoints).
             max_seq_length: Maximum sequence length.
             temperature: Sampling temperature.
+            top_p: Top-p sampling.
+            top_k: Top-k sampling.
             max_new_tokens: Maximum new tokens to generate.
         """
-        import torch
         from unsloth import FastLanguageModel
 
         self.model_name = model_name
         self.model_id = model_id
         self.temperature = temperature
+        self.top_p = top_p
+        self.top_k = top_k
         self.max_new_tokens = max_new_tokens
 
         print(f"Loading Qwen model: {model_name}...")
         self.model, self.tokenizer = FastLanguageModel.from_pretrained(
             model_name=model_name,
             max_seq_length=max_seq_length,
-            dtype=torch.bfloat16,
             load_in_4bit=True,
         )
         FastLanguageModel.for_inference(self.model)  # Enable inference optimizations
@@ -244,22 +248,24 @@ class QwenModelAdapter:
 
         # Qwen prompt template
         self.minimal_schema = """Graph schema:
-- Nodes: Gene(symbol), Variant(name), Therapy(name), Disease(name), Biomarker
-- Relationships: (Variant)-[:VARIANT_OF]->(Gene), (Therapy)-[:TARGETS]->(Gene),
-  (Biomarker)-[:AFFECTS_RESPONSE_TO]->(Therapy)
-- Properties: effect, disease_name, pmids, moa, ref_sources, ref_ids, ref_urls
-- Return: Always include LIMIT, no parameters ($variables), use coalesce for arrays"""
+            - Nodes: Gene(symbol), Variant(name), Therapy(name), Disease(name), Biomarker
+            - Relationships: (Variant)-[:VARIANT_OF]->(Gene), (Therapy)-[:TARGETS]->(Gene),
+            (Biomarker)-[:AFFECTS_RESPONSE_TO]->(Therapy)
+            - Properties: effect, disease_name, pmids, moa, ref_sources, ref_ids, ref_urls
+            - Return: Always include LIMIT, no parameters ($variables), use coalesce for arrays
+            """
 
         self.system_prompt = f"""You are an expert Cypher query translator for oncology data.
 
-{self.minimal_schema}
+            {self.minimal_schema}
 
-Rules:
-- Return only Cypher query (no markdown, no explanation)
-- Include RETURN clause and LIMIT
-- Use toLower() for case-insensitive matching
-- Wrap arrays with coalesce(..., []) before any()/all()
-- For disease filters, use token-based CONTAINS matching"""
+            Rules:
+            - Return only Cypher query (no markdown, no explanation)
+            - Include RETURN clause and LIMIT
+            - Use toLower() for case-insensitive matching
+            - Wrap arrays with coalesce(..., []) before any()/all()
+            - For disease filters, use token-based CONTAINS matching
+        """
 
     def get_model_id(self) -> str:
         """Return the model identifier."""
@@ -268,13 +274,13 @@ Rules:
     def _format_prompt(self, question: str) -> str:
         """Format question using Qwen chat template."""
         return f"""<|im_start|>system
-{self.system_prompt}
-<|im_end|>
-<|im_start|>user
-{question}
-<|im_end|>
-<|im_start|>assistant
-"""
+                {self.system_prompt}
+                <|im_end|>
+                <|im_start|>user
+                {question}
+                <|im_end|>
+                <|im_start|>assistant
+            """
 
     def get_full_prompt(self, question: str) -> str:
         """Get the full prompt text that would be sent to the model."""
@@ -293,6 +299,8 @@ Rules:
             temperature=self.temperature,
             do_sample=True,
             pad_token_id=self.tokenizer.eos_token_id,
+            top_p=self.top_p,
+            top_k=self.top_k,
         )
         generated_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
 
