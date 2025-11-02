@@ -1,0 +1,17 @@
+id,question,syntactic_valid,execution_success,result_match,gold_rows,gen_rows,error
+F3.2-000162-P1,Which drugs target both HDAC8 and HDAC9?,✓,✓,✗,3,3,
+F3.2-000005-P1,Which drugs target both ALK and EML4?,✓,✗,✗,4,0,"PipelineError: Neo4j execution failed: CypherSyntaxError: {neo4j_code: Neo.ClientError.Statement.SyntaxError} {message: Variable `r` not defined (line 8, column 3 (offset: 367))
+""  r.moa AS targets_moa,""
+   ^} {gql_status: 42001} {gql_status_description: error: syntax error or access rule violation - invalid syntax}"
+F3.1-000046-P3,Show treatments that target FGFR2 or FGFR3.,✓,✓,✓,24,24,
+F4.2-000016-P2,Which drugs target biomarkers of resistance to Platinum Compound in Ovarian Serous Carcinoma?,✓,✓,✗,2,0,
+F4.2-000184-P3,Find therapies that target resistance genes for Imatinib in Melanoma.,✓,✓,✗,85,4,
+F4.2-000171-S1-P2,Which drugs target biomarkers of resistance to Dasatinib in Naevocarcinoma?,✓,✓,✗,35,0,
+F4.2-000042-P3,Find therapies that target resistance genes for Gemcitabine in Pancreatic Adenocarcinoma.,✓,✓,✗,3,2,
+F4.1-000033-S1-P3,Show treatments hitting ALK that have biomarker evidence in Non-small Cell Lung Carcinoma.,✓,✓,✗,90,100,
+F4.1-000047-P1,What drugs targeting ALK have biomarker evidence in Diffuse Large B-cell Lymphoma?,✓,✗,✗,1,0,"PipelineError: Neo4j execution failed: CypherSyntaxError: {neo4j_code: Neo.ClientError.Statement.SyntaxError} {message: Invalid input 'GROUP': expected ',', 'ORDER BY', 'CALL', 'CREATE', 'LOAD CSV', 'DELETE', 'DETACH', 'FINISH', 'FOREACH', 'INSERT', 'LIMIT', 'MATCH', 'MERGE', 'NODETACH', 'OFFSET', 'OPTIONAL', 'REMOVE', 'RETURN', 'SET', 'SKIP', 'UNION', 'UNWIND', 'USE', 'WHERE', 'WITH' or <EOF> (line 22, column 1 (offset: 956))
+""GROUP BY variant_name, gene_symbol, therapy_name, effect, disease_name""
+ ^} {gql_status: 42001} {gql_status_description: error: syntax error or access rule violation - invalid syntax}"
+F4.1-000072-S1-P3,Show treatments hitting ALK that have biomarker evidence in Stromal Tumour Of Gastrointestinal Tract.,✓,✗,✗,1,0,"PipelineError: Neo4j execution failed: CypherSyntaxError: {neo4j_code: Neo.ClientError.Statement.SyntaxError} {message: Invalid input '{': expected an identifier or '}' (line 4, column 30 (offset: 138))
+""  OR (t)-[:TARGETS]->(:Gene {{symbol: 'ALK'}})""
+                              ^} {gql_status: 42001} {gql_status_description: error: syntax error or access rule violation - invalid syntax}"
