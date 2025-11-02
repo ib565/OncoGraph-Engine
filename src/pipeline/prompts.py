@@ -183,6 +183,12 @@ INSTRUCTION_PROMPT_TEMPLATE = dedent(
     - When the question uses an umbrella disease term (e.g., "lung cancer"), include a
       bullet instructing minimal anchor filtering: require only 'lung' (case-insensitive)
       to appear in rel.disease_name. Do not require 'cancer'/'carcinoma' to maximize recall.
+    - Disease name awareness: Users may phrase diseases using alternative names, synonyms,
+      or variant spellings (e.g., "Chronic Myelogenous Leukaemia" vs "Chronic Myeloid Leukemia",
+      "NSCLC" vs "Non-small Cell Lung Carcinoma"). When a disease is mentioned, map the user's
+      phrasing to the canonical disease name used in the database. For disease filtering, use
+      token-based matching (CONTAINS) on rel.disease_name with the canonical tokens, applying
+      the minimal anchor rule for umbrella terms.
     - When a therapy is explicitly named, include a bullet to match Therapy by
       case-insensitive name equality and allow synonyms/CONTAINS as fallbacks.
     - When the question asks which therapies target a gene or requests mechanisms of
@@ -244,9 +250,12 @@ CYPHER_PROMPT_TEMPLATE = dedent(
       to the gene when variant-specific.
     - Therapy: equality on t.name; OR synonyms equality; OR toLower(t.name)
       CONTAINS; wrap arrays with coalesce(..., []).
-    - Disease (umbrella terms): minimal anchor filtering as described above
-      (e.g., toLower(rel.disease_name) CONTAINS toLower('lung')); otherwise use
-      case-insensitive equality for specific diseases.
+    - Disease filtering: Users may phrase diseases using alternative names, synonyms, or
+      variant spellings. Map the user's phrasing to canonical disease tokens for filtering.
+      For umbrella terms (e.g., "lung cancer"), use minimal anchor filtering (e.g.,
+      toLower(rel.disease_name) CONTAINS toLower('lung')). For specific diseases, use
+      token-based matching with all canonical tokens (e.g., for "Non-small Cell Lung Carcinoma",
+      match all tokens: 'lung', 'non-small', 'cell', 'carcinoma').
     - Effect: compare case-insensitively (e.g., toLower(rel.effect) = 'resistance').
     - Arrays: when using any()/all() over arrays (e.g., synonyms, tags), wrap with
       coalesce(property, []) to avoid null issues.

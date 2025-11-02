@@ -1,0 +1,11 @@
+scikit-learn
+unsloth
+transformers[torch]
+peft
+trl
+bitsandbytes
+tiktoken
+pandas
+tqdm
+python-dotenv
+jupyter

@@ -1,0 +1,17 @@
+id,question,syntactic_valid,execution_success,result_match,gold_rows,gen_rows,error
+F5.2-000167-S1-P2,Show drugs with variant-based evidence in Chronic Myelogenous Leukaemia.,✓,✓,✗,100,0,
+F5.2-000070-S1-P2,Show drugs with variant-based evidence in Infantile Fibrosarcoma.,✓,✗,✗,6,0,"PipelineError: Neo4j execution failed: CypherSyntaxError: {neo4j_code: Neo.ClientError.Statement.SyntaxError} {message: Variable `g` not defined (line 5, column 39 (offset: 262))
+""  CASE WHEN b:Gene THEN b.symbol ELSE g.symbol END AS gene_symbol,""
+                                       ^} {gql_status: 42001} {gql_status_description: error: syntax error or access rule violation - invalid syntax}"
+F5.2-000034-S1-P3,List treatments supported by variant evidence in WHO Grade II Astrocytoma.,✓,✗,✗,2,0,"PipelineError: Neo4j execution failed: CypherSyntaxError: {neo4j_code: Neo.ClientError.Statement.SyntaxError} {message: Invalid input 'GROUP': expected ',', 'ORDER BY', 'CALL', 'CREATE', 'LOAD CSV', 'DELETE', 'DETACH', 'FINISH', 'FOREACH', 'INSERT', 'LIMIT', 'MATCH', 'MERGE', 'NODETACH', 'OFFSET', 'OPTIONAL', 'REMOVE', 'RETURN', 'SET', 'SKIP', 'UNION', 'UNWIND', 'USE', 'WHERE', 'WITH' or <EOF> (line 28, column 1 (offset: 910))
+""GROUP BY variant_name, gene_symbol, therapy_name, effect, disease_name""
+ ^} {gql_status: 42001} {gql_status_description: error: syntax error or access rule violation - invalid syntax}"
+F5.2-000092-P3,List treatments supported by variant evidence in B-lymphoblastic Leukemia/lymphoma With TCF3-PBX1.,✓,✓,✗,2,0,
+F5.2-000096-S1-P1,Which therapies have variant biomarkers in Carcinoma Of Urinary Bladder?,✓,✓,✗,49,2,
+F5.2-000032-S1-P2,Show drugs with variant-based evidence in Ureteral Small Cell Carcinoma.,✓,✗,✗,2,0,"PipelineError: Neo4j execution failed: CypherSyntaxError: {neo4j_code: Neo.ClientError.Statement.SyntaxError} {message: Invalid input 'GROUP': expected ',', 'ORDER BY', 'CALL', 'CREATE', 'LOAD CSV', 'DELETE', 'DETACH', 'FINISH', 'FOREACH', 'INSERT', 'LIMIT', 'MATCH', 'MERGE', 'NODETACH', 'OFFSET', 'OPTIONAL', 'REMOVE', 'RETURN', 'SET', 'SKIP', 'UNION', 'UNWIND', 'USE', 'WHERE', 'WITH' or <EOF> (line 34, column 1 (offset: 868))
+""GROUP BY""
+ ^} {gql_status: 42001} {gql_status_description: error: syntax error or access rule violation - invalid syntax}"
+F5.2-000170-S1-P1,Which therapies have variant biomarkers in Vulvar Epidermoid Carcinoma?,✓,✓,✗,1,0,
+F5.2-000093-P3,List treatments supported by variant evidence in Myofibroma.,✓,✓,✗,1,0,
+F5.2-000048-S1,List therapies with variant-level biomarkers in Minimally Invasive Lung Adenocarcinoma.,✓,✓,✗,1,39,
+F5.2-000012-S1-P3,List treatments supported by variant evidence in B-ALL With IAMP21.,✓,✓,✗,2,0,
