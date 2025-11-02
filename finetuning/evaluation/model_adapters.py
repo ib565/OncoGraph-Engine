@@ -313,8 +313,6 @@ class QwenModelAdapter:
             top_k=self.top_k,
         )
 
-        print(f"Generated outputs: {outputs}")
-
         # Decode only the newly generated tokens (skip input tokens)
         input_length = self.tokenizer(prompt_text, return_tensors="pt")["input_ids"].shape[1]
         generated_tokens = outputs[0][input_length:]
