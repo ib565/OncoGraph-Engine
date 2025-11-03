@@ -199,6 +199,18 @@ OncoGraph has been validated against established findings:
 
 ---
 
+
+## Fine-Tuning (Text-to-Cypher)
+
+OncoGraph includes a fine-tuned model that translates natural language oncology questions directly into Cypher.
+
+- Overview (problem, approach, results): [docs/FINETUNING_OVERVIEW.md](docs/FINETUNING_OVERVIEW.md)
+- Technical details (dataset, training, evaluation): [docs/FINETUNING_DETAILS.md](docs/FINETUNING_DETAILS.md)
+
+Hugging Face artifacts: merged 16-bit model and LoRA adapters are linked in the overview.
+
+---
+
 ## Example Queries & Gene Lists
 
 ### Graph Q&A Examples
