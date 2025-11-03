@@ -1,18 +1,19 @@
 {
-  "timestamp": "2025-11-03T00:30:26.706513",
+  "timestamp": "2025-11-03T19:30:34.699402",
   "test_set_size": 80,
   "models": {
     "gemini-2.0-flash": {
       "metrics": {
         "total": 80,
-        "syntactic_validity_pct": 100.0,
-        "execution_success_pct": 90.0,
-        "semantic_accuracy_pct": 55.55555555555556,
-        "avg_latency_ms": 928.8759162503993,
-        "avg_input_tokens": 7165.4125,
-        "avg_output_tokens": 238.05,
-        "total_input_tokens": 573233,
-        "total_output_tokens": 19044
+        "syntactic_validity_pct": 97.5,
+        "execution_success_pct": 89.74358974358975,
+        "semantic_accuracy_pct": 54.285714285714285,
+        "avg_latency_ms": 14558.572984993953,
+        "avg_tokens_per_second": 24998.56171420989,
+        "avg_input_tokens": 7075.8,
+        "avg_output_tokens": 233.15,
+        "total_input_tokens": 566064,
+        "total_output_tokens": 18652
       },
       "result_count": 80
     }

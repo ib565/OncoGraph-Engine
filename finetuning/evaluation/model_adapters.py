@@ -215,7 +215,7 @@ class QwenModelAdapter:
         temperature: float = 0.7,
         top_p: float = 0.8,
         top_k: int = 20,
-        max_new_tokens: int = 512,
+        max_new_tokens: int = 1024,
     ):
         """Initialize the Qwen model adapter.
 
@@ -244,6 +244,8 @@ class QwenModelAdapter:
             load_in_4bit=True,
         )
         FastLanguageModel.for_inference(self.model)  # Enable inference optimizations
+        # Cache device once to avoid querying per-call
+        self.device = next(self.model.parameters()).device
         # Ensure the tokenizer uses the correct Qwen3 instruct chat template
         try:
             from unsloth.chat_templates import get_chat_template
@@ -304,9 +306,12 @@ class QwenModelAdapter:
         """Generate Cypher query using Qwen model."""
         prompt_text = self._format_prompt(question)
 
-        # Generate: inline tokenization and move to model's device (matches Unsloth docs)
+        # Tokenize once and move to model's device (matches Unsloth docs)
+        tokenized_inputs = self.tokenizer(prompt_text, return_tensors="pt").to(self.device)
+
+        # Generate using the pre-tokenized inputs
         outputs = self.model.generate(
-            **self.tokenizer(prompt_text, return_tensors="pt").to(next(self.model.parameters()).device),
+            **tokenized_inputs,
             max_new_tokens=self.max_new_tokens,
             temperature=self.temperature,
             top_p=self.top_p,
@@ -314,8 +319,13 @@ class QwenModelAdapter:
         )
 
         # Decode only the newly generated tokens (skip input tokens)
-        input_length = self.tokenizer(prompt_text, return_tensors="pt")["input_ids"].shape[1]
+        input_length = tokenized_inputs["input_ids"].shape[1]
         generated_tokens = outputs[0][input_length:]
+        # Store precise generated token count for downstream metrics
+        try:
+            self._last_gen_output_tokens = int(len(generated_tokens))  # type: ignore[attr-defined]
+        except Exception:
+            self._last_gen_output_tokens = None  # type: ignore[attr-defined]
         generated_text = self.tokenizer.decode(generated_tokens, skip_special_tokens=True)
 
         # Clean up markdown code fences if present
