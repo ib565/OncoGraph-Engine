@@ -304,9 +304,13 @@ class QwenModelAdapter:
         """Generate Cypher query using Qwen model."""
         prompt_text = self._format_prompt(question)
 
-        # Generate: inline tokenization and move to model's device (matches Unsloth docs)
+        # Tokenize once and move to model's device (matches Unsloth docs)
+        device = next(self.model.parameters()).device
+        tokenized_inputs = self.tokenizer(prompt_text, return_tensors="pt").to(device)
+
+        # Generate using the pre-tokenized inputs
         outputs = self.model.generate(
-            **self.tokenizer(prompt_text, return_tensors="pt").to(next(self.model.parameters()).device),
+            **tokenized_inputs,
             max_new_tokens=self.max_new_tokens,
             temperature=self.temperature,
             top_p=self.top_p,
@@ -314,7 +318,7 @@ class QwenModelAdapter:
         )
 
         # Decode only the newly generated tokens (skip input tokens)
-        input_length = self.tokenizer(prompt_text, return_tensors="pt")["input_ids"].shape[1]
+        input_length = tokenized_inputs["input_ids"].shape[1]
         generated_tokens = outputs[0][input_length:]
         generated_text = self.tokenizer.decode(generated_tokens, skip_special_tokens=True)
 
