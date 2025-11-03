@@ -2,9 +2,12 @@
 
 **Knowledge-graph Q&A + pathway enrichment for oncology research**
 
-[Try the live deployment](https://onco-graph-engine.vercel.app/) | [Watch the 2-min demo](https://www.youtube.com/watch?v=4HtPS-SvBwk)
+[Try the live deployment](https://onco-graph-engine.vercel.app/) | [Watch the 2-min demo](https://www.youtube.com/watch?v=4HtPS-SvBwk) | [Qwen3-4B-Oncograph fine tuned model](docs/FINETUNING_OVERVIEW.md)
 
-**For developers:** [Technical Details](docs/TECHNICAL_DETAILS.md) — Architecture, security, testing, etc
+**For developers:** 
+- [Technical Details](docs/TECHNICAL_DETAILS.md) — Architecture, security, testing, etc
+- [Fine-Tuning (Text-to-Cypher)](docs/FINETUNING_DETAILS.md) — Overview, technical details, and more
+
 
 ---
 
@@ -348,6 +351,17 @@ python -m pytest
 ## For Developers
 
 Want to understand the internals? See [**TECHNICAL_DETAILS.md**](docs/TECHNICAL_DETAILS.md)
+
+---
+
+## Fine-Tuning (Text-to-Cypher)
+
+OncoGraph includes a fine-tuned model that translates natural language oncology questions directly into Cypher.
+
+- Overview (problem, approach, results): [docs/FINETUNING_OVERVIEW.md](docs/FINETUNING_OVERVIEW.md)
+- Technical details (dataset, training, evaluation): [docs/FINETUNING_DETAILS.md](docs/FINETUNING_DETAILS.md)
+
+Hugging Face artifacts: merged 16-bit model and LoRA adapters are linked in the overview.
 
 ---
 
