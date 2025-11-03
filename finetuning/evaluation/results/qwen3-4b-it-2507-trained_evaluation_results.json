@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-11-03T13:08:14.044660",
+  "timestamp": "2025-11-03T14:12:59.936359",
   "test_set_size": 80,
   "models": {
     "qwen3-4b-it-2507-trained": {
@@ -7,13 +7,13 @@
         "total": 80,
         "syntactic_validity_pct": 100.0,
         "execution_success_pct": 100.0,
-        "semantic_accuracy_pct": 95.0,
-        "avg_latency_ms": 18784.05221902499,
-        "avg_tokens_per_second": 12.107375733046073,
+        "semantic_accuracy_pct": 91.25,
+        "avg_latency_ms": 13982.0551832625,
+        "avg_tokens_per_second": 16.3346510543249,
         "avg_input_tokens": 225.0625,
-        "avg_output_tokens": 227.075,
+        "avg_output_tokens": 228.725,
         "total_input_tokens": 18005,
-        "total_output_tokens": 18166
+        "total_output_tokens": 18298
       },
       "result_count": 80
     }
