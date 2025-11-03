@@ -129,6 +129,8 @@ class Evaluator:
         gold_cypher: str,
         generated_cypher: str,
         prompt_text: str | None = None,
+        generation_latency_ms: float | None = None,
+        output_tokens_override: int | None = None,
     ) -> dict[str, Any]:
         """Evaluate a single generated Cypher query.
 
@@ -141,13 +143,15 @@ class Evaluator:
         Returns:
             Dictionary with evaluation results.
         """
-        start_time = time.perf_counter()
-
         # Count tokens
         if prompt_text is None:
             prompt_text = self.model_adapter.get_full_prompt(question)
         input_tokens = self.model_adapter.count_tokens(prompt_text)
-        output_tokens = self.model_adapter.count_tokens(generated_cypher)
+        output_tokens = (
+            output_tokens_override
+            if output_tokens_override is not None
+            else self.model_adapter.count_tokens(generated_cypher)
+        )
 
         # Syntactic validation
         syntactic_valid, syntax_error = evaluate_cypher_syntax(generated_cypher, self.validator)
@@ -169,7 +173,9 @@ class Evaluator:
         if syntactic_valid and execution_success:
             result_match = compare_results(gold_rows, generated_rows)
 
-        latency_ms = (time.perf_counter() - start_time) * 1000
+        # Latency is generation-only latency
+        latency_ms = float(generation_latency_ms or 0.0)
+        tokens_per_second = (output_tokens / (latency_ms / 1000.0)) if latency_ms > 0 else 0.0
 
         return {
             "syntactic_valid": syntactic_valid,
@@ -180,6 +186,7 @@ class Evaluator:
             "latency_ms": latency_ms,
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
+            "tokens_per_second": tokens_per_second,
             "gold_rows": gold_rows,
             "generated_rows": generated_rows,
         }
@@ -204,6 +211,7 @@ class Evaluator:
         total_input_tokens = sum(r["input_tokens"] for r in results)
         total_output_tokens = sum(r["output_tokens"] for r in results)
         total_latency_ms = sum(r["latency_ms"] for r in results)
+        avg_tokens_per_second = sum(r.get("tokens_per_second", 0.0) for r in results) / total
 
         return {
             "total": total,
@@ -215,6 +223,7 @@ class Evaluator:
                 (result_match_count / execution_success_count) * 100 if execution_success_count > 0 else 0.0
             ),
             "avg_latency_ms": total_latency_ms / total,
+            "avg_tokens_per_second": avg_tokens_per_second,
             "avg_input_tokens": total_input_tokens / total,
             "avg_output_tokens": total_output_tokens / total,
             "total_input_tokens": total_input_tokens,
@@ -272,14 +281,21 @@ def run_evaluation(
         record_id = record["id"]
 
         try:
-            # Generate Cypher
+            # Generate Cypher (time generation only)
+            _gen_start = time.perf_counter()
             generated_cypher = model_adapter.generate_cypher(question)
+            generation_latency_ms = (time.perf_counter() - _gen_start) * 1000.0
+
+            # Prefer precise output token count if adapter provides it (e.g., Qwen)
+            output_tokens_override = getattr(model_adapter, "_last_gen_output_tokens", None)
 
             # Evaluate
             eval_result = evaluator.evaluate_single(
                 question=question,
                 gold_cypher=gold_cypher,
                 generated_cypher=generated_cypher,
+                generation_latency_ms=generation_latency_ms,
+                output_tokens_override=output_tokens_override,
             )
 
             # Add metadata

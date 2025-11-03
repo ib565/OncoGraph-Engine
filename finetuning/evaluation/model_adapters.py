@@ -320,6 +320,11 @@ class QwenModelAdapter:
         # Decode only the newly generated tokens (skip input tokens)
         input_length = tokenized_inputs["input_ids"].shape[1]
         generated_tokens = outputs[0][input_length:]
+        # Store precise generated token count for downstream metrics
+        try:
+            self._last_gen_output_tokens = int(len(generated_tokens))  # type: ignore[attr-defined]
+        except Exception:
+            self._last_gen_output_tokens = None  # type: ignore[attr-defined]
         generated_text = self.tokenizer.decode(generated_tokens, skip_special_tokens=True)
 
         # Clean up markdown code fences if present
