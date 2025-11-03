@@ -244,6 +244,8 @@ class QwenModelAdapter:
             load_in_4bit=True,
         )
         FastLanguageModel.for_inference(self.model)  # Enable inference optimizations
+        # Cache device once to avoid querying per-call
+        self.device = next(self.model.parameters()).device
         # Ensure the tokenizer uses the correct Qwen3 instruct chat template
         try:
             from unsloth.chat_templates import get_chat_template
@@ -305,8 +307,7 @@ class QwenModelAdapter:
         prompt_text = self._format_prompt(question)
 
         # Tokenize once and move to model's device (matches Unsloth docs)
-        device = next(self.model.parameters()).device
-        tokenized_inputs = self.tokenizer(prompt_text, return_tensors="pt").to(device)
+        tokenized_inputs = self.tokenizer(prompt_text, return_tensors="pt").to(self.device)
 
         # Generate using the pre-tokenized inputs
         outputs = self.model.generate(
