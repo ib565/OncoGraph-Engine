@@ -217,7 +217,7 @@ class Evaluator:
             "total": total,
             "syntactic_validity_pct": (syntactic_valid_count / total) * 100,
             "execution_success_pct": (execution_success_count / total) * 100,
-            "semantic_accuracy_pct": (result_match_count / total) * 100,
+            "output_accuracy_pct": (result_match_count / total) * 100,
             "avg_latency_ms": total_latency_ms / total,
             "avg_tokens_per_second": avg_tokens_per_second,
             "avg_input_tokens": total_input_tokens / total,

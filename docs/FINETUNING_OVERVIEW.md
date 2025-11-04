@@ -37,7 +37,7 @@ Fine-tuned an open source model (`Qwen3-4B-Instruct-2507`) on oncology-specific 
 
 ## Results
 
-| Model | Syntactic Validity | Execution Success | **Semantic Accuracy** | Avg Latency |
+| Model | Syntactic Validity | Execution Success | **Output Accuracy** | Avg Latency |
 |-------|-------------------|-------------------|----------------------|-------------|
 | **qwen3-4b-ft-oncograph** (fine-tuned) | **100%** | **100%** | **91.25%** | ~14.0s |
 | Gemini 2.0 Flash (baseline) | 97.5% | 89.7% | 54.3% | ~14.6s |
@@ -48,7 +48,7 @@ Fine-tuned an open source model (`Qwen3-4B-Instruct-2507`) on oncology-specific 
 
 Test set size: 80 queries; evaluation harness supports checkpointed resumption for larger runs.
 
-**Evaluation depth:** Three-level validation (syntactic → execution → semantic accuracy) with manual error analysis for systematic improvements
+**Evaluation depth:** Three-level validation (syntactic → execution → output accuracy) with manual error analysis for systematic improvements
 
 **Performance Notes:**
 - Fine-tuned model latency (~14s) is bottlenecked by free Colab T4 GPU; 16-bit merged model provides faster inference than LoRA adapters
@@ -58,7 +58,7 @@ Test set size: 80 queries; evaluation harness supports checkpointed resumption f
 
 ## Impact
 
-- **2x improvement** in semantic accuracy over baseline models
+- **2x improvement** in output accuracy over baseline models
 - **~100% reliability** in generating valid, executable Cypher queries
 - **Single-step generation** eliminates multi-call latency and API costs
 - **Domain-specific expertise** trained on oncology data patterns

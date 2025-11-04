@@ -7,7 +7,7 @@
         "total": 80,
         "syntactic_validity_pct": 98.75,
         "execution_success_pct": 88.75,
-        "semantic_accuracy_pct": 48.75,
+        "output_accuracy_pct": 48.75,
         "avg_latency_ms": 14558.572984993953,
         "avg_tokens_per_second": 24998.56171420989,
         "avg_input_tokens": 7075.8,

@@ -74,10 +74,10 @@ For a high-level overview, see [FINETUNING_OVERVIEW.md](FINETUNING_OVERVIEW.md).
 **Metrics:**
 1. Syntactic validity (passes `RuleBasedValidator`)
 2. Execution success (runs on Neo4j)
-3. Semantic accuracy (exact result match with gold Cypher)
+3. Output accuracy (exact result match with gold Cypher)
 4. Latency, token usage, throughput
 
-**Error Analysis:** Manual review of cases where syntactic and execution pass but semantic fails (saved to `partial_matches_{model_id}.jsonl`) to identify systematic patterns in result mismatches.
+**Error Analysis:** Manual review of cases where syntactic and execution pass but output fails (saved to `partial_matches_{model_id}.jsonl`) to identify systematic patterns in result mismatches.
 
 **Process:**
 1. Configure `MODELS_TO_RUN` list
