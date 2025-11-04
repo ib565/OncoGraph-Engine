@@ -84,6 +84,8 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [shareLoading, setShareLoading] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoading || !progress) {
@@ -301,6 +303,34 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
     }
   }
 
+  // Handle sharing run
+  const handleShare = useCallback(async () => {
+    if (!run_id) {
+      // Fallback: copy current URL if no run_id
+      const url = window.location.href;
+      await navigator.clipboard.writeText(url);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+      return;
+    }
+
+    setShareLoading(true);
+    try {
+      const shareUrl = `${window.location.origin}/runs/${run_id}`;
+      await navigator.clipboard.writeText(shareUrl);
+      setShareUrl(shareUrl);
+      setCopySuccess(true);
+      setTimeout(() => {
+        setCopySuccess(false);
+        setShareUrl(null);
+      }, 3000);
+    } catch (err) {
+      console.error("Failed to copy share URL:", err);
+    } finally {
+      setShareLoading(false);
+    }
+  }, [run_id]);
+
   // Handle moving genes to Hypothesis Analyzer
   function handleMoveToHypothesisAnalyzer() {
     if (!result?.rows) return;
@@ -402,7 +432,33 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
               <div className="layout-column answer-column">
                 <div className="card">
                   <header className="panel-header">
-                    <h3 className="panel-title">Answer</h3>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                      <h3 className="panel-title">Answer</h3>
+                      {run_id && (
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          onClick={handleShare}
+                          disabled={shareLoading}
+                          style={{ 
+                            fontSize: '12px', 
+                            padding: '6px 12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                          title="Share this query result"
+                        >
+                          {shareLoading ? (
+                            <>⏳ Sharing...</>
+                          ) : copySuccess && shareUrl ? (
+                            <>✓ Copied!</>
+                          ) : (
+                            <>🔗 Share</>
+                          )}
+                        </button>
+                      )}
+                    </div>
                   </header>
                   <div className="card-content">
                     {lastQuery && (

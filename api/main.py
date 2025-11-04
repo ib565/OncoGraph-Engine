@@ -18,6 +18,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+import psycopg
+
 from pipeline import (
     GeminiConfig,
     GeminiCypherGenerator,
@@ -82,6 +84,22 @@ class EnrichmentResponse(BaseModel):
 class FeedbackRequest(BaseModel):
     run_id: str = Field(..., min_length=1, description="Run ID to associate feedback with")
     cypher_correct: bool = Field(..., description="Whether the generated Cypher query was correct")
+
+
+class RunResponse(BaseModel):
+    run_id: str
+    run_type: str  # "query" or "enrichment"
+    question: str | None = None  # For query runs
+    genes: str | None = None  # For enrichment runs
+    cypher: str | None = None  # For query runs
+    row_count: int | None = None  # For query runs
+    answer: str | None = None  # For query runs
+    summary: str | None = None  # For enrichment runs
+    enrichment_results: list[dict[str, object]] | None = None  # For enrichment runs
+    plot_data: dict[str, object] | None = None  # For enrichment runs
+    duration_ms: int
+    started_at: str
+    model: str = "Gemini"  # Default, can be updated when fine-tuned models are deployed
 
 
 @lru_cache(maxsize=1)
@@ -167,6 +185,17 @@ def get_enrichment_summarizer() -> GeminiEnrichmentSummarizer:
     return GeminiEnrichmentSummarizer(config=config)
 
 
+def get_db_connection():
+    """Get database connection for reading runs."""
+    pg_dsn = os.getenv("TRACE_DATABASE_URL") or os.getenv("DATABASE_URL")
+    if not pg_dsn:
+        return None
+    try:
+        return psycopg.connect(pg_dsn, autocommit=True)
+    except Exception:
+        return None
+
+
 app = FastAPI(title="OncoGraph API", version="0.1.0")
 
 allowed_origins = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "*").split(",") if origin]
@@ -180,9 +209,50 @@ app.add_middleware(
 )
 
 
-@app.get("/healthz", response_model=dict[str, str])
-def healthz() -> dict[str, str]:
-    return {"status": "ok"}
+@app.get("/healthz", response_model=dict[str, str | bool])
+def healthz() -> dict[str, str | bool]:
+    """Health check with dependency verification."""
+    status: dict[str, str | bool] = {"status": "ok"}
+
+    # Check Neo4j
+    try:
+        neo4j_uri = os.getenv("NEO4J_URI", "").strip()
+        neo4j_user = os.getenv("NEO4J_USER", "").strip()
+        neo4j_password = os.getenv("NEO4J_PASSWORD", "").strip()
+
+        if neo4j_uri and neo4j_user and neo4j_password:
+            from neo4j import GraphDatabase
+
+            driver = GraphDatabase.driver(neo4j_uri, auth=(neo4j_user, neo4j_password))
+            driver.verify_connectivity()
+            driver.close()
+            status["neo4j"] = True
+        else:
+            status["neo4j"] = "not_configured"
+    except Exception:
+        status["neo4j"] = False
+        status["status"] = "degraded"
+
+    # Check Postgres (optional)
+    pg_dsn = os.getenv("TRACE_DATABASE_URL") or os.getenv("DATABASE_URL")
+    if pg_dsn:
+        try:
+            conn = get_db_connection()
+            if conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT 1")
+                conn.close()
+                status["postgres"] = True
+            else:
+                status["postgres"] = False
+                status["status"] = "degraded"
+        except Exception:
+            status["postgres"] = False
+            status["status"] = "degraded"
+    else:
+        status["postgres"] = "not_configured"
+
+    return status
 
 
 @app.head("/healthz")
@@ -548,6 +618,108 @@ def get_gene_set(
 
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to fetch gene set: {str(exc)}") from exc
+
+
+@app.get("/runs/{run_id}", response_model=RunResponse)
+def get_run(run_id: str) -> RunResponse:
+    """Retrieve a saved run by run_id."""
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=503, detail="Database not configured. Run history is not available.")
+
+    try:
+        with conn.cursor() as cur:
+            # Try query runs first (step='run')
+            cur.execute(
+                """
+                SELECT payload->>'question' as question,
+                       payload->>'cypher' as cypher,
+                       (payload->>'row_count')::int as row_count,
+                       payload->>'answer' as answer,
+                       (payload->>'duration_ms')::int as duration_ms,
+                       payload->>'started_at' as started_at,
+                       timestamp
+                FROM traces
+                WHERE run_id = %s AND step = 'run'
+                ORDER BY timestamp DESC
+                LIMIT 1
+                """,
+                (run_id,),
+            )
+            row = cur.fetchone()
+
+            if row:
+                question, cypher, row_count, answer, duration_ms, started_at, timestamp = row
+                return RunResponse(
+                    run_id=run_id,
+                    run_type="query",
+                    question=question,
+                    cypher=cypher,
+                    row_count=row_count,
+                    answer=answer,
+                    duration_ms=duration_ms or 0,
+                    started_at=started_at or timestamp.isoformat() if timestamp else "",
+                )
+
+            # Try enrichment runs (step='enrichment_response')
+            cur.execute(
+                """
+                SELECT payload->>'valid_genes' as valid_genes,
+                       payload->>'summary' as summary,
+                       payload->'enrichment_results' as enrichment_results,
+                       payload->'plot_data' as plot_data,
+                       (payload->>'duration_ms')::int as duration_ms,
+                       payload->>'started_at' as started_at,
+                       timestamp
+                FROM traces
+                WHERE run_id = %s AND step = 'enrichment_response'
+                ORDER BY timestamp DESC
+                LIMIT 1
+                """,
+                (run_id,),
+            )
+            row = cur.fetchone()
+
+            if row:
+                valid_genes, summary, enrichment_results, plot_data, duration_ms, started_at, timestamp = row
+                # Parse JSONB fields
+                genes_str = None
+                if valid_genes:
+                    try:
+                        genes_list = json.loads(valid_genes) if isinstance(valid_genes, str) else valid_genes
+                        genes_str = ", ".join(genes_list) if isinstance(genes_list, list) else str(valid_genes)
+                    except Exception:
+                        genes_str = str(valid_genes)
+
+                enrichment_list = None
+                if enrichment_results:
+                    enrichment_list = (
+                        json.loads(enrichment_results) if isinstance(enrichment_results, str) else enrichment_results
+                    )
+
+                plot_dict = None
+                if plot_data:
+                    plot_dict = json.loads(plot_data) if isinstance(plot_data, str) else plot_data
+
+                return RunResponse(
+                    run_id=run_id,
+                    run_type="enrichment",
+                    genes=genes_str,
+                    summary=summary,
+                    enrichment_results=enrichment_list,
+                    plot_data=plot_dict,
+                    duration_ms=duration_ms or 0,
+                    started_at=started_at or timestamp.isoformat() if timestamp else "",
+                )
+
+            raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error retrieving run: {str(exc)}") from exc
+    finally:
+        conn.close()
 
 
 @app.get("/analyze/genes/stream")
