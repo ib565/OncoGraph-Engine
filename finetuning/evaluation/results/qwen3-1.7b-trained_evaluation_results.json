@@ -1,0 +1,21 @@
+{
+  "timestamp": "2025-11-04T16:10:23.397375",
+  "test_set_size": 80,
+  "models": {
+    "qwen3-1.7b-trained": {
+      "metrics": {
+        "total": 80,
+        "syntactic_validity_pct": 97.5,
+        "execution_success_pct": 98.71794871794873,
+        "semantic_accuracy_pct": 72.72727272727273,
+        "avg_latency_ms": 9906.855741062485,
+        "avg_tokens_per_second": 22.59274496268208,
+        "avg_input_tokens": 225.0625,
+        "avg_output_tokens": 223.35,
+        "total_input_tokens": 18005,
+        "total_output_tokens": 17868
+      },
+      "result_count": 80
+    }
+  }
+}
