@@ -15,7 +15,7 @@ export default function TopBar() {
 
   return (
     <div className="top-bar">
-      <h1 className="top-bar-title">OncoGraph Agent</h1>
+      <h1 className="top-bar-title">OncoGraph</h1>
 
       <nav className="top-bar-nav" aria-label="Primary">
         {tabs.map((tab) => {

@@ -1,6 +1,6 @@
 # Fine-Tuning Technical Details
 
-Complete technical documentation for fine-tuning the OncoGraph Agent text-to-Cypher model.
+Complete technical documentation for fine-tuning the OncoGraph text-to-Cypher model.
 
 **Model:** `unsloth/Qwen3-4B-Instruct-2507` (4-bit quantized)  
 **Framework:** Unsloth with LoRA  
