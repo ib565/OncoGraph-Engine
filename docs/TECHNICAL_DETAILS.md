@@ -121,7 +121,7 @@ Comprehensive `pytest` suite covering:
 
 | Feature                             | Purpose                                                     |
 | ----------------------------------- | ----------------------------------------------------------- |
-| Fine tuned Cypher generation model | Use a fine tuned model for Cypher generation for better accuracy and speed.|
+| Fine tuned Cypher generation model | ✅ **Completed** - Two models trained (Qwen3-1.7B and Qwen3-4B) with 72.5% and 91.25% accuracy. See [Fine-Tuning Overview](FINETUNING_OVERVIEW.md) |
 | Publication & Statement Nodes       | Track per-paper evidence for finer-grained provenance.      |
 | Clinical Trial Nodes                | Link biomarkers, therapies, and diseases to trials.         |
 | Enhanced Drug & Disease Ontologies | Integrate synonyms and identifiers from ChEMBL and DOID.    |

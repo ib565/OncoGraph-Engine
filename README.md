@@ -1,13 +1,12 @@
 # OncoGraph
 
-**Knowledge-graph Q&A + pathway enrichment for oncology research**
+**Knowledge-graph Q&A + pathway enrichment for oncology research with fine-tuned models for text-to-Cypher**
 
-[Try the live deployment](https://oncograph.vercel.app/) | [Watch the 2-min demo](https://www.youtube.com/watch?v=4HtPS-SvBwk) | [Qwen3-4B-Oncograph fine tuned model](docs/FINETUNING_OVERVIEW.md)
+[Try the live deployment](https://oncograph.vercel.app/) | [Watch the 2-min demo](https://www.youtube.com/watch?v=4HtPS-SvBwk) | [Fine-Tuned Models](docs/FINETUNING_OVERVIEW.md) | [📊 Model Evaluation](https://ib565.github.io/OncoGraph/model_evaluation_report.html)
 
 **For developers:** 
 - [Technical Details](docs/TECHNICAL_DETAILS.md) — Architecture, security, testing, etc
-- [Fine-Tuning (Text-to-Cypher)](docs/FINETUNING_DETAILS.md) — Overview, technical details, and more
-
+- [Fine-Tuning (Text-to-Cypher)](docs/FINETUNING_DETAILS.md) — Overview, technical details, etc. *Note: Fine tuned models are not deployed, looking for cheap inference options.*
 
 ---
 
@@ -205,12 +204,21 @@ OncoGraph has been validated against established findings:
 
 ## Fine-Tuning (Text-to-Cypher)
 
-OncoGraph includes a fine-tuned model that translates natural language oncology questions directly into Cypher.
+OncoGraph includes fine-tuned models that translate natural language oncology questions directly into Cypher.
 
-- Overview (problem, approach, results): [docs/FINETUNING_OVERVIEW.md](docs/FINETUNING_OVERVIEW.md)
-- Technical details (dataset, training, evaluation): [docs/FINETUNING_DETAILS.md](docs/FINETUNING_DETAILS.md)
+**📊 [View comprehensive evaluation results and graphs →](https://ib565.github.io/OncoGraph/model_evaluation_report.html)**
 
-Hugging Face artifacts: merged 16-bit model and LoRA adapters are linked in the overview.
+The evaluation report includes detailed visualizations of accuracy metrics, latency analysis, token usage, and accuracy vs latency trade-offs across all evaluated models.
+
+**Documentation:**
+- **Overview** (problem, approach, results): [docs/FINETUNING_OVERVIEW.md](docs/FINETUNING_OVERVIEW.md)
+- **Technical details** (dataset, training, evaluation): [docs/FINETUNING_DETAILS.md](docs/FINETUNING_DETAILS.md)
+
+**Models Available:**
+- **Qwen3-1.7B-Oncograph:** 72.5% accuracy, ~9.9s latency - Good speed/accuracy trade-off
+- **Qwen3-4B-Oncograph:** 91.25% accuracy, ~14s latency - Highest accuracy
+
+Both models are available on Hugging Face as 16-bit merged models (vLLM-compatible) and LoRA adapters. Links in the overview document.
 
 ---
 
@@ -354,19 +362,8 @@ Want to understand the internals? See [**TECHNICAL_DETAILS.md**](docs/TECHNICAL_
 
 ---
 
-## Fine-Tuning (Text-to-Cypher)
-
-OncoGraph includes a fine-tuned model that translates natural language oncology questions directly into Cypher.
-
-- Overview (problem, approach, results): [docs/FINETUNING_OVERVIEW.md](docs/FINETUNING_OVERVIEW.md)
-- Technical details (dataset, training, evaluation): [docs/FINETUNING_DETAILS.md](docs/FINETUNING_DETAILS.md)
-
-Hugging Face artifacts: merged 16-bit model and LoRA adapters are linked in the overview.
-
----
-
 ## Roadmap
-- **Fine tune a model for Cypher generation.**
+- **Fine tune a model for Cypher generation.** ✅ Completed - See [Fine-Tuning Overview](docs/FINETUNING_OVERVIEW.md)
 - Persist saved analyses to the graph: `(Analysis)-[:ENRICHED_IN]->(Pathway)` and `(Gene)-[:HIT_IN_ANALYSIS]->(Pathway)`.  
 - Clinical Trial Nodes (link biomarkers, therapies, diseases to trials).  
 - Reified evidence model (Statement/Publication nodes).  

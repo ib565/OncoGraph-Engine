@@ -2,11 +2,9 @@
 
 Complete technical documentation for fine-tuning the OncoGraph text-to-Cypher model.
 
-**Model:** `unsloth/Qwen3-4B-Instruct-2507` (4-bit quantized)  
 **Framework:** Unsloth with LoRA  
-**Output:** `ib565/qwen3-4b-ft-oncograph-16bit` (merged) and `ib565/qwen3-4b-ft-oncograph-lora-adapters` (LoRA)
 
-For a high-level overview, see [FINETUNING_OVERVIEW.md](FINETUNING_OVERVIEW.md).
+For model information, Hugging Face links, and evaluation results, see [FINETUNING_OVERVIEW.md](FINETUNING_OVERVIEW.md).
 
 ---
 
@@ -59,15 +57,16 @@ For a high-level overview, see [FINETUNING_OVERVIEW.md](FINETUNING_OVERVIEW.md).
 - Checkpoints: `finetuning/models/checkpoints/`
 
 **Inference Performance Notes:**
-- 16-bit merged model provides slightly faster inference than loading LoRA adapters separately
+- 16-bit merged models provide faster inference than loading LoRA adapters separately and are vLLM-compatible
 - Current inference bottleneck is free Colab T4 GPU (using Unsloth); vLLM may offer further optimization (untested)
 
 ---
 
 ## Evaluation
 
-**Notebook:** `finetuning/notebooks/evaluate_models.ipynb` (evaluates both baselines and fine-tuned models)  
-**Comparison:** `finetuning/notebooks/compare_evaluation_results.ipynb`
+**Notebooks:**
+- **Evaluation:** `finetuning/notebooks/evaluate_models.ipynb` (evaluates both baselines and fine-tuned models)
+- **📊 Model Evaluation Report:** `https://ib565.github.io/OncoGraph/model_evaluation_report.html` - Comprehensive evaluation results with detailed graphs and analysis
 
 **Architecture:** Model-agnostic design using Protocol-based adapters (`finetuning/evaluation/model_adapters.py`) and unified harness (`finetuning/evaluation/harness.py`).
 
@@ -87,7 +86,10 @@ For a high-level overview, see [FINETUNING_OVERVIEW.md](FINETUNING_OVERVIEW.md).
 **Models Evaluated:**
 - `gemini-2.0-flash`, `gemini-2.5-flash-lite` (2-step pipeline)
 - `qwen3-4b-it-2507-base` (untuned)
-- `qwen3-4b-it-2507-trained` (fine-tuned)
+- `qwen3-4b-it-2507-trained` (fine-tuned Qwen3-4B)
+- `qwen3-1.7b-trained` (fine-tuned Qwen3-1.7B)
+
+For detailed results, see the [results summary table](FINETUNING_OVERVIEW.md#results) in the overview or the [Model Evaluation Report](https://ib565.github.io/OncoGraph/model_evaluation_report.html).
 
 ---
 
