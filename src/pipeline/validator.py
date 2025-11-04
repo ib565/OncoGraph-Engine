@@ -137,7 +137,38 @@ class RuleBasedValidator:
 
     def _check_labels(self, text: str) -> None:
         rel_types = set(REL_TYPE_PATTERN.findall(text))
-        for label in NODE_LABEL_PATTERN.findall(text):
+
+        # Collect labels only from valid Cypher label contexts:
+        # 1) Node patterns inside parentheses, before any property map `{ ... }`
+        # 2) Label predicates like `var:Label` that appear outside maps/brackets
+
+        labels: set[str] = set()
+
+        # 1) Labels in node patterns: (alias:Label[:Label2] ... {props})
+        for node_content in re.findall(r"\(([^)]*)\)", text):
+            before_props = node_content.split("{", 1)[0]
+            for label in re.findall(r":\s*`?([A-Za-z_][A-Za-z0-9_]*)`?", before_props):
+                labels.add(label)
+
+        # 2) Label predicates outside maps/brackets: e.g., CASE WHEN b:Gene THEN ...
+        def strip_sections(src: str, open_char: str, close_char: str) -> str:
+            out_chars: list[str] = []
+            depth = 0
+            for ch in src:
+                if ch == open_char:
+                    depth += 1
+                elif ch == close_char and depth:
+                    depth -= 1
+                elif depth == 0:
+                    out_chars.append(ch)
+            return "".join(out_chars)
+
+        outside = strip_sections(text, "{", "}")
+        outside = strip_sections(outside, "[", "]")
+        for _var, label in re.findall(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*:\s*`?([A-Za-z_][A-Za-z0-9_]*)`?", outside):
+            labels.add(label)
+
+        for label in labels:
             # Skip tokens that are actually relationship types
             if label in ALLOWED_RELATIONSHIPS or label in rel_types:
                 continue
