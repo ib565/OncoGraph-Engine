@@ -2,7 +2,7 @@
 
 **Knowledge-graph Q&A + pathway enrichment for oncology research**
 
-[Try the live deployment](https://onco-graph-engine.vercel.app/) | [Watch the 2-min demo](https://www.youtube.com/watch?v=4HtPS-SvBwk) | [Qwen3-4B-Oncograph fine tuned model](docs/FINETUNING_OVERVIEW.md)
+[Try the live deployment](https://oncograph.vercel.app/) | [Watch the 2-min demo](https://www.youtube.com/watch?v=4HtPS-SvBwk) | [Qwen3-4B-Oncograph fine tuned model](docs/FINETUNING_OVERVIEW.md)
 
 **For developers:** 
 - [Technical Details](docs/TECHNICAL_DETAILS.md) — Architecture, security, testing, etc
@@ -11,7 +11,7 @@
 
 ---
 
-[![Live Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://onco-graph-engine.vercel.app/)
+[![Live Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://oncograph.vercel.app/)
 [![Watch the demo](https://img.shields.io/badge/watch--on-YouTube-red?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=4HtPS-SvBwk)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
@@ -94,7 +94,7 @@ combination strategies targeting downstream pathways.
 
 **Try it now (no installation required):**
 
-1. Visit the [live demo](https://onco-graph-engine.vercel.app/)
+1. Visit the [live demo](https://oncograph.vercel.app/)
 2. Click any example query, or try: `"Which genes predict resistance to cetuximab in colorectal cancer?"`
 3. Click **"Move to Hypothesis Analyzer"** when results appear
 4. Review pathway enrichment + AI summary
