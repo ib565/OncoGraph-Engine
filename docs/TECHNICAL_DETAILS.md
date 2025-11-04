@@ -117,6 +117,56 @@ Comprehensive `pytest` suite covering:
 - **API**: Request validation, error responses, SSE streaming
 - **Test architecture**: Fixtures for database isolation, mock objects for external APIs, snapshot testing for LLM outputs
 
+## Local Development Setup
+
+### Prerequisites
+- Python 3.10+, Neo4j Desktop/Server, Node.js 16+
+- Google Gemini API key ([get one here](https://ai.google.dev/))
+
+### Setup
+
+**1. Environment variables** - Create `.env` in project root:
+```bash
+GOOGLE_API_KEY="your_gemini_api_key_here"
+NEO4J_URI="bolt://localhost:7687"
+NEO4J_USER="neo4j"
+NEO4J_PASSWORD="your_password"
+```
+
+**2. Backend:**
+```bash
+python -m venv venv
+source venv/bin/activate  # or .\venv\Scripts\activate (Windows)
+pip install -r requirements.txt && pip install -e .
+```
+
+**3. Database:**
+```bash
+# Start Neo4j, then seed with included data:
+python -m src.graph.builder
+
+# Or generate fresh data from CIViC/OpenTargets:
+python -m src.pipeline.civic_ingest --out-dir data/civic/latest --enrich-tags
+DATA_DIR="data/civic/latest" python -m src.graph.builder
+```
+
+**4. Run:**
+```bash
+# Backend (terminal 1)
+uvicorn api.main:app --reload
+
+# Frontend (terminal 2)
+cd web && npm install
+NEXT_PUBLIC_API_URL="http://localhost:8000" npm run dev
+```
+
+Visit `http://localhost:3000` for UI, `http://localhost:8000/docs` for API docs.
+
+**5. Test:**
+```bash
+python -m pytest
+```
+
 ## Future Extensions
 
 | Feature                             | Purpose                                                     |

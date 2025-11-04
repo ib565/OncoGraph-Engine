@@ -16,63 +16,15 @@
 
 ---
 
-## What Problem Does This Solve?
+## What It Does
 
-When computational models predict a gene signature affects drug response, 
-researchers need to:
-1. **Validate** - Is this finding supported by clinical evidence?
-2. **Interpret** - What biological mechanism explains this pattern?
-3. **Act** - What therapies target this mechanism?
+Ask questions like *"Which genes predict resistance to cetuximab in colorectal cancer?"* and get:
+- **Clinical evidence** with PMIDs from curated databases (CIViC, OpenTargets)
+- **Pathway enrichment analysis** with one-click biological interpretation
+- **AI-generated summaries** explaining mechanisms and significance
+- **Suggested follow-up queries** to continue exploring the knowledge graph
 
-This typically requires hours of manual work across multiple tools.
-
-**OncoGraph integrates the entire workflow into minutes:**
-- Query clinical evidence in natural language
-- Interpret biological mechanisms via pathway enrichment
-- Explore therapeutic options through the knowledge graph
-- All with traceable sources and exportable results
-
-**Complements AI discovery platforms:** When models (e.g., Noetik's OCTO) 
-predict gene signatures from spatial data, OncoGraph validates them 
-against clinical evidence, interprets the mechanism, and identifies 
-therapeutic options.
-
----
-
-## Complete Workflow: KRAS G12D Resistance in Colorectal Cancer
-
-This example demonstrates OncoGraph's end-to-end workflow for 
-understanding therapy resistance and finding alternatives.
-
-### Step 1: Identify Resistance Mechanisms
-**Query:** "Which genes predict resistance to cetuximab or panitumumab 
-in colorectal cancer?"
-
-**Result:** 13 genes including KRAS, NRAS, BRAF, ERBB2, PIK3CA, etc.  
-**Evidence:** 88 evidence items across 45 PMIDs
-
-### Step 2: Understand Biological Mechanism
-**Action:** Click "Move to Hypothesis Analyzer"  
-**Result:** Enrichment in ErbB signaling pathway (p < 1e-19)
-
-**AI Summary:** "These genes converge on receptor tyrosine kinase 
-signaling. Dysregulation allows tumor cells to maintain proliferative 
-signals despite EGFR blockade."
-
-### Step 3: Find Alternative Therapeutic Targets
-**Action:** Click suggested query "Which therapies target ERBB2, 
-MAP2K1, or PIK3CA?"
-
-**Result:** 
-- ERBB2 inhibitors: trastuzumab, pertuzumab, etc.
-- MEK inhibitors: trametinib, cobimetinib
-- PI3K inhibitors: alpelisib, copanlisib
-
-**Insight:** Patients with anti-EGFR resistance may benefit from 
-combination strategies targeting downstream pathways.
-
-**Time:** ~7 minutes from question to actionable hypothesis  
-**Manual equivalent:** 45-60 minutes
+Built on **Neo4j** + **fine-tuned LLMs** for text-to-Cypher translation. Results are traceable, exportable, and validated against clinical evidence.
 
 ---
 
@@ -89,57 +41,84 @@ combination strategies targeting downstream pathways.
 
 ---
 
-## Quick Start
+## Complete Workflow Example
 
-**Try it now (no installation required):**
+### KRAS Resistance in Colorectal Cancer
 
-1. Visit the [live demo](https://oncograph.vercel.app/)
-2. Click any example query, or try: `"Which genes predict resistance to cetuximab in colorectal cancer?"`
-3. Click **"Move to Hypothesis Analyzer"** when results appear
-4. Review pathway enrichment + AI summary
-5. Click suggested follow-up queries to continue exploring
+This demonstrates OncoGraph's end-to-end workflow for understanding therapy resistance and finding alternatives.
 
-**See the complete workflow example below for detailed walkthrough.**
+**Step 1: Identify Resistance Mechanisms**  
+Query: *"Which genes predict resistance to cetuximab or panitumumab in colorectal cancer?"*  
+→ **Result:** 13 genes (KRAS, NRAS, BRAF, ERBB2, PIK3CA, etc.) with 88 evidence items across 45 PMIDs
+
+**Step 2: Understand Biological Mechanism**  
+Action: Click "Move to Hypothesis Analyzer"  
+→ **Result:** Enrichment in ErbB signaling pathway (p < 1e-19)  
+→ **AI Summary:** "These genes converge on receptor tyrosine kinase signaling. Dysregulation allows tumor cells to maintain proliferative signals despite EGFR blockade."
+
+**Step 3: Find Alternative Therapeutic Targets**  
+Action: Click suggested query *"Which therapies target ERBB2, MAP2K1, or PIK3CA?"*  
+→ **Result:** ERBB2 inhibitors (trastuzumab, pertuzumab), MEK inhibitors (trametinib, cobimetinib), PI3K inhibitors (alpelisib, copanlisib)
+
+**Insight:** Patients with anti-EGFR resistance may benefit from combination strategies targeting downstream pathways.
+
+**Time:** ~7 minutes from question to actionable hypothesis | **Manual equivalent:** 45-60 minutes
+
+---
+
+## What Problem Does This Solve?
+
+When computational models predict a gene signature affects drug response, researchers need to:
+1. **Validate** - Is this finding supported by clinical evidence?
+2. **Interpret** - What biological mechanism explains this pattern?
+3. **Act** - What therapies target this mechanism?
+
+This typically requires hours of manual work across multiple tools.
+
+**OncoGraph integrates the entire workflow:**
+- Query clinical evidence in natural language
+- Interpret biological mechanisms via pathway enrichment
+- Explore therapeutic options through the knowledge graph
+- All with traceable sources and exportable results
+
+**Complements AI discovery platforms:** When models (e.g., Noetik's OCTO) predict gene signatures from spatial data, OncoGraph validates them against clinical evidence, interprets the mechanism, and identifies therapeutic options
 
 ---
 
 ## Key Features
 
-**Natural Language Graph Queries**
-- Ask questions in plain English about genes, variants, therapies, diseases
-- LLM generates Cypher query → executes on Neo4j knowledge graph
-- Results include PMIDs, sources, interactive visualization, and raw Cypher
-- One-click export of genes to Hypothesis Analyzer
+**🔍 Natural Language Graph Queries**
+- **Ask questions in plain English** about genes, variants, therapies, diseases
+- **LLM generates Cypher** → executes on Neo4j knowledge graph
+- **Results include** PMIDs, sources, interactive visualization, and raw Cypher
+- **One-click export** of genes to Hypothesis Analyzer
 
-**Pathway Enrichment Analysis**
-- Over-representation analysis via Enrichr (Reactome 2022, GO BP 2023, KEGG 2021)
-- Dot plot visualization of enriched pathways
-- AI-generated summary explaining biological significance
-- Suggested follow-up queries that execute in Graph Q&A tab
+**🧬 Pathway Enrichment Analysis**
+- **Over-representation analysis** via Enrichr (Reactome 2022, GO BP 2023, KEGG 2021)
+- **Dot plot visualization** of enriched pathways
+- **AI-generated summary** explaining biological significance
+- **Suggested follow-up queries** that execute in Graph Q&A tab
 
-**Integrated Workflow**
-- Seamless transitions: Query → Enrichment → Follow-up → Repeat
-- All sources traceable to PMIDs
+**🔄 Integrated Workflow**
+- **Seamless transitions:** Query → Enrichment → Follow-up → Repeat
+- **All sources traceable** to PMIDs
 
-**Transparent by Design**
-- Display raw Cypher and raw results for validation
-
----
-
-## Data sources
-
-### CIViC (Clinical Interpretations of Variants in Cancer)
-- Used for variant‑level evidence of therapy response (sensitivity/resistance) with PubMed IDs.
-
-### OpenTargets
-- Used for therapy → gene TARGETS relationships and mechanism of action tags.
+**✅ Transparent by Design**
+- **Display raw Cypher** and raw results for validation
 
 ---
 
-## Scope and limitations
-- Public, curated data only; not exhaustive.  
-- Evidence is stored on relationships (no reified evidence graph in V1).  
-- Results are **for research and education**. Do not use for clinical decisions.
+## Data Sources
+
+**CIViC** (Clinical Interpretations of Variants in Cancer) - Variant-level evidence of therapy response (sensitivity/resistance) with PubMed IDs  
+**OpenTargets** - Therapy → gene TARGETS relationships and mechanism of action tags
+
+---
+
+## Scope and Limitations
+- **Public, curated data only** - not exhaustive  
+- **Evidence stored on relationships** (no reified evidence graph in V1)  
+- **For research and education only** - do not use for clinical decisions
 
 ---
 
@@ -177,48 +156,33 @@ combination strategies targeting downstream pathways.
 
 ## Scientific Validation
 
-OncoGraph has been validated against established findings:
+OncoGraph has been validated against established clinical findings:
 
-### KRAS Mutations in Anti-EGFR Therapy
+**KRAS Mutations in Anti-EGFR Therapy**  
+Correctly identified 28+ KRAS variants (G12D, G12V, G13D, etc.) predicting cetuximab resistance in colorectal cancer. Cross-referenced with landmark study PMID:17363584 (Di Nicolantonio et al., 2008).
 
-**Query:** "Which KRAS variants predict resistance to cetuximab in colorectal cancer?"
-
-**Results:** Correctly identified 28+ KRAS variants including G12D, G12V, G13D with supporting PMIDs
-
-**Validation:** Cross-referenced with landmark study PMID:17363584 (Di Nicolantonio et al., 2008)
-
-**Clinical relevance:** Directly informs treatment decisions for mCRC patients
-
-### BRAF-Targeted Therapies
-
-**Query:** "What therapies target BRAF mutations?"
-
-**Results:** FDA-approved BRAF inhibitors (dabrafenib, vemurafenib, encorafenib) plus 10 additional agents
-
-**Validation:** Matches current NCCN guidelines for BRAF-mutant cancers
+**BRAF-Targeted Therapies**  
+Matches FDA-approved BRAF inhibitors (dabrafenib, vemurafenib, encorafenib) and current NCCN guidelines for BRAF-mutant cancers.
 
 *OncoGraph is a research tool. Validate all results against primary literature before clinical application.*
 
 ---
 
 
-## Fine-Tuning (Text-to-Cypher)
+## Fine-Tuned Models (Text-to-Cypher)
 
-OncoGraph includes fine-tuned models that translate natural language oncology questions directly into Cypher.
+OncoGraph includes **fine-tuned LLMs** that translate natural language oncology questions directly into Cypher queries:
 
-**📊 [View comprehensive evaluation results and graphs →](https://ib565.github.io/OncoGraph/model_evaluation_report.html)**
+| Model | Accuracy | Latency | Best For |
+|-------|----------|---------|----------|
+| **Qwen3-4B-Oncograph** | 91.25% | ~14s | Highest accuracy |
+| **Qwen3-1.7B-Oncograph** | 72.5% | ~9.9s | Speed/accuracy balance |
 
-The evaluation report includes detailed visualizations of accuracy metrics, latency analysis, token usage, and accuracy vs latency trade-offs across all evaluated models.
+**📊 [View comprehensive evaluation results →](https://ib565.github.io/OncoGraph/model_evaluation_report.html)**
 
-**Documentation:**
-- **Overview** (problem, approach, results): [docs/FINETUNING_OVERVIEW.md](docs/FINETUNING_OVERVIEW.md)
-- **Technical details** (dataset, training, evaluation): [docs/FINETUNING_DETAILS.md](docs/FINETUNING_DETAILS.md)
+**Documentation:** [Overview](docs/FINETUNING_OVERVIEW.md) | [Technical Details](docs/FINETUNING_DETAILS.md)
 
-**Models Available:**
-- **Qwen3-1.7B-Oncograph:** 72.5% accuracy, ~9.9s latency - Good speed/accuracy trade-off
-- **Qwen3-4B-Oncograph:** 91.25% accuracy, ~14s latency - Highest accuracy
-
-Both models are available on Hugging Face as 16-bit merged models (vLLM-compatible) and LoRA adapters. Links in the overview document.
+Models available on Hugging Face as 16-bit merged models (vLLM-compatible) and LoRA adapters. *Note: Fine-tuned models not yet deployed; looking for cost-effective inference options.*
 
 ---
 
@@ -257,88 +221,26 @@ KRAS, NRAS, BRAF, MAP2K1, MAP2K2, EGFR
 
 ---
 
-## Install and run (local)
+## Local Development
 
-### Prerequisites
-- Python 3.10+  
-- Neo4j Desktop or Server  
-- Node.js and npm
+**Prerequisites:** Python 3.10+, Neo4j, Node.js
 
-
-### 1. Configure Environment
-
-Create a `.env` file in the project root with the following variables:
-
+**Quick setup:**
 ```bash
-GOOGLE_API_KEY="your_gemini_api_key"
-NEO4J_URI="bolt://localhost:7687"
-NEO4J_USER="neo4j"
-NEO4J_PASSWORD="your_password"
-```
-
-### 2. Setup Backend
-
-Create a virtual environment and install dependencies:
-
-```bash
-# Create and activate virtual environment
-python -m venv venv
-.\venv\Scripts\activate
-
-# Install dependencies and the local package
-pip install --upgrade pip
-pip install -r requirements.txt
-pip install -e .
-```
-
-### 3. Seed the Database
-
-You can use the small, included dataset or generate a fresh one from the source APIs.
-
-#### Option A: Use the included seed data (Recommended for quick start)
-```bash
-python -m src.graph.builder
-```
-
-#### Option B: Generate data from CIViC + OpenTargets
-```bash
-# Generate CSVs under data/civic/latest
-python -m src.pipeline.civic_ingest --out-dir data/civic/latest --enrich-tags
-
-# Point the builder to the generated dataset and ingest
-$env:DATA_DIR="data/civic/latest"
-python -m src.graph.builder
-```
-
-### 4. Run the Application
-
-**Start the Backend API:**
-```bash
+# Backend
+python -m venv venv && source venv/bin/activate  # or .\venv\Scripts\activate on Windows
+pip install -r requirements.txt && pip install -e .
+python -m src.graph.builder  # seed database
 uvicorn api.main:app --reload
-```
 
-**Run the Web Interface:**
-```bash
-# Navigate to the web directory
-cd web
-
-# Install dependencies
-npm install
-
-# Set the API URL and run the development server
-$env:NEXT_PUBLIC_API_URL="http://localhost:8000"
+# Frontend (in new terminal)
+cd web && npm install
 npm run dev
 ```
 
-The UI will be available at [http://localhost:3000](http://localhost:3000).
+**Environment variables:** Create `.env` with `GOOGLE_API_KEY`, `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`
 
-### 5. Run Tests
-
-To run the backend test suite:
-
-```bash
-python -m pytest
-```
+See [TECHNICAL_DETAILS.md](docs/TECHNICAL_DETAILS.md) for full setup instructions, testing, and architecture details
 
 ---
 
