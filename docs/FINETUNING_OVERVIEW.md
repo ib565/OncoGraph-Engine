@@ -1,12 +1,12 @@
 # Fine-Tuning Overview
 
-High-level overview of the OncoGraph Engine fine-tuning project for text-to-Cypher generation.
+High-level overview of OncoGraph fine-tuning project for text-to-Cypher generation.
 
 ---
 
 ## Problem
 
-The OncoGraph Engine translates natural language questions about oncology data into Neo4j Cypher queries. The original system used a two-step LLM pipeline (Gemini) that had the following limitations:
+OncoGraph translates natural language questions about oncology data into Neo4j Cypher queries. The original system used a two-step LLM pipeline (Gemini) that had the following limitations:
 - **Lack of schema/dataset-specific knowledge**
 - **High latency:** Multiple API calls per query
 - **High cost:** API usage per request

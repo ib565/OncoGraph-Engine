@@ -1,4 +1,4 @@
-# OncoGraph Engine
+# OncoGraph
 
 **Knowledge-graph Q&A + pathway enrichment for oncology research**
 
