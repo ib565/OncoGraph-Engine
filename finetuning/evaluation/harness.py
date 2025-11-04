@@ -216,12 +216,8 @@ class Evaluator:
         return {
             "total": total,
             "syntactic_validity_pct": (syntactic_valid_count / total) * 100,
-            "execution_success_pct": (
-                (execution_success_count / syntactic_valid_count) * 100 if syntactic_valid_count > 0 else 0.0
-            ),
-            "semantic_accuracy_pct": (
-                (result_match_count / execution_success_count) * 100 if execution_success_count > 0 else 0.0
-            ),
+            "execution_success_pct": (execution_success_count / total) * 100,
+            "semantic_accuracy_pct": (result_match_count / total) * 100,
             "avg_latency_ms": total_latency_ms / total,
             "avg_tokens_per_second": avg_tokens_per_second,
             "avg_input_tokens": total_input_tokens / total,
