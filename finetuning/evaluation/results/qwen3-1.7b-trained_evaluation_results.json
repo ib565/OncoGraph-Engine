@@ -5,9 +5,9 @@
     "qwen3-1.7b-trained": {
       "metrics": {
         "total": 80,
-        "syntactic_validity_pct": 97.5,
-        "execution_success_pct": 96.25,
-        "semantic_accuracy_pct": 70.0,
+        "syntactic_validity_pct": 100,
+        "execution_success_pct": 98.75,
+        "semantic_accuracy_pct": 72.5,
         "avg_latency_ms": 9906.855741062485,
         "avg_tokens_per_second": 22.59274496268208,
         "avg_input_tokens": 225.0625,
