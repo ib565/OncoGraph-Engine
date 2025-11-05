@@ -32,6 +32,9 @@ Fine-tuned open source Qwen models on oncology-specific question-to-Cypher pairs
 **Available on Hugging Face:**
 Each model is available in two formats (16-bit vLLM-compatible merged model and LoRA adapters):
 
+**OncoGraph Collection:**
+[`collections/ib565/oncograph`](https://huggingface.co/collections/ib565/oncograph)
+
 **Qwen3-1.7B-Oncograph:**
 - Merged 16-bit model: [`ib565/qwen3-1.7b-ft-oncograph-16bit`](https://huggingface.co/ib565/qwen3-1.7b-ft-oncograph-16bit)
 - LoRA adapters: [`ib565/qwen3-1.7b-ft-oncograph-lora-adapters`](https://huggingface.co/ib565/qwen3-1.7b-ft-oncograph-lora-adapters)
@@ -61,6 +64,7 @@ The evaluation report includes detailed visualizations of:
 |-------|-------------------|-------------------|----------------------|-------------|
 | **qwen3-4b-ft-oncograph** (fine-tuned) | **100%** | **100%** | **91.25%** | ~14.0s |
 | **qwen3-1.7b-ft-oncograph** (fine-tuned) | **100%** | **98.75%** | **72.5%** | ~9.9s |
+| Gemini 2.5 Flash (baseline) | 100% | 96.25% | 46.25% | ~20.5s |
 | Gemini 2.0 Flash (baseline) | 98.75% | 88.75% | 48.75% | ~14.6s |
 | Gemini 2.5 Flash Lite (baseline) | 100% | 92.5% | 41.25% | **~6.4s** |
 | qwen3-4b-base (untuned) | 88.75% | 53.75% | 3.75% | N/A |
