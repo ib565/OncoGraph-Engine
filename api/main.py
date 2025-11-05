@@ -101,7 +101,7 @@ def build_engine() -> QueryEngine:
     )
 
     gemini_summarizer_config = GeminiConfig(
-        model=os.getenv("GEMINI_SUMMARIZER_MODEL", "gemini-2.5-flash"),
+        model=os.getenv("GEMINI_SUMMARIZER_MODEL", "gemini-2.5-flash-lite"),
         temperature=float(os.getenv("GEMINI_SUMMARIZER_TEMPERATURE", "0.1")),
         api_key=os.getenv("GOOGLE_API_KEY"),
     )
