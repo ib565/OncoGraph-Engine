@@ -2,7 +2,7 @@
 
 **Knowledge-graph Q&A + pathway enrichment for oncology research w/ fine-tuned models for text-to-Cypher**
 
-[Try the live deployment](https://oncograph.vercel.app/) | [Watch the 2-min demo](https://www.youtube.com/watch?v=4HtPS-SvBwk) | [Fine-Tuned Models](docs/FINETUNING_OVERVIEW.md) | [📊 Model Evaluation](https://ib565.github.io/OncoGraph/model_evaluation_report.html)
+[Try the live deployment](https://oncograph.vercel.app/) | [Watch the 2-min demo](https://www.youtube.com/watch?v=1XboGF-kAmI) | [Fine-Tuned Models](docs/FINETUNING_OVERVIEW.md) | [📊 Model Evaluation](https://ib565.github.io/OncoGraph/model_evaluation_report.html)
 
 **For developers:** 
 - [Technical Details](docs/TECHNICAL_DETAILS.md) — Architecture, security, testing, etc
@@ -11,7 +11,7 @@
 ---
 
 [![Live Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://oncograph.vercel.app/)
-[![Watch the demo](https://img.shields.io/badge/watch--on-YouTube-red?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=4HtPS-SvBwk)
+[![Watch the demo](https://img.shields.io/badge/watch--on-YouTube-red?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=1XboGF-kAmI)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ---
