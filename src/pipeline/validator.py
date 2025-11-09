@@ -51,8 +51,8 @@ ALLOWED_PROPERTIES = {
 LIMIT_PATTERN = re.compile(r"\bLIMIT\s+(\d+)", re.IGNORECASE)
 # Match node labels like (:Gene) or (n:Gene) or (n:Gene:Biomarker), excluding rel brackets
 NODE_LABEL_PATTERN = re.compile(r"(?<!\[):\s*`?([A-Za-z_][A-Za-z0-9_]*)`?")
-# Match relationship types like [:TYPE], [: TYPE], or [:`TYPE`]
-REL_TYPE_PATTERN = re.compile(r"\[\s*:\s*`?([A-Za-z_][A-Za-z0-9_]*)`?")
+# Match relationship types like [:TYPE], [r:TYPE], [r: TYPE], or [r:`TYPE`]
+REL_TYPE_PATTERN = re.compile(r"\[\s*(?:[A-Za-z_][A-Za-z0-9_]*\s*)?:\s*`?([A-Za-z_][A-Za-z0-9_]*)`?")
 PROPERTY_PATTERN = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\.([A-Za-z_][A-Za-z0-9_]*)")
 
 
