@@ -88,9 +88,18 @@ Integrates statistical pathway enrichment with AI interpretation for comprehensi
 ## System Internals
 
 ### Caching & Performance
-- **TTL cache**: Thread-safe in-memory cache (default 30min) with deep-copy isolation for LLM and enrichment calls
+- **Postgres-backed persistent cache**: Thread-safe cache with 48h default TTL (configurable) stored in Postgres JSONB, enabling cache persistence across restarts and shared access across multiple API instances
+- **Fallback to in-memory cache**: If Postgres is unavailable, automatically falls back to in-memory `TTLCache` (30min default)
+- **Lazy expiration cleanup**: Expired entries are deleted during cache lookups; batch cleanup runs every 100 set operations to prevent accumulation
+- **Cache invalidation**: Manual invalidation via `delete(key)` or `delete_by_prefix(prefix)` methods (e.g., `delete_by_prefix("expand_instructions:")` to invalidate all instruction expansions)
 - **Deterministic hashing**: `stable_hash()` for consistent cache keys across restarts
 - **Batch operations**: Parallel processing where dependencies permit; optimized transaction sizes
+
+**Configuration:**
+- `CACHE_DATABASE_URL` (optional): Postgres DSN for cache (falls back to `TRACE_DATABASE_URL` or `DATABASE_URL`)
+- `LLM_CACHE_TTL_SECONDS` (default: 172800 = 48h): TTL for LLM cache entries
+- `ENRICHMENT_CACHE_TTL_SECONDS` (default: 172800 = 48h): TTL for enrichment cache entries
+- `CACHE_TTL_SECONDS` (default: 1800 = 30min): Fallback TTL if specific cache TTLs not set (only used if Postgres unavailable)
 
 ### Logging & Observability
 - **Structured traces**: JSONL logs (`logs/traces/YYYYMMDD.jsonl`) with run IDs, timestamps, and error chains
