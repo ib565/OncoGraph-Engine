@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import threading
 from datetime import UTC, datetime
@@ -43,6 +44,17 @@ from pipeline.trace import (
 from pipeline.types import PipelineError, with_context_trace
 
 load_dotenv()
+
+# Configure logging level from environment variable (default: INFO)
+# Set LOG_LEVEL=DEBUG to enable debug logging for cache and other components
+log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(
+    level=getattr(logging, log_level, logging.INFO),
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+# Set specific logger for pipeline.utils to DEBUG if LOG_LEVEL is DEBUG
+if log_level == "DEBUG":
+    logging.getLogger("pipeline.utils").setLevel(logging.DEBUG)
 
 
 class QueryRequest(BaseModel):
