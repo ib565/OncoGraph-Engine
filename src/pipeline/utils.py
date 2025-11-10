@@ -7,6 +7,7 @@ import json
 import os
 import threading
 import time
+from contextvars import ContextVar
 from datetime import UTC, datetime, timedelta
 from typing import Any, TypeVar
 
@@ -16,6 +17,9 @@ except ImportError:
     psycopg = None  # type: ignore[assignment, unused-ignore]
 
 T = TypeVar("T")
+
+# Context variable for run_id (set at API level, accessible throughout pipeline)
+_run_id_context: ContextVar[str | None] = ContextVar("run_id", default=None)
 
 
 class TTLCache:
@@ -198,23 +202,25 @@ class PostgresCache:
             expires_at = datetime.now(UTC) + timedelta(seconds=ttl)
             # Serialize value to JSON
             value_json = json.dumps(value, default=str, ensure_ascii=False)
+            run_id = get_run_id() or ""
 
             with psycopg.connect(self._dsn, autocommit=True) as conn:
                 with conn.cursor() as cur:
                     cur.execute(
                         """
                         INSERT INTO cache_entries 
-                        (cache_key, cache_type, value, expires_at, created_at, access_count, last_accessed_at)
-                        VALUES (%s, %s, %s::jsonb, %s, NOW(), 0, NOW())
+                        (cache_key, cache_type, value, run_id, expires_at, created_at, access_count, last_accessed_at)
+                        VALUES (%s, %s, %s::jsonb, %s, %s, NOW(), 0, NOW())
                         ON CONFLICT (cache_key) 
                         DO UPDATE SET 
                             value = EXCLUDED.value,
+                            run_id = EXCLUDED.run_id,
                             expires_at = EXCLUDED.expires_at,
                             created_at = NOW(),
                             access_count = 0,
                             last_accessed_at = NOW()
                         """,
-                        (key, self._cache_type, value_json, expires_at),
+                        (key, self._cache_type, value_json, run_id, expires_at),
                     )
 
             # Occasional batch cleanup (every 100 set operations)
@@ -268,6 +274,21 @@ class PostgresCache:
                     return cur.rowcount or 0
         except Exception:
             # Cache failures must be non-fatal
+            return 0
+
+    def delete_by_run_id(self, run_id: str) -> int:
+        """Delete all entries associated with a run_id. Returns count deleted."""
+        self._ensure_initialized()
+
+        try:
+            with psycopg.connect(self._dsn, autocommit=True) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "DELETE FROM cache_entries WHERE run_id = %s AND cache_type = %s",
+                        (run_id, self._cache_type),
+                    )
+                    return cur.rowcount or 0
+        except Exception:
             return 0
 
     def clear(self) -> None:
@@ -358,6 +379,16 @@ def _normalize_for_hashing(obj: Any) -> Any:
         return obj
 
 
+def get_run_id() -> str | None:
+    """Get the current run_id from context, if available."""
+    return _run_id_context.get()
+
+
+def set_run_id(run_id: str) -> None:
+    """Set the run_id in context (called at API level)."""
+    _run_id_context.set(run_id)
+
+
 def stable_hash(obj: Any) -> str:
     """Create a stable hash of an object for cache keys."""
     # Normalize the object first to handle list ordering and float precision
@@ -365,6 +396,15 @@ def stable_hash(obj: Any) -> str:
     # Sort dict keys and use consistent JSON formatting
     json_str = json.dumps(normalized, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(json_str.encode()).hexdigest()
+
+
+def make_cache_key(operation: str, *args: Any) -> str:
+    """Create a deterministic cache key from operation + content only.
+
+    Format: {operation}:{content_hash}
+    """
+    content_hash = ":".join(stable_hash(arg) for arg in args)
+    return f"{operation}:{content_hash}"
 
 
 def get_cache_ttl() -> int:
@@ -395,13 +435,15 @@ def _init_cache_table(dsn: str) -> None:
         cache_key TEXT PRIMARY KEY,
         cache_type VARCHAR(50) NOT NULL,
         value JSONB NOT NULL,
+        run_id TEXT NOT NULL,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         expires_at TIMESTAMPTZ NOT NULL,
         access_count INTEGER DEFAULT 0,
         last_accessed_at TIMESTAMPTZ DEFAULT NOW()
       );
       CREATE INDEX IF NOT EXISTS idx_cache_expires_at ON cache_entries(expires_at);
-      CREATE INDEX IF NOT EXISTS idx_cache_type_expires ON cache_entries(cache_type, expires_at);
+      CREATE INDEX IF NOT EXISTS idx_cache_run_id ON cache_entries(run_id);
+      CREATE INDEX IF NOT EXISTS idx_cache_type_run ON cache_entries(cache_type, run_id);
     """
     if psycopg is None:
         return
@@ -415,6 +457,7 @@ def _init_cache_table(dsn: str) -> None:
                         cache_key TEXT PRIMARY KEY,
                         cache_type VARCHAR(50) NOT NULL,
                         value JSONB NOT NULL,
+                        run_id TEXT NOT NULL,
                         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                         expires_at TIMESTAMPTZ NOT NULL,
                         access_count INTEGER DEFAULT 0,
@@ -423,9 +466,8 @@ def _init_cache_table(dsn: str) -> None:
                     """
                 )
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_cache_expires_at ON cache_entries(expires_at)")
-                cur.execute(
-                    "CREATE INDEX IF NOT EXISTS idx_cache_type_expires ON cache_entries(cache_type, expires_at)"
-                )
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_cache_run_id ON cache_entries(run_id)")
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_cache_type_run ON cache_entries(cache_type, run_id)")
     except Exception:
         # Non-fatal: table might already exist or connection might fail
         pass

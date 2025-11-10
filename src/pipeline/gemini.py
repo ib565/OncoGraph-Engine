@@ -20,7 +20,7 @@ from .types import (
     PipelineError,
     Summarizer,
 )
-from .utils import get_llm_cache, stable_hash
+from .utils import get_llm_cache, make_cache_key
 
 try:  # pragma: no cover - optional dependency at runtime
     from google import genai  # type: ignore
@@ -192,9 +192,12 @@ class GeminiInstructionExpander(_GeminiBase, InstructionExpander):
     def expand_instructions(self, question: str) -> str:
         # Check cache first
         cache = get_llm_cache()
-        cache_key = f"expand_instructions:{stable_hash(question.strip())}"
+        cache_key = make_cache_key("expand_instructions", question.strip())
         cached_result = cache.get(cache_key)
         if cached_result is not None:
+            # Log cache hit
+            if hasattr(self, "trace") and self.trace:
+                self.trace.record("cache_hit", {"cache_key": cache_key, "operation": "expand_instructions"})
             return cached_result
 
         prompt = INSTRUCTION_PROMPT_TEMPLATE.format(schema=SCHEMA_SNIPPET, question=question.strip())
@@ -202,6 +205,9 @@ class GeminiInstructionExpander(_GeminiBase, InstructionExpander):
         result = text.strip()
 
         cache.set(cache_key, result)
+        # Log cache set
+        if hasattr(self, "trace") and self.trace:
+            self.trace.record("cache_set", {"cache_key": cache_key, "operation": "expand_instructions"})
         return result
 
 
@@ -211,9 +217,12 @@ class GeminiCypherGenerator(_GeminiBase, CypherGenerator):
     def generate_cypher(self, instructions: str) -> str:
         # Check cache first
         cache = get_llm_cache()
-        cache_key = f"generate_cypher:{stable_hash(instructions.strip())}"
+        cache_key = make_cache_key("generate_cypher", instructions.strip())
         cached_result = cache.get(cache_key)
         if cached_result is not None:
+            # Log cache hit
+            if hasattr(self, "trace") and self.trace:
+                self.trace.record("cache_hit", {"cache_key": cache_key, "operation": "generate_cypher"})
             return cached_result
 
         prompt = CYPHER_PROMPT_TEMPLATE.format(schema=SCHEMA_SNIPPET, instructions=instructions.strip())
@@ -221,6 +230,9 @@ class GeminiCypherGenerator(_GeminiBase, CypherGenerator):
         result = _strip_code_fence(text)
 
         cache.set(cache_key, result)
+        # Log cache set
+        if hasattr(self, "trace") and self.trace:
+            self.trace.record("cache_set", {"cache_key": cache_key, "operation": "generate_cypher"})
         return result
 
 
@@ -230,9 +242,12 @@ class GeminiSummarizer(_GeminiBase, Summarizer):
     def summarize(self, question: str, rows: list[dict[str, object]]) -> str:
         # Check cache first
         cache = get_llm_cache()
-        cache_key = f"summarize:{stable_hash(question.strip())}:{stable_hash(rows)}"
+        cache_key = make_cache_key("summarize", question.strip(), rows)
         cached_result = cache.get(cache_key)
         if cached_result is not None:
+            # Log cache hit
+            if hasattr(self, "trace") and self.trace:
+                self.trace.record("cache_hit", {"cache_key": cache_key, "operation": "summarize"})
             return cached_result
 
         formatted_rows = _format_rows(rows)
@@ -244,6 +259,9 @@ class GeminiSummarizer(_GeminiBase, Summarizer):
         result = text.strip()
 
         cache.set(cache_key, result)
+        # Log cache set
+        if hasattr(self, "trace") and self.trace:
+            self.trace.record("cache_set", {"cache_key": cache_key, "operation": "summarize"})
         return result
 
 
@@ -264,9 +282,12 @@ class GeminiEnrichmentSummarizer(_GeminiBase):
         """
         # Check cache first
         cache = get_llm_cache()
-        cache_key = f"summarize_enrichment:{stable_hash(sorted(gene_list))}:{top_n}:{stable_hash(enrichment_results)}"
+        cache_key = make_cache_key("summarize_enrichment", sorted(gene_list), top_n, enrichment_results)
         cached_result = cache.get(cache_key)
         if cached_result is not None:
+            # Log cache hit
+            if hasattr(self, "trace") and self.trace:
+                self.trace.record("cache_hit", {"cache_key": cache_key, "operation": "summarize_enrichment"})
             # Reconstruct the Pydantic model from the cached dictionary
             if isinstance(cached_result, dict):
                 return EnrichmentSummaryResponse(**cached_result)
@@ -322,6 +343,9 @@ class GeminiEnrichmentSummarizer(_GeminiBase):
             data = json.loads(text)
             result = EnrichmentSummaryResponse(**data)
             cache.set(cache_key, result)
+            # Log cache set
+            if hasattr(self, "trace") and self.trace:
+                self.trace.record("cache_set", {"cache_key": cache_key, "operation": "summarize_enrichment"})
             return result
         except (json.JSONDecodeError, ValueError) as e:
             raise PipelineError(f"Failed to parse structured response: {e}") from e

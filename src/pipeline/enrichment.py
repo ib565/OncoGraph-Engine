@@ -10,7 +10,7 @@ from typing import Any
 import pandas as pd
 import plotly.graph_objects as go
 
-from .utils import get_enrichment_cache, stable_hash
+from .utils import get_enrichment_cache, make_cache_key
 
 try:  # pragma: no cover - optional dependencies
     import gseapy as gp
@@ -74,9 +74,12 @@ class GeneEnrichmentAnalyzer:
 
         # Check cache first
         cache = get_enrichment_cache()
-        cache_key = f"normalize_genes:{stable_hash(sorted(cleaned_genes))}"
+        cache_key = make_cache_key("normalize_genes", sorted(cleaned_genes))
         cached_result = cache.get(cache_key)
         if cached_result is not None:
+            # Log cache hit
+            if self.trace:
+                self._trace("cache_hit", {"cache_key": cache_key, "operation": "normalize_genes"})
             return cached_result
 
         try:
@@ -115,6 +118,14 @@ class GeneEnrichmentAnalyzer:
             # Remove duplicates while preserving order
             valid_genes = list(dict.fromkeys(valid_genes))
 
+            result = (valid_genes, invalid_genes)
+            
+            # Cache the result
+            cache.set(cache_key, result)
+            # Log cache set
+            if self.trace:
+                self._trace("cache_set", {"cache_key": cache_key, "operation": "normalize_genes"})
+
             # Log normalization results
             self._trace(
                 "mygene_results",
@@ -130,8 +141,6 @@ class GeneEnrichmentAnalyzer:
                 f"Normalized {len(cleaned_genes)} input genes: {len(valid_genes)} valid, {len(invalid_genes)} invalid"
             )
 
-            result = (valid_genes, invalid_genes)
-            cache.set(cache_key, result)
             return result
 
         except Exception as e:
@@ -156,9 +165,12 @@ class GeneEnrichmentAnalyzer:
 
         # Check cache first
         cache = get_enrichment_cache()
-        cache_key = f"run_enrichment:{stable_hash(sorted(gene_list))}:{stable_hash(self.enrichr_libraries)}"
+        cache_key = make_cache_key("run_enrichment", sorted(gene_list), self.enrichr_libraries)
         cached_result = cache.get(cache_key)
         if cached_result is not None:
+            # Log cache hit
+            if self.trace:
+                self._trace("cache_hit", {"cache_key": cache_key, "operation": "run_enrichment"})
             return cached_result
 
         try:
@@ -241,6 +253,9 @@ class GeneEnrichmentAnalyzer:
             logger.info(f"Found {len(all_results)} significant enrichment terms, returning top {len(top_results)}")
 
             cache.set(cache_key, top_results)
+            # Log cache set
+            if self.trace:
+                self._trace("cache_set", {"cache_key": cache_key, "operation": "run_enrichment"})
             return top_results
 
         except Exception as e:

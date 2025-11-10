@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import logging
 import os
 import threading
 from datetime import UTC, datetime
@@ -42,19 +41,9 @@ from pipeline.trace import (
     daily_trace_path,
 )
 from pipeline.types import PipelineError, with_context_trace
+from pipeline.utils import get_enrichment_cache, get_llm_cache, set_run_id
 
 load_dotenv()
-
-# Configure logging level from environment variable (default: INFO)
-# Set LOG_LEVEL=DEBUG to enable debug logging for cache and other components
-log_level = os.getenv("LOG_LEVEL", "INFO").upper()
-logging.basicConfig(
-    level=getattr(logging, log_level, logging.INFO),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-# Set specific logger for pipeline.utils to DEBUG if LOG_LEVEL is DEBUG
-if log_level == "DEBUG":
-    logging.getLogger("pipeline.utils").setLevel(logging.DEBUG)
 
 
 class QueryRequest(BaseModel):
@@ -208,6 +197,9 @@ def query(body: QueryRequest, engine: Annotated[QueryEngine, Depends(get_engine)
     started_perf = __import__("time").perf_counter()
     run_id = os.getenv("TRACE_RUN_ID_OVERRIDE") or __import__("uuid").uuid4().hex
 
+    # Set run_id in context for cache key generation
+    set_run_id(run_id)
+
     # Wrap trace with run_id so all events share a common identifier
     traced_engine = engine
     if engine.trace is not None:
@@ -317,6 +309,9 @@ def query_stream(question: str, engine: Annotated[QueryEngine, Depends(get_engin
 
     run_id = os.getenv("TRACE_RUN_ID_OVERRIDE") or __import__("uuid").uuid4().hex
 
+    # Set run_id in context for cache key generation
+    set_run_id(run_id)
+
     # Bridge pipeline trace events into a queue for streaming
     queue_sink = QueueTraceSink()
 
@@ -334,6 +329,7 @@ def query_stream(question: str, engine: Annotated[QueryEngine, Depends(get_engin
     done_event = threading.Event()
 
     def worker() -> None:
+        set_run_id(run_id)
         try:
             result: QueryEngineResult = traced_engine.run(question.strip())
             outcome["result"] = result
@@ -440,6 +436,39 @@ def query_stream(question: str, engine: Annotated[QueryEngine, Depends(get_engin
         "X-Accel-Buffering": "no",  # hint for some proxies (e.g., nginx)
     }
     return StreamingResponse(event_stream(), media_type="text/event-stream", headers=headers)
+
+
+@app.post("/cache/invalidate/{run_id}")
+def invalidate_cache_by_run_id(run_id: str) -> dict[str, str | int]:
+    """Invalidate all cache entries for a specific run_id.
+
+    This deletes all cache entries (expand_instructions, generate_cypher, summarize,
+    summarize_enrichment) associated with the given run_id. Useful for removing
+    incorrect cached results from a specific query.
+
+    Args:
+        run_id: The run_id from a query response to invalidate
+
+    Returns:
+        Dictionary with status, run_id, deleted_count, and message
+    """
+    llm_cache = get_llm_cache()
+    enrichment_cache = get_enrichment_cache()
+    deleted = 0
+
+    # Delete by run_id using cache metadata
+    deleted_llm = getattr(llm_cache, "delete_by_run_id", lambda _rid: 0)(run_id)  # type: ignore[call-arg]
+    deleted_enrichment = getattr(enrichment_cache, "delete_by_run_id", lambda _rid: 0)(run_id)  # type: ignore[call-arg]
+    deleted = (deleted_llm or 0) + (deleted_enrichment or 0)
+
+    return {
+        "status": "success",
+        "run_id": run_id,
+        "deleted_count": deleted,
+        "deleted_llm": deleted_llm or 0,
+        "deleted_enrichment": deleted_enrichment or 0,
+        "message": f"Invalidated cache entries for run_id {run_id}",
+    }
 
 
 @app.post("/query/feedback")
@@ -580,6 +609,9 @@ def analyze_genes_stream(
     started_perf = __import__("time").perf_counter()
     run_id = os.getenv("TRACE_RUN_ID_OVERRIDE") or __import__("uuid").uuid4().hex
 
+    # Set run_id in context for cache key generation
+    set_run_id(run_id)
+
     # Set up trace sinks with selective database logging
     trace_sink = JsonlTraceSink(daily_trace_path(Path("logs") / "traces"))
 
@@ -602,6 +634,7 @@ def analyze_genes_stream(
     done_event = threading.Event()
 
     def worker() -> None:
+        set_run_id(run_id)
         try:
             # Parse gene list (comma or newline separated)
             gene_symbols = []
@@ -823,6 +856,9 @@ def analyze_genes(
     started = datetime.now(UTC).isoformat()
     started_perf = __import__("time").perf_counter()
     run_id = os.getenv("TRACE_RUN_ID_OVERRIDE") or __import__("uuid").uuid4().hex
+
+    # Set run_id in context for cache key generation
+    set_run_id(run_id)
 
     # Set up trace sinks with selective database logging
     trace_sink = JsonlTraceSink(daily_trace_path(Path("logs") / "traces"))
