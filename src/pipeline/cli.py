@@ -51,7 +51,8 @@ def _build_engine() -> QueryEngine:
 
     summarizer = GeminiSummarizer(config=gemini_config)
 
-    trace_path = daily_trace_path(Path("logs") / "traces")
+    trace_base = Path(os.getenv("TRACE_LOG_DIR", "logs")) / "traces"
+    trace_path = daily_trace_path(trace_base)
 
     return QueryEngine(
         config=pipeline_config,

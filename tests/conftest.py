@@ -15,6 +15,14 @@ if SRC_DIR.exists():
 
 
 @pytest.fixture(autouse=True)
+def isolate_trace_logs(tmp_path, monkeypatch):
+    """Redirect trace logs to a temporary directory during tests to avoid polluting production logs."""
+    test_log_dir = tmp_path / "test_logs"
+    test_log_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("TRACE_LOG_DIR", str(test_log_dir))
+
+
+@pytest.fixture(autouse=True)
 def isolate_enrichment_cache(monkeypatch):
     """Ensure enrichment cache is fresh and in-memory for each test."""
     cache = TTLCache()

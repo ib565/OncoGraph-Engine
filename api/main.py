@@ -613,7 +613,8 @@ def analyze_genes_stream(
     set_run_id(run_id)
 
     # Set up trace sinks with selective database logging
-    trace_sink = JsonlTraceSink(daily_trace_path(Path("logs") / "traces"))
+    trace_base = Path(os.getenv("TRACE_LOG_DIR", "logs")) / "traces"
+    trace_sink = JsonlTraceSink(daily_trace_path(trace_base))
 
     pg_dsn = os.getenv("TRACE_DATABASE_URL") or os.getenv("DATABASE_URL")
     if pg_dsn:
@@ -861,7 +862,8 @@ def analyze_genes(
     set_run_id(run_id)
 
     # Set up trace sinks with selective database logging
-    trace_sink = JsonlTraceSink(daily_trace_path(Path("logs") / "traces"))
+    trace_base = Path(os.getenv("TRACE_LOG_DIR", "logs")) / "traces"
+    trace_sink = JsonlTraceSink(daily_trace_path(trace_base))
 
     pg_dsn = os.getenv("TRACE_DATABASE_URL") or os.getenv("DATABASE_URL")
     if pg_dsn:
