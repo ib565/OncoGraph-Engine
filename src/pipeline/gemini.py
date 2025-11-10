@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from dataclasses import dataclass
 
 from pydantic import BaseModel
@@ -20,7 +21,7 @@ from .types import (
     PipelineError,
     Summarizer,
 )
-from .utils import get_llm_cache, make_cache_key
+from .utils import get_llm_cache, get_run_id, make_cache_key
 
 try:  # pragma: no cover - optional dependency at runtime
     from google import genai  # type: ignore
@@ -93,6 +94,7 @@ class _GeminiBase:
             if self.config.api_key:
                 kwargs["api_key"] = self.config.api_key
             self._client = genai.Client(**kwargs)  # type: ignore[call-arg]
+        self._cache_namespace = get_run_id() or f"gemini:{uuid.uuid4().hex}"
 
     def _build_content_config(self) -> object | None:
         if genai_types is None:
@@ -192,7 +194,7 @@ class GeminiInstructionExpander(_GeminiBase, InstructionExpander):
     def expand_instructions(self, question: str) -> str:
         # Check cache first
         cache = get_llm_cache()
-        cache_key = make_cache_key("expand_instructions", question.strip())
+        cache_key = make_cache_key("expand_instructions", self._cache_namespace, question.strip())
         cached_result = cache.get(cache_key)
         if cached_result is not None:
             # Log cache hit
@@ -217,7 +219,7 @@ class GeminiCypherGenerator(_GeminiBase, CypherGenerator):
     def generate_cypher(self, instructions: str) -> str:
         # Check cache first
         cache = get_llm_cache()
-        cache_key = make_cache_key("generate_cypher", instructions.strip())
+        cache_key = make_cache_key("generate_cypher", self._cache_namespace, instructions.strip())
         cached_result = cache.get(cache_key)
         if cached_result is not None:
             # Log cache hit
@@ -242,7 +244,7 @@ class GeminiSummarizer(_GeminiBase, Summarizer):
     def summarize(self, question: str, rows: list[dict[str, object]]) -> str:
         # Check cache first
         cache = get_llm_cache()
-        cache_key = make_cache_key("summarize", question.strip(), rows)
+        cache_key = make_cache_key("summarize", self._cache_namespace, question.strip(), rows)
         cached_result = cache.get(cache_key)
         if cached_result is not None:
             # Log cache hit
@@ -282,7 +284,9 @@ class GeminiEnrichmentSummarizer(_GeminiBase):
         """
         # Check cache first
         cache = get_llm_cache()
-        cache_key = make_cache_key("summarize_enrichment", sorted(gene_list), top_n, enrichment_results)
+        cache_key = make_cache_key(
+            "summarize_enrichment", self._cache_namespace, sorted(gene_list), top_n, enrichment_results
+        )
         cached_result = cache.get(cache_key)
         if cached_result is not None:
             # Log cache hit

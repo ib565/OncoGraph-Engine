@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import logging
 import math
+import uuid
 from dataclasses import dataclass
 from typing import Any
 
 import pandas as pd
 import plotly.graph_objects as go
 
-from .utils import get_enrichment_cache, make_cache_key
+from .utils import get_enrichment_cache, get_run_id, make_cache_key
 
 try:  # pragma: no cover - optional dependencies
     import gseapy as gp
@@ -35,7 +36,7 @@ class EnrichmentResult:
 class GeneEnrichmentAnalyzer:
     """Analyzes gene lists for functional enrichment."""
 
-    def __init__(self, trace=None) -> None:
+    def __init__(self, trace=None, cache=None) -> None:
         """Initialize the analyzer with required dependencies."""
         if mygene is None:
             raise ImportError("mygene package is required for gene enrichment analysis")
@@ -45,6 +46,8 @@ class GeneEnrichmentAnalyzer:
         self.mg = mygene.MyGeneInfo()
         self.enrichr_libraries = ["GO_Biological_Process_2023", "KEGG_2021_Human", "Reactome_2022"]
         self.trace = trace
+        self._cache = cache or get_enrichment_cache()
+        self._cache_namespace = get_run_id() or f"enrichment:{uuid.uuid4().hex}"
 
     def _trace(self, step: str, data: dict[str, object]) -> None:
         """Log trace event if trace sink is available."""
@@ -73,9 +76,8 @@ class GeneEnrichmentAnalyzer:
             return [], []
 
         # Check cache first
-        cache = get_enrichment_cache()
-        cache_key = make_cache_key("normalize_genes", sorted(cleaned_genes))
-        cached_result = cache.get(cache_key)
+        cache_key = make_cache_key("normalize_genes", self._cache_namespace, sorted(cleaned_genes))
+        cached_result = self._cache.get(cache_key)
         if cached_result is not None:
             # Log cache hit
             if self.trace:
@@ -121,7 +123,7 @@ class GeneEnrichmentAnalyzer:
             result = (valid_genes, invalid_genes)
             
             # Cache the result
-            cache.set(cache_key, result)
+            self._cache.set(cache_key, result)
             # Log cache set
             if self.trace:
                 self._trace("cache_set", {"cache_key": cache_key, "operation": "normalize_genes"})
@@ -164,9 +166,8 @@ class GeneEnrichmentAnalyzer:
             return []
 
         # Check cache first
-        cache = get_enrichment_cache()
-        cache_key = make_cache_key("run_enrichment", sorted(gene_list), self.enrichr_libraries)
-        cached_result = cache.get(cache_key)
+        cache_key = make_cache_key("run_enrichment", self._cache_namespace, sorted(gene_list), self.enrichr_libraries)
+        cached_result = self._cache.get(cache_key)
         if cached_result is not None:
             # Log cache hit
             if self.trace:
@@ -252,7 +253,7 @@ class GeneEnrichmentAnalyzer:
 
             logger.info(f"Found {len(all_results)} significant enrichment terms, returning top {len(top_results)}")
 
-            cache.set(cache_key, top_results)
+            self._cache.set(cache_key, top_results)
             # Log cache set
             if self.trace:
                 self._trace("cache_set", {"cache_key": cache_key, "operation": "run_enrichment"})

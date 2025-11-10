@@ -178,6 +178,11 @@ class PostgresCache:
                     # psycopg automatically deserializes JSONB to Python objects (dict/list)
                     # So value_json is already a Python object, not a string
                     value = value_json
+                    if isinstance(value_json, str):
+                        try:
+                            value = json.loads(value_json)
+                        except (TypeError, ValueError, json.JSONDecodeError):
+                            value = value_json
 
                     # Deep copy to avoid mutation
                     return self._deep_copy(value)
