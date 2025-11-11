@@ -15,6 +15,26 @@ if SRC_DIR.exists():
 
 
 @pytest.fixture(autouse=True)
+def disable_db_side_effects(monkeypatch):
+    # Never talk to Postgres in tests
+    for var in ("CACHE_DATABASE_URL", "TRACE_DATABASE_URL", "DATABASE_URL"):
+        monkeypatch.delenv(var, raising=False)
+    # Also silence stdout tracing
+    monkeypatch.setenv("TRACE_STDOUT", "0")
+
+
+@pytest.fixture(autouse=True)
+def isolate_llm_cache(monkeypatch):
+    # Force a fresh in-memory LLM cache per test
+    cache = TTLCache()
+    monkeypatch.setattr("pipeline.utils.get_llm_cache", lambda: cache)
+    try:
+        yield
+    finally:
+        cache.clear()
+
+
+@pytest.fixture(autouse=True)
 def isolate_trace_logs(tmp_path, monkeypatch):
     """Redirect trace logs to a temporary directory during tests to avoid polluting production logs."""
     test_log_dir = tmp_path / "test_logs"
