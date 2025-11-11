@@ -4,14 +4,13 @@ from __future__ import annotations
 
 import logging
 import math
-import uuid
 from dataclasses import dataclass
 from typing import Any
 
 import pandas as pd
 import plotly.graph_objects as go
 
-from .utils import get_enrichment_cache, get_run_id, make_cache_key
+from .utils import get_enrichment_cache, make_cache_key
 
 try:  # pragma: no cover - optional dependencies
     import gseapy as gp
@@ -47,7 +46,6 @@ class GeneEnrichmentAnalyzer:
         self.enrichr_libraries = ["GO_Biological_Process_2023", "KEGG_2021_Human", "Reactome_2022"]
         self.trace = trace
         self._cache = cache or get_enrichment_cache()
-        self._cache_namespace = get_run_id() or f"enrichment:{uuid.uuid4().hex}"
 
     def _trace(self, step: str, data: dict[str, object]) -> None:
         """Log trace event if trace sink is available."""
@@ -76,7 +74,7 @@ class GeneEnrichmentAnalyzer:
             return [], []
 
         # Check cache first
-        cache_key = make_cache_key("normalize_genes", self._cache_namespace, sorted(cleaned_genes))
+        cache_key = make_cache_key("normalize_genes", sorted(cleaned_genes))
         cached_result = self._cache.get(cache_key)
         if cached_result is not None:
             # Log cache hit
@@ -166,7 +164,7 @@ class GeneEnrichmentAnalyzer:
             return []
 
         # Check cache first
-        cache_key = make_cache_key("run_enrichment", self._cache_namespace, sorted(gene_list), self.enrichr_libraries)
+        cache_key = make_cache_key("run_enrichment", sorted(gene_list), self.enrichr_libraries)
         cached_result = self._cache.get(cache_key)
         if cached_result is not None:
             # Log cache hit
