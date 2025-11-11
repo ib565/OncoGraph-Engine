@@ -1,0 +1,16 @@
+{
+  "name": "oncograph",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently --raw \"npm:dev:backend\" \"npm:dev:frontend\"",
+    "dev:backend": "cross-env PYTHONUNBUFFERED=1 TRACE_STDOUT=1 uvicorn api.main:app --reload",
+    "dev:frontend": "cd web && npm run dev",
+    "install:all": "npm install && cd web && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3"
+  }
+}
+

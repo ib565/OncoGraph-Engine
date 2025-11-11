@@ -227,15 +227,32 @@ KRAS, NRAS, BRAF, MAP2K1, MAP2K2, EGFR
 
 **Quick setup:**
 ```bash
-# Backend
+# 1. Setup Python environment
 python -m venv venv && source venv/bin/activate  # or .\venv\Scripts\activate on Windows
 pip install -r requirements.txt && pip install -e .
-python -m src.graph.builder  # seed database
+
+# 2. Seed database
+python -m src.graph.builder
+
+# 3. Install frontend dependencies (once)
+cd web && npm install && cd ..
+
+# 4. Install dev tooling (once; installs concurrently)
+npm install
+
+# 5. Start both backend (port 8000) and frontend (port 3000)
+npm run dev
+```
+
+Already ran `npm install` inside `web/`? You're set—repeat step 3 only when the UI package.json changes. Step 4 still needs to run once at the project root to pull in the root-level tooling.
+
+Prefer separate terminals instead of the combined command?
+```bash
+# Terminal 1 - Backend
 uvicorn api.main:app --reload
 
-# Frontend (in new terminal)
-cd web && npm install
-npm run dev
+# Terminal 2 - Frontend
+cd web && npm run dev
 ```
 
 **Environment variables:** Create `.env` with `GOOGLE_API_KEY`, `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`

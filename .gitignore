@@ -15,3 +15,5 @@ __pycache__/
 logs/
 *.egg-info/
 unsloth_compiled_cache/
+node_modules/
+package-lock.json
