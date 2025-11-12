@@ -231,16 +231,19 @@ KRAS, NRAS, BRAF, MAP2K1, MAP2K2, EGFR
 python -m venv venv && source venv/bin/activate  # or .\venv\Scripts\activate on Windows
 pip install -r requirements.txt && pip install -e .
 
-# 2. Seed database
+# 2. Ingest CIViC data
+python -m src.pipeline.civic_ingest --out-dir data/civic/latest --enrich-tags
+
+# 3. Seed database
 python -m src.graph.builder
 
-# 3. Install frontend dependencies (once)
+# 4. Install frontend dependencies (once)
 cd web && npm install && cd ..
 
-# 4. Install dev tooling (once; installs concurrently)
+# 5. Install dev tooling (once; installs concurrently)
 npm install
 
-# 5. Start both backend (port 8000) and frontend (port 3000)
+# 6. Start both backend (port 8000) and frontend (port 3000)
 npm run dev
 ```
 
