@@ -12,18 +12,23 @@ SCHEMA_SNIPPET = dedent(
       (Variant)-[:VARIANT_OF]->(Gene)
       (Therapy)-[:TARGETS {{source, moa?, ref_sources?, ref_ids?, ref_urls?}}]->(Gene)
       (Biomarker)-[:AFFECTS_RESPONSE_TO {{effect, disease_name, disease_id?,
-        pmids}}]->(Therapy)
+        pmids, evidence_level?, evidence_rating? (integer)}}]->(Therapy)
     - Array properties: pmids, tags, synonyms, ref_sources, ref_ids, ref_urls
     - No parameters: inline single-quoted literals only (no $variables)
 
     Preferred return columns (choose minimally sufficient for the question):
     - AFFECTS queries (predictive evidence): project
-      variant_name, gene_symbol, therapy_name, effect, disease_name, pmids.
+      variant_name, gene_symbol, therapy_name, effect, disease_name, pmids,
+      evidence_level, evidence_rating.
       Always include pmids as an array; default to [] when absent.
+      Always include evidence_level and evidence_rating from rel.evidence_level
+      and rel.evidence_rating.
     - Gene-only AFFECTS queries ("Which genes..."):
       set variant_name = NULL, return gene_symbol, therapy_name, effect,
-      disease_name, pmids, and de-duplicate by gene_symbol, therapy_name,
-      disease_name. Aggregate pmids across evidence rows into a single array.
+      disease_name, pmids, evidence_level, evidence_rating, and de-duplicate
+      by gene_symbol, therapy_name, disease_name. Aggregate pmids across
+      evidence rows into a single array. Collect evidence_level and evidence_rating
+      as arrays of distinct values.
     - TARGETS queries (mechanism/targeting): project
       gene_symbol, therapy_name, r.moa AS targets_moa. Include
       r.ref_sources, r.ref_ids, r.ref_urls for transparency.
@@ -32,9 +37,11 @@ SCHEMA_SNIPPET = dedent(
       variant lookup queries, return only variant_name and gene_symbol.
 
     Always include evidence where applicable:
-    - For AFFECTS queries, use rel.pmids (coalesce to []).
+    - For AFFECTS queries, use rel.pmids (coalesce to []), rel.evidence_level,
+      and rel.evidence_rating.
     - For gene-only AFFECTS, aggregate pmids across all evidence rows that
-      contribute to a gene–therapy–disease tuple.
+      contribute to a gene–therapy–disease tuple. Collect evidence_level and
+      evidence_rating as arrays of distinct values (arrays, consistent with pmids).
     - For TARGETS queries, include reference arrays (r.ref_sources, r.ref_ids,
       r.ref_urls).
 
@@ -57,17 +64,31 @@ SCHEMA_SNIPPET = dedent(
         CASE WHEN b:Gene THEN b.symbol ELSE g.symbol END AS gene_symbol,
         t.name AS therapy_name,
         rel.disease_name AS disease_name,
-        coalesce(rel.pmids, []) AS pmids
+        coalesce(rel.pmids, []) AS pmids,
+        rel.evidence_level AS evidence_level,
+        rel.evidence_rating AS evidence_rating
       WHERE gene_symbol IS NOT NULL
       UNWIND pmids AS p
-      WITH gene_symbol, therapy_name, disease_name, collect(DISTINCT p) AS pmids
+      WITH gene_symbol, therapy_name, disease_name,
+           collect(DISTINCT p) AS pmids,
+           collect(DISTINCT evidence_level) AS evidence_levels,
+           collect(DISTINCT evidence_rating) AS evidence_ratings
+      WITH gene_symbol, therapy_name, disease_name, pmids,
+           [l IN evidence_levels WHERE l IS NOT NULL] AS evidence_levels_filtered,
+           [r IN evidence_ratings WHERE r IS NOT NULL] AS evidence_ratings_filtered
       RETURN
         NULL AS variant_name,
         gene_symbol,
         therapy_name,
         'resistance' AS effect,
         disease_name,
-        pmids
+        pmids,
+        CASE WHEN size(evidence_levels_filtered) > 0 
+             THEN evidence_levels_filtered 
+             ELSE [] END AS evidence_level,
+        CASE WHEN size(evidence_ratings_filtered) > 0 
+             THEN evidence_ratings_filtered 
+             ELSE [] END AS evidence_rating
       LIMIT 100
 
     Canonical example (AFFECTS; adapt values as needed):
@@ -86,7 +107,9 @@ SCHEMA_SNIPPET = dedent(
         t.name AS therapy_name,
         rel.effect AS effect,
         rel.disease_name AS disease_name,
-        coalesce(rel.pmids, []) AS pmids
+        coalesce(rel.pmids, []) AS pmids,
+        rel.evidence_level AS evidence_level,
+        rel.evidence_rating AS evidence_rating
       LIMIT 100
 
     Canonical example (TARGETS; adapt values as needed):
@@ -130,7 +153,9 @@ SCHEMA_SNIPPET = dedent(
         t.name AS therapy_name,
         rel.effect AS effect,
         rel.disease_name AS disease_name,
-        coalesce(rel.pmids, []) AS pmids
+        coalesce(rel.pmids, []) AS pmids,
+        rel.evidence_level AS evidence_level,
+        rel.evidence_rating AS evidence_rating
       LIMIT 100
 
     Canonical rules:
@@ -144,6 +169,9 @@ SCHEMA_SNIPPET = dedent(
         • de-duplicate by gene_symbol, therapy_name, disease_name,
         • aggregate pmids across evidence rows: use UNWIND pmids AS p, then
           collect(DISTINCT p) AS pmids to ensure no duplicates.
+        • collect evidence_level and evidence_rating as arrays of distinct values:
+          collect(DISTINCT evidence_level) and collect(DISTINCT evidence_rating),
+          then filter nulls. Return as arrays.
     - Specific variant:
       - Always require VARIANT_OF to the named gene.
       - Prefer equality on Variant.name for full names like 'KRAS G12C' or
@@ -189,7 +217,8 @@ SCHEMA_SNIPPET = dedent(
       gene_symbol. Do NOT add unnecessary NULL columns (therapy_name, effect, disease_name,
       pmids) unless the query requires them. Always match return columns to query type:
       AFFECTS queries return variant_name, gene_symbol, therapy_name, effect, disease_name,
-      pmids; TARGETS queries return gene_symbol, therapy_name, targets_moa, ref_sources/ref_ids/ref_urls.
+      pmids, evidence_level, evidence_rating; TARGETS queries return gene_symbol, therapy_name,
+      targets_moa, ref_sources/ref_ids/ref_urls.
     - Filter scoping: place WHERE filters that constrain (b)-[rel:AFFECTS_RESPONSE_TO]->(t)
       immediately after introducing those bindings. Do not attach such filters to OPTIONAL MATCH.
     - Effect filtering: ALWAYS compare case-insensitively: toLower(rel.effect) = 'resistance'
@@ -214,9 +243,11 @@ INSTRUCTION_PROMPT_TEMPLATE = dedent(
     starting with "- "; no Cypher and no JSON.
 
     Always include evidence:
-    - For AFFECTS queries, return pmids from rel.pmids (array; default []).
+    - For AFFECTS queries, return pmids from rel.pmids (array; default []), and
+      always include rel.evidence_level and rel.evidence_rating.
     - For gene-only AFFECTS questions, collapse to gene-level and aggregate pmids
-      across evidence rows for each gene–therapy–disease tuple.
+      across evidence rows for each gene–therapy–disease tuple. Include evidence_level
+      and evidence_rating from the relationship.
     - For TARGETS queries, include r.ref_sources, r.ref_ids, r.ref_urls.
 
     - If the question asks for "genes" (no specific variant named), instruct to:
@@ -281,13 +312,17 @@ CYPHER_PROMPT_TEMPLATE = dedent(
     - When checking array properties (synonyms, tags, reference arrays), wrap with
       coalesce(..., []) before any()/all().
     - AFFECTS evidence: project pmids from rel.pmids as an array
-      (use coalesce(rel.pmids, [])); for gene-only requests, collapse to the
-      gene level and aggregate pmids across evidence rows.
+      (use coalesce(rel.pmids, [])); always include rel.evidence_level and
+      rel.evidence_rating. For gene-only requests, collapse to the gene level
+      and aggregate pmids across evidence rows. Collect evidence_level and
+      evidence_rating as arrays of distinct values.
     - TARGETS evidence: include r.moa AS targets_moa and the reference arrays
       r.ref_sources, r.ref_ids, r.ref_urls (do not derive pmids).
     - Return the minimally sufficient columns for the query type:
-      • AFFECTS: variant_name, gene_symbol, therapy_name, effect, disease_name, pmids.
-      • Gene-only AFFECTS: set variant_name = NULL and aggregate pmids.
+      • AFFECTS: variant_name, gene_symbol, therapy_name, effect, disease_name,
+        pmids, evidence_level, evidence_rating.
+      • Gene-only AFFECTS: set variant_name = NULL, aggregate pmids, and include
+        evidence_level and evidence_rating as arrays of distinct values.
       • TARGETS: gene_symbol, therapy_name, targets_moa, ref_sources, ref_ids, ref_urls.
       • Simple variant lookups: ONLY variant_name and gene_symbol.
       • Include therapy_name and at least one of gene_symbol or variant_name only
@@ -359,7 +394,7 @@ ENRICHMENT_SUMMARY_PROMPT_TEMPLATE = dedent(
       Relationships:
       - (Variant)-[:VARIANT_OF]->(Gene)
       - (Therapy)-[:TARGETS {{action_type}}]->(Gene)
-      - (Biomarker)-[:AFFECTS_RESPONSE_TO {{effect, disease_name, pmids}}]->(Therapy)
+      - (Biomarker)-[:AFFECTS_RESPONSE_TO {{effect, disease_name, pmids, evidence_level, evidence_rating}}]->(Therapy)
       Biomarker can be a Gene or a Variant.
       Effect can be 'Sensitivity' or 'Resistance'.
 

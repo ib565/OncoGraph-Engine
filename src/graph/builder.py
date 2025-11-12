@@ -148,6 +148,14 @@ class OncoGraphBuilder:
         for optional_key in ("disease_id",):
             cleaned.setdefault(optional_key, None)
 
+        # Convert evidence_rating to integer if present and numeric
+        if "evidence_rating" in cleaned and cleaned["evidence_rating"] is not None:
+            try:
+                cleaned["evidence_rating"] = int(cleaned["evidence_rating"])
+            except (ValueError, TypeError):
+                # If conversion fails, set to None
+                cleaned["evidence_rating"] = None
+
         return cleaned
 
     # --- Batch Node Creation Methods (UNWIND rows) ---
@@ -263,7 +271,9 @@ class OncoGraphBuilder:
             UNWIND pmids_all AS p
             WITH rlt, r, collect(DISTINCT p) AS pmids_uniq
             SET rlt.pmids = pmids_uniq,
-                rlt.notes = r.notes
+                rlt.notes = r.notes,
+                rlt.evidence_level = coalesce(r.evidence_level, rlt.evidence_level),
+                rlt.evidence_rating = coalesce(r.evidence_rating, rlt.evidence_rating)
             """,
             {"rows": rows},
         )
@@ -290,7 +300,9 @@ class OncoGraphBuilder:
             UNWIND pmids_all AS p
             WITH rlt, r, collect(DISTINCT p) AS pmids_uniq
             SET rlt.pmids = pmids_uniq,
-                rlt.notes = r.notes
+                rlt.notes = r.notes,
+                rlt.evidence_level = coalesce(r.evidence_level, rlt.evidence_level),
+                rlt.evidence_rating = coalesce(r.evidence_rating, rlt.evidence_rating)
             """,
             {"rows": rows},
         )

@@ -270,9 +270,9 @@ def build_targets_and_enrichments(
                 gene_to_refs.setdefault(sym, set())
 
         # Emit rows
-        for gene, _ in sorted(gene_to_moa.items()):
+        for gene, moa_set in sorted(gene_to_moa.items()):
             extra_genes.add(gene)
-            moa_join = " | ".join(sorted(gene_to_moa.get(gene) or [])) or None
+            moa_join = " | ".join(sorted(moa_set)) if moa_set else None
             action_join = " | ".join(sorted(gene_to_action.get(gene) or [])) or None
             refs = gene_to_refs.get(gene) or set()
             # dedup primarily by URL; else by (source,id)

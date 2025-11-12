@@ -12,7 +12,7 @@ Outputs (relative to --out-dir):
   relationships/variant_of.csv (variant_name,gene_symbol)
   relationships/affects_response.csv (
     biomarker_type,biomarker_name,therapy_name,
-    effect,disease_name,pmids,source,notes
+    effect,disease_name,pmids,source,notes,evidence_level,evidence_rating
   )
   relationships/targets.csv (
     therapy_name,gene_symbol,source,moa,action_type,ref_sources,ref_ids,ref_urls
@@ -82,6 +82,8 @@ class CivicEvidence:
     clinical_significance: str | None
     pmids: list[str]
     evidence_statement: str | None
+    evidence_level: str | None
+    evidence_rating: str | None
 
 
 def _safe_get(obj: dict, path: list[str], default: str | None = None) -> str | None:
@@ -126,7 +128,7 @@ def _fetch_civic_v2_graphql(api_url: str, page_size: int = 500, max_pages: int |
     print(f"[civic] Fetching CIViC v2 GraphQL from {api_url} with page size {page_size}")
     query = """
         query EvidenceItems($after: String, $first: Int!) {
-          evidenceItems(first: $first, after: $after) {
+          evidenceItems(first: $first, after: $after, status: ACCEPTED) {
             pageInfo { hasNextPage endCursor }
             edges {
               node {
@@ -136,7 +138,10 @@ def _fetch_civic_v2_graphql(api_url: str, page_size: int = 500, max_pages: int |
                 disease { name doid diseaseAliases }
                 therapies { name }
                 significance
+                evidenceLevel
+                evidenceRating
                 evidenceDirection
+                status
                 source { citationId link }
               }
             }
@@ -192,6 +197,9 @@ def _fetch_civic_v2_graphql(api_url: str, page_size: int = 500, max_pages: int |
                 "drugs": node.get("therapies") or [],
                 "clinical_significance": node.get("significance"),
                 "evidence_direction": node.get("evidenceDirection"),
+                "evidence_level": node.get("evidenceLevel"),
+                "evidence_rating": node.get("evidenceRating"),
+                "status": node.get("status"),
                 "sources": [node.get("source")] if node.get("source") else [],
                 "evidence_statement": node.get("description"),
             }
@@ -324,6 +332,11 @@ def _to_evidence_items(raw_items: list[dict]) -> list[CivicEvidence]:
                     pmids.append(str(pmid))
 
         evidence_statement = _safe_get(obj, ["evidence_statement"]) or _safe_get(obj, ["description"])
+        # evidence_level and evidence_rating may be strings or integers from GraphQL
+        evidence_level_raw = obj.get("evidence_level")
+        evidence_rating_raw = obj.get("evidence_rating")
+        evidence_level = str(evidence_level_raw).strip() if evidence_level_raw is not None else None
+        evidence_rating = str(evidence_rating_raw).strip() if evidence_rating_raw is not None else None
 
         items.append(
             CivicEvidence(
@@ -339,6 +352,8 @@ def _to_evidence_items(raw_items: list[dict]) -> list[CivicEvidence]:
                 ),
                 pmids=[p for p in pmids if p],
                 evidence_statement=(evidence_statement.strip() if isinstance(evidence_statement, str) else None),
+                evidence_level=evidence_level,
+                evidence_rating=evidence_rating,
             )
         )
     return items
@@ -505,6 +520,8 @@ def run_civic_ingest(
                         "pmids": ";".join(sorted(set(ev.pmids))) if ev.pmids else "",
                         "source": "civic",
                         "notes": "",
+                        "evidence_level": ev.evidence_level or "",
+                        "evidence_rating": ev.evidence_rating or "",
                     }
                 )
 
@@ -522,8 +539,17 @@ def run_civic_ingest(
         if enrich.get("chembl_id"):
             therapy_rows[tname]["chembl_id"] = enrich.get("chembl_id")
         if enrich.get("synonyms"):
-            existing_syn = therapy_rows[tname].get("synonyms") or []
-            merged = sorted(set(existing_syn) | set(enrich.get("synonyms") or []))
+            existing_syn_raw = therapy_rows[tname].get("synonyms")
+            # Handle both None, string (semicolon-separated), and list formats
+            if existing_syn_raw is None:
+                existing_syn_list = []
+            elif isinstance(existing_syn_raw, str):
+                existing_syn_list = [s.strip() for s in existing_syn_raw.split(";") if s.strip()]
+            elif isinstance(existing_syn_raw, list):
+                existing_syn_list = existing_syn_raw
+            else:
+                existing_syn_list = []
+            merged = sorted(set(existing_syn_list) | set(enrich.get("synonyms") or []))
             therapy_rows[tname]["synonyms"] = ";".join(merged) if merged else None
     for g in ot_extra_genes:
         gene_symbols.add(g)
@@ -694,6 +720,8 @@ def run_civic_ingest(
                 str(r.get("pmids") or ""),
                 str(r.get("source") or ""),
                 str(r.get("notes") or ""),
+                str(r.get("evidence_level") or ""),
+                str(r.get("evidence_rating") or ""),
             )
 
     _write_csv(
@@ -707,6 +735,8 @@ def run_civic_ingest(
             "pmids",
             "source",
             "notes",
+            "evidence_level",
+            "evidence_rating",
         ],
         _affects_rows_iter(),
     )
@@ -721,6 +751,8 @@ def run_civic_ingest(
             "pmids",
             "source",
             "notes",
+            "evidence_level",
+            "evidence_rating",
         ],
         _affects_rows_iter(),
     )
