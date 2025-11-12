@@ -143,10 +143,9 @@ class PostgresCache:
                         """
                         SELECT value, expires_at 
                         FROM cache_entries 
-                        WHERE cache_key = %s 
-                          AND cache_type = %s
+                        WHERE cache_key = %s
                         """,
-                        (key, self._cache_type),
+                        (key,),
                     )
                     row = cur.fetchone()
 
@@ -159,8 +158,8 @@ class PostgresCache:
                     if expires_at < datetime.now(UTC):
                         # Delete expired entry
                         cur.execute(
-                            "DELETE FROM cache_entries WHERE cache_key = %s AND cache_type = %s",
-                            (key, self._cache_type),
+                            "DELETE FROM cache_entries WHERE cache_key = %s",
+                            (key,),
                         )
                         return None
 
@@ -170,9 +169,9 @@ class PostgresCache:
                         UPDATE cache_entries 
                         SET access_count = access_count + 1,
                             last_accessed_at = NOW()
-                        WHERE cache_key = %s AND cache_type = %s
+                        WHERE cache_key = %s
                         """,
-                        (key, self._cache_type),
+                        (key,),
                     )
 
                     # psycopg automatically deserializes JSONB to Python objects (dict/list)
@@ -219,10 +218,9 @@ class PostgresCache:
                         ON CONFLICT (cache_key) 
                         DO UPDATE SET 
                             value = EXCLUDED.value,
+                            cache_type = EXCLUDED.cache_type,
                             run_id = EXCLUDED.run_id,
                             expires_at = EXCLUDED.expires_at,
-                            created_at = NOW(),
-                            access_count = 0,
                             last_accessed_at = NOW()
                         """,
                         (key, self._cache_type, value_json, run_id, expires_at),
@@ -251,15 +249,15 @@ class PostgresCache:
             with psycopg.connect(self._dsn, autocommit=True) as conn:
                 with conn.cursor() as cur:
                     cur.execute(
-                        "DELETE FROM cache_entries WHERE cache_key = %s AND cache_type = %s",
-                        (key, self._cache_type),
+                        "DELETE FROM cache_entries WHERE cache_key = %s",
+                        (key,),
                     )
         except Exception as e:
             # Cache failures must be non-fatal, but log for debugging
             import logging
 
             logger = logging.getLogger(__name__)
-            logger.debug(f"Cache set failed for key {key[:50]}...: {e}", exc_info=True)
+            logger.debug(f"Cache delete failed for key {key[:50]}...: {e}", exc_info=True)
             pass
 
     def delete_by_prefix(self, prefix: str) -> int:
