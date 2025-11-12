@@ -231,7 +231,7 @@ KRAS, NRAS, BRAF, MAP2K1, MAP2K2, EGFR
 python -m venv venv && source venv/bin/activate  # or .\venv\Scripts\activate on Windows
 pip install -r requirements.txt && pip install -e .
 
-# 2. Ingest CIViC data
+# 2. Ingest CIViC & OpenTargets data
 python -m src.pipeline.civic_ingest --out-dir data/civic/latest --enrich-tags
 
 # 3. Seed database
