@@ -106,6 +106,7 @@ Integrates statistical pathway enrichment with AI interpretation for comprehensi
 - **Pluggable sinks**: JSONL, Stdout, Queue (SSE), Postgres, Composite, Filtered
 - **Non-fatal design**: Tracing failures don't crash application; graceful degradation
 - **Configuration**: CLI flags (`--trace`, `--debug`) or environment variables
+- **Cache visibility**: Final `query_response` / `enrichment_response` events now include `cache_used` and `cache_operations`, enabling latency splits.
 
 ### Error Handling & Reliability
 - **LLM retry logic**: Exponential backoff (3 attempts) with detailed error context capture

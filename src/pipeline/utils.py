@@ -21,6 +21,33 @@ T = TypeVar("T")
 # Context variable for run_id (set at API level, accessible throughout pipeline)
 _run_id_context: ContextVar[str | None] = ContextVar("run_id", default=None)
 
+# Context variable to track cache operations per request
+_cache_ops_context: ContextVar[set[str] | None] = ContextVar("cache_operations", default=None)
+
+
+def start_cache_hit_collection() -> None:
+    """Initialize cache hit collection for the current request context."""
+    _cache_ops_context.set(set())
+
+
+def note_cache_hit_from_key(cache_key: str) -> None:
+    """Record that a cache key was served from cache in the current context."""
+    operations = _cache_ops_context.get()
+    if operations is None:
+        return
+
+    operation = cache_key.split(":", 1)[0]
+    if operation:
+        operations.add(operation)
+
+
+def get_collected_cache_hits() -> set[str]:
+    """Return the set of cache operations hit in the current context."""
+    operations = _cache_ops_context.get()
+    if not operations:
+        return set()
+    return set(operations)
+
 
 class TTLCache:
     """Thread-safe in-memory TTL cache with configurable expiration."""
@@ -42,6 +69,7 @@ class TTLCache:
                 del self._cache[key]
                 return None
 
+            note_cache_hit_from_key(key)
             # Deep copy to avoid mutation of cached values
             return self._deep_copy(value)
 
@@ -163,6 +191,7 @@ class PostgresCache:
                         )
                         return None
 
+                    note_cache_hit_from_key(key)
                     # Update access stats
                     cur.execute(
                         """

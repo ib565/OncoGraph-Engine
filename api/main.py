@@ -41,7 +41,13 @@ from pipeline.trace import (
     daily_trace_path,
 )
 from pipeline.types import PipelineError, with_context_trace
-from pipeline.utils import get_enrichment_cache, get_llm_cache, set_run_id
+from pipeline.utils import (
+    get_collected_cache_hits,
+    get_enrichment_cache,
+    get_llm_cache,
+    set_run_id,
+    start_cache_hit_collection,
+)
 
 load_dotenv()
 
@@ -199,6 +205,7 @@ def query(body: QueryRequest, engine: Annotated[QueryEngine, Depends(get_engine)
 
     # Set run_id in context for cache key generation
     set_run_id(run_id)
+    start_cache_hit_collection()
 
     # Wrap trace with run_id so all events share a common identifier
     traced_engine = engine
@@ -282,6 +289,7 @@ def query(body: QueryRequest, engine: Annotated[QueryEngine, Depends(get_engine)
         raise HTTPException(status_code=500, detail=detail_response) from exc
 
     if traced_engine.trace is not None:
+        duration_ms = int((__import__("time").perf_counter() - started_perf) * 1000)
         traced_engine.trace.record(
             "run",
             {
@@ -290,7 +298,18 @@ def query(body: QueryRequest, engine: Annotated[QueryEngine, Depends(get_engine)
                 "cypher": result.cypher,
                 "row_count": len(result.rows),
                 "answer": result.answer,
-                "duration_ms": int((__import__("time").perf_counter() - started_perf) * 1000),
+                "duration_ms": duration_ms,
+            },
+        )
+        cache_ops = sorted(get_collected_cache_hits())
+        traced_engine.trace.record(
+            "query_response",
+            {
+                "started_at": started,
+                "question": body.question.strip(),
+                "duration_ms": duration_ms,
+                "cache_used": bool(cache_ops),
+                "cache_operations": cache_ops,
             },
         )
 
@@ -330,9 +349,38 @@ def query_stream(question: str, engine: Annotated[QueryEngine, Depends(get_engin
 
     def worker() -> None:
         set_run_id(run_id)
+        start_cache_hit_collection()
+        started = datetime.now(UTC).isoformat()
+        started_perf = __import__("time").perf_counter()
         try:
             result: QueryEngineResult = traced_engine.run(question.strip())
             outcome["result"] = result
+
+            # Log final response with cache information
+            if traced_engine.trace is not None:
+                duration_ms = int((__import__("time").perf_counter() - started_perf) * 1000)
+                traced_engine.trace.record(
+                    "run",
+                    {
+                        "started_at": started,
+                        "question": question.strip(),
+                        "cypher": result.cypher,
+                        "row_count": len(result.rows),
+                        "answer": result.answer,
+                        "duration_ms": duration_ms,
+                    },
+                )
+                cache_ops = sorted(get_collected_cache_hits())
+                traced_engine.trace.record(
+                    "query_response",
+                    {
+                        "started_at": started,
+                        "question": question.strip(),
+                        "duration_ms": duration_ms,
+                        "cache_used": bool(cache_ops),
+                        "cache_operations": cache_ops,
+                    },
+                )
         except PipelineError as exc:
             # Create detailed error information
             error_info = {
@@ -636,6 +684,7 @@ def analyze_genes_stream(
 
     def worker() -> None:
         set_run_id(run_id)
+        start_cache_hit_collection()
         try:
             # Parse gene list (comma or newline separated)
             gene_symbols = []
@@ -755,6 +804,7 @@ def analyze_genes_stream(
 
             # Log final response
             total_duration = int((__import__("time").perf_counter() - started_perf) * 1000)
+            cache_ops = sorted(get_collected_cache_hits())
             contextual_trace.record(
                 "enrichment_response",
                 {
@@ -765,6 +815,8 @@ def analyze_genes_stream(
                     "has_plot_data": bool(enrichment_result.plot_data and enrichment_result.plot_data.get("data")),
                     "followup_questions_count": len(summary_response.followUpQuestions),
                     "duration_ms": total_duration,
+                    "cache_used": bool(cache_ops),
+                    "cache_operations": cache_ops,
                 },
             )
 
@@ -860,6 +912,7 @@ def analyze_genes(
 
     # Set run_id in context for cache key generation
     set_run_id(run_id)
+    start_cache_hit_collection()
 
     # Set up trace sinks with selective database logging
     trace_base = Path(os.getenv("TRACE_LOG_DIR", "logs")) / "traces"
@@ -1012,6 +1065,7 @@ def analyze_genes(
 
         # Log final response
         total_duration = int((__import__("time").perf_counter() - started_perf) * 1000)
+        cache_ops = sorted(get_collected_cache_hits())
         contextual_trace.record(
             "enrichment_response",
             {
@@ -1022,6 +1076,8 @@ def analyze_genes(
                 "has_plot_data": bool(result.plot_data and result.plot_data.get("data")),
                 "followup_questions_count": len(summary_response.followUpQuestions),
                 "duration_ms": total_duration,
+                "cache_used": bool(cache_ops),
+                "cache_operations": cache_ops,
             },
         )
 
