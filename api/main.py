@@ -486,6 +486,35 @@ def query_stream(question: str, engine: Annotated[QueryEngine, Depends(get_engin
     return StreamingResponse(event_stream(), media_type="text/event-stream", headers=headers)
 
 
+@app.post("/cache/clear")
+def clear_cache() -> dict[str, str]:
+    """Clear all caches completely.
+
+    This clears:
+    - LLM cache (expand_instructions, generate_cypher, summarize)
+    - Enrichment cache (summarize_enrichment)
+    - LRU caches (build_engine, get_enrichment_analyzer, get_enrichment_summarizer)
+
+    Returns:
+        Dictionary with status and message
+    """
+    # Clear LLM and enrichment caches
+    llm_cache = get_llm_cache()
+    enrichment_cache = get_enrichment_cache()
+    llm_cache.clear()
+    enrichment_cache.clear()
+
+    # Clear LRU caches
+    build_engine.cache_clear()
+    get_enrichment_analyzer.cache_clear()
+    get_enrichment_summarizer.cache_clear()
+
+    return {
+        "status": "success",
+        "message": "All caches cleared successfully",
+    }
+
+
 @app.post("/cache/invalidate/{run_id}")
 def invalidate_cache_by_run_id(run_id: str) -> dict[str, str | int]:
     """Invalidate all cache entries for a specific run_id.
