@@ -12,8 +12,8 @@ SCHEMA_SNIPPET = dedent(
       (Variant)-[:VARIANT_OF]->(Gene)
       (Therapy)-[:TARGETS {{source, moa?, ref_sources?, ref_ids?, ref_urls?}}]->(Gene)
       (Biomarker)-[:AFFECTS_RESPONSE_TO {{effect, disease_name, disease_id?,
-        pmids, evidence_level?, evidence_rating? (integer)}}]->(Therapy)
-    - Array properties: pmids, tags, synonyms, ref_sources, ref_ids, ref_urls
+        pmids, evidence_level? (array), evidence_rating? (array of integers)}}]->(Therapy)
+    - Array properties: pmids, tags, synonyms, ref_sources, ref_ids, ref_urls, evidence_level, evidence_rating
     - No parameters: inline single-quoted literals only (no $variables)
 
     Preferred return columns (choose minimally sufficient for the question):
@@ -22,7 +22,8 @@ SCHEMA_SNIPPET = dedent(
       evidence_level, evidence_rating.
       Always include pmids as an array; default to [] when absent.
       Always include evidence_level and evidence_rating from rel.evidence_level
-      and rel.evidence_rating.
+      and rel.evidence_rating (both are arrays; use coalesce(rel.evidence_level, [])
+      and coalesce(rel.evidence_rating, []) to default to empty arrays).
     - Gene-only AFFECTS queries ("Which genes..."):
       set variant_name = NULL, return gene_symbol, therapy_name, effect,
       disease_name, pmids, evidence_level, evidence_rating, and de-duplicate
@@ -37,11 +38,13 @@ SCHEMA_SNIPPET = dedent(
       variant lookup queries, return only variant_name and gene_symbol.
 
     Always include evidence where applicable:
-    - For AFFECTS queries, use rel.pmids (coalesce to []), rel.evidence_level,
-      and rel.evidence_rating.
+    - For AFFECTS queries, use rel.pmids (coalesce to []), rel.evidence_level
+      (coalesce to []), and rel.evidence_rating (coalesce to []). Both evidence_level
+      and evidence_rating are stored as arrays in the relationship.
     - For gene-only AFFECTS, aggregate pmids across all evidence rows that
-      contribute to a gene–therapy–disease tuple. Collect evidence_level and
-      evidence_rating as arrays of distinct values (arrays, consistent with pmids).
+      contribute to a gene–therapy–disease tuple. For evidence_level and evidence_rating,
+      first collect all relationships for each tuple, then extract arrays and UNWIND
+      each array type separately to avoid Cartesian products, then collect distinct values.
     - For TARGETS queries, include reference arrays (r.ref_sources, r.ref_ids,
       r.ref_urls).
 
@@ -64,18 +67,22 @@ SCHEMA_SNIPPET = dedent(
         CASE WHEN b:Gene THEN b.symbol ELSE g.symbol END AS gene_symbol,
         t.name AS therapy_name,
         rel.disease_name AS disease_name,
-        coalesce(rel.pmids, []) AS pmids,
-        rel.evidence_level AS evidence_level,
-        rel.evidence_rating AS evidence_rating
+        rel
       WHERE gene_symbol IS NOT NULL
-      UNWIND pmids AS p
+      WITH gene_symbol, therapy_name, disease_name, collect(rel) AS rels
       WITH gene_symbol, therapy_name, disease_name,
-           collect(DISTINCT p) AS pmids,
-           collect(DISTINCT evidence_level) AS evidence_levels,
-           collect(DISTINCT evidence_rating) AS evidence_ratings
-      WITH gene_symbol, therapy_name, disease_name, pmids,
-           [l IN evidence_levels WHERE l IS NOT NULL] AS evidence_levels_filtered,
-           [r IN evidence_ratings WHERE r IS NOT NULL] AS evidence_ratings_filtered
+           reduce(pms = [], r IN rels | pms + coalesce(r.pmids, [])) AS pmids_flat,
+           reduce(els = [], r IN rels | els + coalesce(r.evidence_level, [])) AS levels_flat,
+           reduce(ers = [], r IN rels | ers + coalesce(r.evidence_rating, [])) AS ratings_flat
+      UNWIND pmids_flat AS p
+      WITH gene_symbol, therapy_name, disease_name,
+           collect(DISTINCT p) AS pmids, levels_flat, ratings_flat
+      UNWIND levels_flat AS el
+      WITH gene_symbol, therapy_name, disease_name,
+           pmids, collect(DISTINCT el) AS evidence_level, ratings_flat
+      UNWIND ratings_flat AS er
+      WITH gene_symbol, therapy_name, disease_name,
+           pmids, evidence_level, collect(DISTINCT er) AS evidence_rating
       RETURN
         NULL AS variant_name,
         gene_symbol,
@@ -83,12 +90,8 @@ SCHEMA_SNIPPET = dedent(
         'resistance' AS effect,
         disease_name,
         pmids,
-        CASE WHEN size(evidence_levels_filtered) > 0 
-             THEN evidence_levels_filtered 
-             ELSE [] END AS evidence_level,
-        CASE WHEN size(evidence_ratings_filtered) > 0 
-             THEN evidence_ratings_filtered 
-             ELSE [] END AS evidence_rating
+        evidence_level,
+        evidence_rating
       LIMIT 100
 
     Canonical example (AFFECTS; adapt values as needed):
@@ -108,8 +111,8 @@ SCHEMA_SNIPPET = dedent(
         rel.effect AS effect,
         rel.disease_name AS disease_name,
         coalesce(rel.pmids, []) AS pmids,
-        rel.evidence_level AS evidence_level,
-        rel.evidence_rating AS evidence_rating
+        coalesce(rel.evidence_level, []) AS evidence_level,
+        coalesce(rel.evidence_rating, []) AS evidence_rating
       LIMIT 100
 
     Canonical example (TARGETS; adapt values as needed):
@@ -154,8 +157,8 @@ SCHEMA_SNIPPET = dedent(
         rel.effect AS effect,
         rel.disease_name AS disease_name,
         coalesce(rel.pmids, []) AS pmids,
-        rel.evidence_level AS evidence_level,
-        rel.evidence_rating AS evidence_rating
+        coalesce(rel.evidence_level, []) AS evidence_level,
+        coalesce(rel.evidence_rating, []) AS evidence_rating
       LIMIT 100
 
     Canonical rules:
@@ -170,8 +173,9 @@ SCHEMA_SNIPPET = dedent(
         • aggregate pmids across evidence rows: use UNWIND pmids AS p, then
           collect(DISTINCT p) AS pmids to ensure no duplicates.
         • collect evidence_level and evidence_rating as arrays of distinct values:
-          collect(DISTINCT evidence_level) and collect(DISTINCT evidence_rating),
-          then filter nulls. Return as arrays.
+          First collect all relationships for each gene_symbol/therapy_name/disease_name tuple,
+          then extract arrays from relationships (using coalesce to handle null arrays),
+          UNWIND each array type separately to avoid Cartesian products, and collect distinct values.
     - Specific variant:
       - Always require VARIANT_OF to the named gene.
       - Prefer equality on Variant.name for full names like 'KRAS G12C' or
@@ -244,10 +248,12 @@ INSTRUCTION_PROMPT_TEMPLATE = dedent(
 
     Always include evidence:
     - For AFFECTS queries, return pmids from rel.pmids (array; default []), and
-      always include rel.evidence_level and rel.evidence_rating.
+      always include rel.evidence_level and rel.evidence_rating (both arrays; use
+      coalesce(rel.evidence_level, []) and coalesce(rel.evidence_rating, [])).
     - For gene-only AFFECTS questions, collapse to gene-level and aggregate pmids
-      across evidence rows for each gene–therapy–disease tuple. Include evidence_level
-      and evidence_rating from the relationship.
+      across evidence rows for each gene–therapy–disease tuple. For evidence_level
+      and evidence_rating, first collect all relationships for each tuple, then extract
+      arrays and UNWIND each array type separately to avoid Cartesian products.
     - For TARGETS queries, include r.ref_sources, r.ref_ids, r.ref_urls.
 
     - If the question asks for "genes" (no specific variant named), instruct to:
@@ -313,16 +319,19 @@ CYPHER_PROMPT_TEMPLATE = dedent(
       coalesce(..., []) before any()/all().
     - AFFECTS evidence: project pmids from rel.pmids as an array
       (use coalesce(rel.pmids, [])); always include rel.evidence_level and
-      rel.evidence_rating. For gene-only requests, collapse to the gene level
-      and aggregate pmids across evidence rows. Collect evidence_level and
-      evidence_rating as arrays of distinct values.
+      rel.evidence_rating as arrays (use coalesce(rel.evidence_level, []) and
+      coalesce(rel.evidence_rating, [])). For gene-only requests, collapse to the gene level
+      and aggregate pmids across evidence rows. For evidence_level and evidence_rating,
+      first collect all relationships for each gene–therapy–disease tuple, then extract
+      arrays and UNWIND each array type separately to avoid Cartesian products.
     - TARGETS evidence: include r.moa AS targets_moa and the reference arrays
       r.ref_sources, r.ref_ids, r.ref_urls (do not derive pmids).
     - Return the minimally sufficient columns for the query type:
       • AFFECTS: variant_name, gene_symbol, therapy_name, effect, disease_name,
         pmids, evidence_level, evidence_rating.
       • Gene-only AFFECTS: set variant_name = NULL, aggregate pmids, and include
-        evidence_level and evidence_rating as arrays of distinct values.
+        evidence_level and evidence_rating as arrays of distinct values (collect relationships
+        for each tuple, extract arrays, then UNWIND each array type separately).
       • TARGETS: gene_symbol, therapy_name, targets_moa, ref_sources, ref_ids, ref_urls.
       • Simple variant lookups: ONLY variant_name and gene_symbol.
       • Include therapy_name and at least one of gene_symbol or variant_name only
@@ -394,7 +403,8 @@ ENRICHMENT_SUMMARY_PROMPT_TEMPLATE = dedent(
       Relationships:
       - (Variant)-[:VARIANT_OF]->(Gene)
       - (Therapy)-[:TARGETS {{action_type}}]->(Gene)
-      - (Biomarker)-[:AFFECTS_RESPONSE_TO {{effect, disease_name, pmids, evidence_level, evidence_rating}}]->(Therapy)
+      - (Biomarker)-[:AFFECTS_RESPONSE_TO {{effect, disease_name, pmids,
+        evidence_level (array), evidence_rating (array)}}]->(Therapy)
       Biomarker can be a Gene or a Variant.
       Effect can be 'Sensitivity' or 'Resistance'.
 

@@ -270,10 +270,19 @@ class OncoGraphBuilder:
             WITH rlt, coalesce(rlt.pmids, []) + coalesce(r.pmids, []) AS pmids_all, r
             UNWIND pmids_all AS p
             WITH rlt, r, collect(DISTINCT p) AS pmids_uniq
+            WITH rlt, r, pmids_uniq,
+                 coalesce(rlt.evidence_level, []) + 
+                 CASE WHEN r.evidence_level IS NOT NULL THEN [r.evidence_level] ELSE [] END AS evidence_levels_all,
+                 coalesce(rlt.evidence_rating, []) + 
+                 CASE WHEN r.evidence_rating IS NOT NULL THEN [r.evidence_rating] ELSE [] END AS evidence_ratings_all
+            UNWIND evidence_levels_all AS el
+            WITH rlt, r, pmids_uniq, collect(DISTINCT el) AS evidence_levels_uniq, evidence_ratings_all
+            UNWIND evidence_ratings_all AS er
+            WITH rlt, r, pmids_uniq, evidence_levels_uniq, collect(DISTINCT er) AS evidence_ratings_uniq
             SET rlt.pmids = pmids_uniq,
                 rlt.notes = r.notes,
-                rlt.evidence_level = coalesce(r.evidence_level, rlt.evidence_level),
-                rlt.evidence_rating = coalesce(r.evidence_rating, rlt.evidence_rating)
+                rlt.evidence_level = evidence_levels_uniq,
+                rlt.evidence_rating = evidence_ratings_uniq
             """,
             {"rows": rows},
         )
@@ -299,10 +308,19 @@ class OncoGraphBuilder:
             WITH rlt, coalesce(rlt.pmids, []) + coalesce(r.pmids, []) AS pmids_all, r
             UNWIND pmids_all AS p
             WITH rlt, r, collect(DISTINCT p) AS pmids_uniq
+            WITH rlt, r, pmids_uniq,
+                 coalesce(rlt.evidence_level, []) + 
+                 CASE WHEN r.evidence_level IS NOT NULL THEN [r.evidence_level] ELSE [] END AS evidence_levels_all,
+                 coalesce(rlt.evidence_rating, []) + 
+                 CASE WHEN r.evidence_rating IS NOT NULL THEN [r.evidence_rating] ELSE [] END AS evidence_ratings_all
+            UNWIND evidence_levels_all AS el
+            WITH rlt, r, pmids_uniq, collect(DISTINCT el) AS evidence_levels_uniq, evidence_ratings_all
+            UNWIND evidence_ratings_all AS er
+            WITH rlt, r, pmids_uniq, evidence_levels_uniq, collect(DISTINCT er) AS evidence_ratings_uniq
             SET rlt.pmids = pmids_uniq,
                 rlt.notes = r.notes,
-                rlt.evidence_level = coalesce(r.evidence_level, rlt.evidence_level),
-                rlt.evidence_rating = coalesce(r.evidence_rating, rlt.evidence_rating)
+                rlt.evidence_level = evidence_levels_uniq,
+                rlt.evidence_rating = evidence_ratings_uniq
             """,
             {"rows": rows},
         )
