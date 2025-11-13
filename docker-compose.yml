@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    
+    container_name: oncograph-backend
+    
+    ports:
+      - "8000:8000"
+    
+    # Reads from .env file automatically
+    environment:
+      - NEO4J_URI=${NEO4J_URI:-bolt://localhost:7687}
+      - NEO4J_USER=${NEO4J_USER:-neo4j}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - TRACE_STDOUT=${TRACE_STDOUT:-1}
+      - PYTHONUNBUFFERED=1
+    
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    restart: unless-stopped

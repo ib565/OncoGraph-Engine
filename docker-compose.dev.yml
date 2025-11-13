@@ -1,0 +1,17 @@
+# Development override - enables live reload
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+version: '3.8'
+
+services:
+  backend:
+    volumes:
+      - .:/app
+      - ./logs:/app/logs
+      - ./data:/app/data
+    
+    command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    
+    environment:
+      - TRACE_STDOUT=1
+      - PYTHONUNBUFFERED=1
