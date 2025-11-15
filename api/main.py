@@ -99,18 +99,21 @@ def build_engine() -> QueryEngine:
         model=os.getenv("GEMINI_INSTRUCTION_EXPANDER_MODEL", "gemini-2.5-flash"),
         temperature=float(os.getenv("GEMINI_INSTRUCTION_EXPANDER_TEMPERATURE", "0.1")),
         api_key=os.getenv("GOOGLE_API_KEY"),
+        api_key_alt=os.getenv("GOOGLE_API_KEY_ALT"),
     )
 
     gemini_cypher_generator_config = GeminiConfig(
         model=os.getenv("GEMINI_CYPHER_GENERATOR_MODEL", "gemini-2.5-flash"),
         temperature=float(os.getenv("GEMINI_CYPHER_GENERATOR_TEMPERATURE", "0.1")),
         api_key=os.getenv("GOOGLE_API_KEY"),
+        api_key_alt=os.getenv("GOOGLE_API_KEY_ALT"),
     )
 
     gemini_summarizer_config = GeminiConfig(
         model=os.getenv("GEMINI_SUMMARIZER_MODEL", "gemini-2.5-flash-lite"),
         temperature=float(os.getenv("GEMINI_SUMMARIZER_TEMPERATURE", "0.1")),
         api_key=os.getenv("GOOGLE_API_KEY"),
+        api_key_alt=os.getenv("GOOGLE_API_KEY_ALT"),
     )
 
     neo4j_uri = os.getenv("NEO4J_URI", "").strip()
@@ -170,6 +173,7 @@ def get_enrichment_summarizer() -> GeminiEnrichmentSummarizer:
         model=os.getenv("GEMINI_SUMMARIZER_MODEL", "gemini-2.5-flash"),
         temperature=float(os.getenv("GEMINI_SUMMARIZER_TEMPERATURE", "0.1")),
         api_key=os.getenv("GOOGLE_API_KEY"),
+        api_key_alt=os.getenv("GOOGLE_API_KEY_ALT"),
     )
     return GeminiEnrichmentSummarizer(config=config)
 

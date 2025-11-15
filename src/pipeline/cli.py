@@ -33,6 +33,7 @@ def _build_engine() -> QueryEngine:
         model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
         temperature=float(os.getenv("GEMINI_TEMPERATURE", "0.1")),
         api_key=os.getenv("GOOGLE_API_KEY"),
+        api_key_alt=os.getenv("GOOGLE_API_KEY_ALT"),
     )
 
     expander = GeminiInstructionExpander(config=gemini_config)

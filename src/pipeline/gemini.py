@@ -39,6 +39,7 @@ class GeminiConfig:
     max_output_tokens: int | None = None
     top_p: float | None = None
     api_key: str | None = None
+    api_key_alt: str | None = None
 
 
 class EnrichmentSummaryResponse(BaseModel):
@@ -86,12 +87,16 @@ class _GeminiBase:
         self.config = config or GeminiConfig()
         if client is not None:
             self._client = client
+            self._current_api_key = None  # Tracked separately when client is provided
         else:
             if genai is None:  # pragma: no cover - handled in production environment
                 raise PipelineError("google-genai package is required for Gemini adapters")
             kwargs: dict[str, object] = {}
             if self.config.api_key:
                 kwargs["api_key"] = self.config.api_key
+                self._current_api_key = self.config.api_key
+            else:
+                self._current_api_key = None
             self._client = genai.Client(**kwargs)  # type: ignore[call-arg]
 
     def _build_content_config(self) -> object | None:
@@ -102,6 +107,37 @@ class _GeminiBase:
             top_p=self.config.top_p,
             max_output_tokens=self.config.max_output_tokens,
         )
+
+    def _is_rate_limit_error(self, exc: Exception) -> bool:
+        """Check if exception indicates a rate limit error."""
+        error_str = str(exc).upper()
+        # Check for status code 429
+        if hasattr(exc, "code") and str(exc.code) == "429":
+            return True
+        if hasattr(exc, "status_code") and exc.status_code == 429:
+            return True
+        # Check for RESOURCE_EXHAUSTED in error message
+        if "RESOURCE_EXHAUSTED" in error_str:
+            return True
+        # Check for "429" in error string as fallback
+        if "429" in error_str:
+            return True
+        return False
+
+    def _switch_to_alternate_key(self) -> bool:
+        """Switch to alternate API key if available. Returns True if switch was successful."""
+        if not self.config.api_key_alt:
+            return False
+        if self._current_api_key == self.config.api_key_alt:
+            return False  # Already using alternate key
+
+        logging.info("Switching to alternate API key due to rate limit")
+        kwargs: dict[str, object] = {}
+        if self.config.api_key_alt:
+            kwargs["api_key"] = self.config.api_key_alt
+            self._current_api_key = self.config.api_key_alt
+        self._client = genai.Client(**kwargs)  # type: ignore[call-arg]
+        return True
 
     def _call_model(self, *, prompt: str) -> str:
         """Call Gemini API with retry logic and comprehensive error handling."""
@@ -115,6 +151,7 @@ class _GeminiBase:
 
         # Simple retry loop with exponential backoff
         last_exception = None
+        key_switched = False
         for attempt in range(3):  # 3 attempts total
             try:
                 response = self._client.models.generate_content(**kwargs)
@@ -146,6 +183,13 @@ class _GeminiBase:
                     error_details["reason"] = str(exc.reason)
 
                 logging.warning(f"Gemini API call failed: {error_details}")
+
+                # Check for rate limit and switch to alternate key if available
+                if self._is_rate_limit_error(exc) and not key_switched:
+                    if self._switch_to_alternate_key():
+                        key_switched = True
+                        # Retry immediately with alternate key (no backoff delay)
+                        continue
 
                 # Don't retry on the last attempt
                 if attempt == 2:
