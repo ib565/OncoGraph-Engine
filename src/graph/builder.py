@@ -148,6 +148,22 @@ class OncoGraphBuilder:
         for optional_key in ("disease_id",):
             cleaned.setdefault(optional_key, None)
 
+        # Convert disease_id to string if present (handles pandas float conversion)
+        if "disease_id" in cleaned and cleaned["disease_id"] is not None:
+            try:
+                # Convert to string, removing decimal point if it's a float (e.g., 60079.0 -> "60079")
+                disease_id_value = cleaned["disease_id"]
+                if isinstance(disease_id_value, float):
+                    # Convert float to int first to remove .0, then to string
+                    cleaned["disease_id"] = str(int(disease_id_value))
+                else:
+                    cleaned["disease_id"] = str(disease_id_value).strip()
+                    if cleaned["disease_id"] == "":
+                        cleaned["disease_id"] = None
+            except (ValueError, TypeError):
+                # If conversion fails, set to None
+                cleaned["disease_id"] = None
+
         # Convert evidence_rating to integer if present and numeric
         if "evidence_rating" in cleaned and cleaned["evidence_rating"] is not None:
             try:
