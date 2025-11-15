@@ -299,9 +299,9 @@ def main() -> None:
     max_disease_synonyms_env = os.environ.get("GEN_DS_MAX_DISEASE_SYNONYMS")
     print(f"[generate_dataset] max_disease_synonyms_env: {max_disease_synonyms_env}")
     try:
-        max_disease_synonyms = int(max_disease_synonyms_env) if max_disease_synonyms_env else 3
+        max_disease_synonyms = int(max_disease_synonyms_env) if max_disease_synonyms_env else 2
     except ValueError:
-        max_disease_synonyms = 3
+        max_disease_synonyms = 2
         print(f"[generate_dataset] Invalid GEN_DS_MAX_DISEASE_SYNONYMS, using default: {max_disease_synonyms}")
     print(f"[generate_dataset] max_disease_synonyms: {max_disease_synonyms}")
     seed_env = os.environ.get("GEN_DS_SEED")
