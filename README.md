@@ -147,6 +147,7 @@ This typically requires hours of manual work across multiple tools.
   - **Properties:**  
     - `effect (Sensitivity|Resistance)`  
     - `disease_name`, `disease_id?`, `pmids (array)`, `source`, `notes?`
+    - `best_evidence_level? (string, A-E)`, `evidence_levels? (array)`, `evidence_count? (integer)`, `avg_rating? (float)`, `max_rating? (integer)`
 
 ### Notes
 - “Biomarker” is used as an extra label on Gene/Variant for convenience.  

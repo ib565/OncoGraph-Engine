@@ -12,7 +12,8 @@ Outputs (relative to --out-dir):
   relationships/variant_of.csv (variant_name,gene_symbol)
   relationships/affects_response.csv (
     biomarker_type,biomarker_name,therapy_name,
-    effect,disease_name,pmids,source,notes,evidence_level,evidence_rating
+    effect,disease_name,disease_id,pmids,source,notes,
+    best_evidence_level,evidence_levels,evidence_count,avg_rating,max_rating
   )
   relationships/targets.csv (
     therapy_name,gene_symbol,source,moa,action_type,ref_sources,ref_ids,ref_urls
@@ -411,6 +412,19 @@ def _enrich_tags(therapy_name: str, targets: set[str]) -> set[str]:
     return tags
 
 
+def _compute_best_evidence_level(levels: set[str]) -> str:
+    """Compute best (minimum) evidence level from set of levels (A-E).
+
+    Order: A < B < C < D < E
+    Returns empty string if no valid levels found.
+    """
+    LEVEL_ORDER = {"A": 1, "B": 2, "C": 3, "D": 4, "E": 5}
+    valid_levels = [level for level in levels if level and level.upper() in LEVEL_ORDER]
+    if not valid_levels:
+        return ""
+    return min(valid_levels, key=lambda x: LEVEL_ORDER.get(x.upper(), 999))
+
+
 def _today_stamp() -> str:
     return datetime.now(UTC).strftime("%Y%m%d")
 
@@ -527,6 +541,103 @@ def run_civic_ingest(
                 )
 
                 # We no longer use CIViC to infer TARGETS; skip accumulation
+
+    # Aggregate affects_rows by (biomarker_type, biomarker_name, therapy_name, effect, disease_name, disease_id)
+    print(f"[civic] Aggregating {len(affects_rows)} evidence rows into relationships...")
+    aggregated_affects: dict[tuple[str, str, str, str, str, str | None], list[dict[str, object]]] = defaultdict(list)
+    for row in affects_rows:
+        key = (
+            str(row.get("biomarker_type") or ""),
+            str(row.get("biomarker_name") or ""),
+            str(row.get("therapy_name") or ""),
+            str(row.get("effect") or ""),
+            str(row.get("disease_name") or ""),
+            row.get("disease_id"),  # Keep as None if missing
+        )
+        aggregated_affects[key].append(row)
+
+    aggregated_rows: list[dict[str, object]] = []
+    for key, group_rows in aggregated_affects.items():
+        biomarker_type, biomarker_name, therapy_name, effect, disease_name, disease_id = key
+
+        # Collect all PMIDs
+        all_pmids: set[str] = set()
+        for row in group_rows:
+            pmids_str = str(row.get("pmids") or "")
+            if pmids_str:
+                all_pmids.update(p.strip() for p in pmids_str.split(";") if p.strip())
+
+        # Collect evidence levels
+        evidence_levels_set: set[str] = set()
+        for row in group_rows:
+            level = str(row.get("evidence_level") or "").strip()
+            if level:
+                evidence_levels_set.add(level)
+
+        # Collect ratings (parse numeric values)
+        ratings: list[float] = []
+        for row in group_rows:
+            rating_str = str(row.get("evidence_rating") or "").strip()
+            if rating_str:
+                try:
+                    rating_val = float(rating_str)
+                    if rating_val > 0:  # Only include positive ratings
+                        ratings.append(rating_val)
+                except (ValueError, TypeError):
+                    pass  # Skip invalid ratings
+
+        # Compute metrics
+        evidence_count = len(group_rows)
+        best_evidence_level = _compute_best_evidence_level(evidence_levels_set)
+        evidence_levels_sorted = sorted(
+            evidence_levels_set, key=lambda x: {"A": 1, "B": 2, "C": 3, "D": 4, "E": 5}.get(x.upper(), 999)
+        )
+
+        avg_rating: float | None = None
+        if ratings:
+            avg_rating = round(sum(ratings) / len(ratings), 2)
+
+        max_rating: int | None = None
+        if ratings:
+            max_rating = int(max(ratings))
+
+        # Collect sources (usually all "civic", but handle multiple if needed)
+        sources: set[str] = set()
+        for row in group_rows:
+            source_val = str(row.get("source") or "").strip()
+            if source_val:
+                sources.add(source_val)
+        primary_source = sorted(sources)[0] if sources else "civic"
+
+        # Collect notes (concatenate non-empty, or keep empty)
+        notes_parts: list[str] = []
+        for row in group_rows:
+            note = str(row.get("notes") or "").strip()
+            if note:
+                notes_parts.append(note)
+        notes = "; ".join(notes_parts) if notes_parts else ""
+
+        aggregated_rows.append(
+            {
+                "biomarker_type": biomarker_type,
+                "biomarker_name": biomarker_name,
+                "therapy_name": therapy_name,
+                "effect": effect,
+                "disease_name": disease_name,
+                "disease_id": disease_id,
+                "pmids": ";".join(sorted(all_pmids)),
+                "source": primary_source,
+                "notes": notes,
+                "best_evidence_level": best_evidence_level,
+                "evidence_levels": ";".join(evidence_levels_sorted),
+                "evidence_count": evidence_count,
+                "avg_rating": avg_rating,
+                "max_rating": max_rating,
+            }
+        )
+
+    print(f"[civic] Aggregated to {len(aggregated_rows)} relationships (from {len(affects_rows)} evidence rows)")
+    affects_rows = aggregated_rows
 
     # Build TARGETS and enrichments from OpenTargets
     print(f"[civic] Querying OpenTargets for {len(therapy_rows)} therapies…")
@@ -712,6 +823,8 @@ def run_civic_ingest(
 
     def _affects_rows_iter():
         for r in affects_rows:
+            avg_rating_val = r.get("avg_rating")
+            max_rating_val = r.get("max_rating")
             yield (
                 str(r.get("biomarker_type") or ""),
                 str(r.get("biomarker_name") or ""),
@@ -722,8 +835,11 @@ def run_civic_ingest(
                 str(r.get("pmids") or ""),
                 str(r.get("source") or ""),
                 str(r.get("notes") or ""),
-                str(r.get("evidence_level") or ""),
-                str(r.get("evidence_rating") or ""),
+                str(r.get("best_evidence_level") or ""),
+                str(r.get("evidence_levels") or ""),
+                str(r.get("evidence_count") or ""),
+                str(avg_rating_val) if avg_rating_val is not None else "",
+                str(max_rating_val) if max_rating_val is not None else "",
             )
 
     _write_csv(
@@ -738,8 +854,11 @@ def run_civic_ingest(
             "pmids",
             "source",
             "notes",
-            "evidence_level",
-            "evidence_rating",
+            "best_evidence_level",
+            "evidence_levels",
+            "evidence_count",
+            "avg_rating",
+            "max_rating",
         ],
         _affects_rows_iter(),
     )
@@ -755,8 +874,11 @@ def run_civic_ingest(
             "pmids",
             "source",
             "notes",
-            "evidence_level",
-            "evidence_rating",
+            "best_evidence_level",
+            "evidence_levels",
+            "evidence_count",
+            "avg_rating",
+            "max_rating",
         ],
         _affects_rows_iter(),
     )

@@ -141,7 +141,7 @@ class OncoGraphBuilder:
                 return []
             return [item.strip() for item in str(raw).split(";") if item.strip()]
 
-        for key in ("synonyms", "tags", "pmids", "ref_sources", "ref_ids", "ref_urls"):
+        for key in ("synonyms", "tags", "pmids", "ref_sources", "ref_ids", "ref_urls", "evidence_levels"):
             if key in row:
                 cleaned[key] = split_semicolon_list(row.get(key))
 
@@ -164,13 +164,29 @@ class OncoGraphBuilder:
                 # If conversion fails, set to None
                 cleaned["disease_id"] = None
 
-        # Convert evidence_rating to integer if present and numeric
-        if "evidence_rating" in cleaned and cleaned["evidence_rating"] is not None:
+        # Convert evidence_count to integer if present and numeric
+        if "evidence_count" in cleaned and cleaned["evidence_count"] is not None:
             try:
-                cleaned["evidence_rating"] = int(cleaned["evidence_rating"])
+                cleaned["evidence_count"] = int(cleaned["evidence_count"])
             except (ValueError, TypeError):
                 # If conversion fails, set to None
-                cleaned["evidence_rating"] = None
+                cleaned["evidence_count"] = None
+
+        # Convert avg_rating to float if present and numeric
+        if "avg_rating" in cleaned and cleaned["avg_rating"] is not None:
+            try:
+                cleaned["avg_rating"] = float(cleaned["avg_rating"])
+            except (ValueError, TypeError):
+                # If conversion fails, set to None
+                cleaned["avg_rating"] = None
+
+        # Convert max_rating to integer if present and numeric
+        if "max_rating" in cleaned and cleaned["max_rating"] is not None:
+            try:
+                cleaned["max_rating"] = int(cleaned["max_rating"])
+            except (ValueError, TypeError):
+                # If conversion fails, set to None
+                cleaned["max_rating"] = None
 
         return cleaned
 
@@ -276,29 +292,19 @@ class OncoGraphBuilder:
             MATCH (b:Gene {symbol: r.biomarker_name})
             MATCH (t:Therapy {name: r.therapy_name})
             SET b:Biomarker
-            MERGE (b)-[rlt:AFFECTS_RESPONSE_TO {
+            MERGE (b)-[rel:AFFECTS_RESPONSE_TO {
                 effect: r.effect,
                 disease_name: r.disease_name,
-                disease_id: coalesce(r.disease_id, ''),
-                source: r.source
+                disease_id: coalesce(r.disease_id, '')
             }]->(t)
-            WITH rlt, r
-            WITH rlt, coalesce(rlt.pmids, []) + coalesce(r.pmids, []) AS pmids_all, r
-            UNWIND pmids_all AS p
-            WITH rlt, r, collect(DISTINCT p) AS pmids_uniq
-            WITH rlt, r, pmids_uniq,
-                 coalesce(rlt.evidence_level, []) + 
-                 CASE WHEN r.evidence_level IS NOT NULL THEN [r.evidence_level] ELSE [] END AS evidence_levels_all,
-                 coalesce(rlt.evidence_rating, []) + 
-                 CASE WHEN r.evidence_rating IS NOT NULL THEN [r.evidence_rating] ELSE [] END AS evidence_ratings_all
-            UNWIND evidence_levels_all AS el
-            WITH rlt, r, pmids_uniq, collect(DISTINCT el) AS evidence_levels_uniq, evidence_ratings_all
-            UNWIND evidence_ratings_all AS er
-            WITH rlt, r, pmids_uniq, evidence_levels_uniq, collect(DISTINCT er) AS evidence_ratings_uniq
-            SET rlt.pmids = pmids_uniq,
-                rlt.notes = r.notes,
-                rlt.evidence_level = evidence_levels_uniq,
-                rlt.evidence_rating = evidence_ratings_uniq
+            SET rel.pmids = coalesce(r.pmids, []),
+                rel.source = r.source,
+                rel.notes = coalesce(r.notes, ''),
+                rel.best_evidence_level = coalesce(r.best_evidence_level, ''),
+                rel.evidence_levels = coalesce(r.evidence_levels, []),
+                rel.evidence_count = coalesce(r.evidence_count, 0),
+                rel.avg_rating = r.avg_rating,
+                rel.max_rating = r.max_rating
             """,
             {"rows": rows},
         )
@@ -314,29 +320,19 @@ class OncoGraphBuilder:
             MATCH (b:Variant {name: r.biomarker_name})
             MATCH (t:Therapy {name: r.therapy_name})
             SET b:Biomarker
-            MERGE (b)-[rlt:AFFECTS_RESPONSE_TO {
+            MERGE (b)-[rel:AFFECTS_RESPONSE_TO {
                 effect: r.effect,
                 disease_name: r.disease_name,
-                disease_id: coalesce(r.disease_id, ''),
-                source: r.source
+                disease_id: coalesce(r.disease_id, '')
             }]->(t)
-            WITH rlt, r
-            WITH rlt, coalesce(rlt.pmids, []) + coalesce(r.pmids, []) AS pmids_all, r
-            UNWIND pmids_all AS p
-            WITH rlt, r, collect(DISTINCT p) AS pmids_uniq
-            WITH rlt, r, pmids_uniq,
-                 coalesce(rlt.evidence_level, []) + 
-                 CASE WHEN r.evidence_level IS NOT NULL THEN [r.evidence_level] ELSE [] END AS evidence_levels_all,
-                 coalesce(rlt.evidence_rating, []) + 
-                 CASE WHEN r.evidence_rating IS NOT NULL THEN [r.evidence_rating] ELSE [] END AS evidence_ratings_all
-            UNWIND evidence_levels_all AS el
-            WITH rlt, r, pmids_uniq, collect(DISTINCT el) AS evidence_levels_uniq, evidence_ratings_all
-            UNWIND evidence_ratings_all AS er
-            WITH rlt, r, pmids_uniq, evidence_levels_uniq, collect(DISTINCT er) AS evidence_ratings_uniq
-            SET rlt.pmids = pmids_uniq,
-                rlt.notes = r.notes,
-                rlt.evidence_level = evidence_levels_uniq,
-                rlt.evidence_rating = evidence_ratings_uniq
+            SET rel.pmids = coalesce(r.pmids, []),
+                rel.source = r.source,
+                rel.notes = coalesce(r.notes, ''),
+                rel.best_evidence_level = coalesce(r.best_evidence_level, ''),
+                rel.evidence_levels = coalesce(r.evidence_levels, []),
+                rel.evidence_count = coalesce(r.evidence_count, 0),
+                rel.avg_rating = r.avg_rating,
+                rel.max_rating = r.max_rating
             """,
             {"rows": rows},
         )
