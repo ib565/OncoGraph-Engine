@@ -1,11 +1,12 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import MiniGraph from "./MiniGraph";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useAppContext, type QueryResponse } from "../contexts/AppContext";
+import { csvEscape, downloadCsv } from "../utils/csv";
 
 type GraphPanelProps = {
   rows: Array<Record<string, unknown>>;
@@ -84,6 +85,11 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+  const geneSymbols = useMemo(
+    () => (result?.rows ? extractGeneSymbols(result.rows) : []),
+    [result?.rows]
+  );
+  const hasRows = Boolean(result?.rows?.length);
 
   useEffect(() => {
     if (!isLoading || !progress) {
@@ -285,9 +291,6 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
 
   // Handle copying genes to clipboard
   async function handleCopyGenes() {
-    if (!result?.rows) return;
-    
-    const geneSymbols = extractGeneSymbols(result.rows);
     if (geneSymbols.length === 0) return;
     
     const geneString = geneSymbols.join(", ");
@@ -303,9 +306,6 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
 
   // Handle moving genes to Hypothesis Analyzer
   function handleMoveToHypothesisAnalyzer() {
-    if (!result?.rows) return;
-    
-    const geneSymbols = extractGeneSymbols(result.rows);
     if (geneSymbols.length === 0) return;
     
     const geneString = geneSymbols.join(", ");
@@ -318,6 +318,53 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
     // Navigate to hypotheses tab
     router.push('/hypotheses');
   }
+
+  const buildGraphCsv = useCallback(
+    (exportRows: Array<Record<string, unknown>>) => {
+      const columns = Array.from(
+        exportRows.reduce((set, row) => {
+          Object.keys(row).forEach((key) => set.add(key));
+          return set;
+        }, new Set<string>())
+      ).sort();
+
+      const metadataLines = [
+        ["# Export Type", "Graph QA"],
+        ["# Question", lastQuery ?? ""],
+        ["# Run ID", run_id ?? ""],
+        ["# Generated At", new Date().toISOString()],
+        ["# API Endpoint", API_URL ?? ""],
+        ["# Row Count", exportRows.length.toString()],
+        [],
+        columns,
+      ];
+
+      const dataLines = exportRows.map((row) =>
+        columns.map((col) => {
+          const value = row[col];
+          if (Array.isArray(value)) {
+            return value.join("; ");
+          }
+          if (typeof value === "object" && value !== null) {
+            return JSON.stringify(value);
+          }
+          return value ?? "";
+        })
+      );
+
+      return [...metadataLines, ...dataLines]
+        .map((line) => line.map(csvEscape).join(","))
+        .join("\n");
+    },
+    [lastQuery, run_id]
+  );
+
+  const handleExportRows = useCallback(() => {
+    if (!hasRows || !result?.rows) return;
+    const csvContent = buildGraphCsv(result.rows);
+    const filename = `graph-qa_${run_id ?? Date.now()}.csv`;
+    downloadCsv(filename, csvContent);
+  }, [buildGraphCsv, hasRows, result?.rows, run_id]);
 
   return (
     <div className="graph-panel">
@@ -449,48 +496,65 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
                           Explore the raw query results with references.
                         </p>
                       </div>
-                      {result?.rows && extractGeneSymbols(result.rows).length > 0 && (
+                      {(geneSymbols.length > 0 || hasRows) && (
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          {geneSymbols.length > 0 && (
+                            <>
+                              <button
+                                type="button"
+                                className="secondary-button"
+                                onClick={handleCopyGenes}
+                                style={{ 
+                                  fontSize: '12px', 
+                                  padding: '6px 12px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                                title={`Copy ${geneSymbols.length} gene symbols to clipboard`}
+                              >
+                                {copySuccess ? (
+                                  <>
+                                    <span>✓</span>
+                                    <span>Copied!</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span>📋</span>
+                                    <span>Copy Genes</span>
+                                  </>
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                className="primary-button"
+                                onClick={handleMoveToHypothesisAnalyzer}
+                                style={{ 
+                                  fontSize: '12px', 
+                                  padding: '6px 12px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                                title={`Move ${geneSymbols.length} gene symbols to Hypothesis Analyzer`}
+                              >
+                                <span>🧬</span>
+                                <span>Move to Hypothesis Analyzer</span>
+                              </button>
+                            </>
+                          )}
                           <button
                             type="button"
                             className="secondary-button"
-                            onClick={handleCopyGenes}
-                            style={{ 
-                              fontSize: '12px', 
-                              padding: '6px 12px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px'
+                            onClick={handleExportRows}
+                            style={{
+                              fontSize: '12px',
+                              padding: '6px 12px'
                             }}
-                            title={`Copy ${extractGeneSymbols(result.rows).length} gene symbols to clipboard`}
+                            disabled={!hasRows}
+                            title="Download Cypher rows with metadata as CSV"
                           >
-                            {copySuccess ? (
-                              <>
-                                <span>✓</span>
-                                <span>Copied!</span>
-                              </>
-                            ) : (
-                              <>
-                                <span>📋</span>
-                                <span>Copy Genes</span>
-                              </>
-                            )}
-                          </button>
-                          <button
-                            type="button"
-                            className="primary-button"
-                            onClick={handleMoveToHypothesisAnalyzer}
-                            style={{ 
-                              fontSize: '12px', 
-                              padding: '6px 12px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
-                            title={`Move ${extractGeneSymbols(result.rows).length} gene symbols to Hypothesis Analyzer`}
-                          >
-                            <span>🧬</span>
-                            <span>Move to Hypothesis Analyzer</span>
+                            ⬇ Download CSV
                           </button>
                         </div>
                       )}

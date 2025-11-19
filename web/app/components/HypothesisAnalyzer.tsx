@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useAppContext, type EnrichmentResponse, type PartialEnrichmentResult, type SummaryResult } from "../contexts/AppContext";
 import PlotlyChart from "./PlotlyChart";
+import { csvEscape, downloadCsv } from "../utils/csv";
 
 
 type GeneSetResponse = {
@@ -295,6 +296,55 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
     await analyzeGenes(genes);
   }
 
+  const buildEnrichmentCsv = useCallback(
+    (source: PartialEnrichmentResult | EnrichmentResponse, sourceLabel: string) => {
+      const enrichmentRows = source.enrichment_results || [];
+      const libraries = Array.from(new Set(enrichmentRows.map((row) => row.library))).sort();
+      const metadataLines = [
+        ["# Export Type", "Hypothesis Analyzer Enrichment"],
+        ["# Source", sourceLabel],
+        ["# Generated At", new Date().toISOString()],
+        ["# API Endpoint", API_URL ?? ""],
+        ["# Gene Input", genes],
+        ["# Valid Genes", (source.valid_genes?.length ?? 0).toString()],
+        ["# Invalid Genes", (source.invalid_genes?.length ?? 0).toString()],
+        ["# Library Coverage", libraries.join("; ")],
+        ["# Result Count", enrichmentRows.length.toString()],
+        [],
+        ["term", "library", "p_value", "adjusted_p_value", "odds_ratio", "gene_count", "genes", "description"],
+      ];
+
+      const dataLines = enrichmentRows.map((row) => [
+        row.term,
+        row.library,
+        row.p_value,
+        row.adjusted_p_value,
+        row.odds_ratio ?? "",
+        row.gene_count,
+        row.genes.join("; "),
+        row.description ?? "",
+      ]);
+
+      return [...metadataLines, ...dataLines]
+        .map((line) => line.map(csvEscape).join(","))
+        .join("\n");
+    },
+    [API_URL, genes]
+  );
+
+  const handleExportEnrichment = useCallback(() => {
+    const source = result ?? partialResult;
+    if (!source || !source.enrichment_results || source.enrichment_results.length === 0) return;
+
+    const csvContent = buildEnrichmentCsv(source, result ? "Complete Result" : "Partial Result");
+    const filename = `hypothesis-enrichment_${Date.now()}.csv`;
+    downloadCsv(filename, csvContent);
+  }, [buildEnrichmentCsv, partialResult, result]);
+
+  const hasEnrichmentResults =
+    (partialResult?.enrichment_results?.length ?? 0) > 0 ||
+    (result?.enrichment_results?.length ?? 0) > 0;
+
   return (
     <div className="bench-panel">
       <div className="panel-header">
@@ -537,11 +587,25 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
               <div className="layout-column enrichment-column">
                 <div className="card rows-card">
                   <header className="panel-header">
-                    <h3 className="panel-title">Enrichment Results</h3>
-                    <p className="panel-copy">
-                      Detailed results from functional enrichment analysis.
-                      Results are sorted by statistical significance.
-                    </p>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: "12px" }}>
+                      <div>
+                        <h3 className="panel-title">Enrichment Results</h3>
+                        <p className="panel-copy">
+                          Detailed results from functional enrichment analysis.
+                          Results are sorted by statistical significance.
+                        </p>
+                      </div>
+                      {hasEnrichmentResults && (
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          onClick={handleExportEnrichment}
+                          style={{ height: "fit-content", marginTop: "4px" }}
+                        >
+                          ⬇ Download CSV
+                        </button>
+                      )}
+                    </div>
                     {/* Gene count chips */}
                     <div className="gene-count-chips" style={{ marginTop: "8px" }}>
                       <span 
