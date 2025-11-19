@@ -264,13 +264,14 @@ SCHEMA_SNIPPET = dedent(
       WITH t, gi, gx WHERE gx IS NULL (therapy does NOT target excluded gene).
       Then continue with biomarker matching. Never use NOT t.name = 'G2' as G2 is a gene,
       not a therapy name.
-    - Return columns: Return ONLY the columns needed for the question. For simple variant
-      lookups (e.g., "What variants are known for gene X?"), return only variant_name and
-      gene_symbol. Do NOT add unnecessary NULL columns (therapy_name, effect, disease_name,
-      pmids) unless the query requires them. Always match return columns to query type:
-      AFFECTS queries return variant_name, gene_symbol, therapy_name, effect, disease_name,
-      pmids, best_evidence_level, evidence_levels, evidence_count, avg_rating, max_rating;
-      TARGETS queries return gene_symbol, therapy_name, targets_moa, ref_sources/ref_ids/ref_urls.
+    - Return columns: Always match return columns to the query type's standard schema.
+      For AFFECTS queries, ALWAYS return the complete schema: variant_name (set to NULL for
+      gene-only queries), gene_symbol, therapy_name, effect, disease_name, pmids,
+      best_evidence_level, evidence_levels, evidence_count, avg_rating, max_rating.
+      For TARGETS queries, return: gene_symbol, therapy_name, targets_moa, ref_sources/ref_ids/ref_urls.
+      For simple variant lookups, return only variant_name and gene_symbol.
+      IMPORTANT: Include all standard schema fields for the query type, even if some are NULL.
+      Do NOT add NULL columns from other query types (e.g., don't add targets_moa to AFFECTS queries).
     - Filter scoping: place WHERE filters that constrain (b)-[rel:AFFECTS_RESPONSE_TO]->(t)
       immediately after introducing those bindings. Do not attach such filters to OPTIONAL MATCH.
     - Effect filtering: ALWAYS compare case-insensitively: toLower(rel.effect) = 'resistance'
@@ -307,7 +308,9 @@ INSTRUCTION_PROMPT_TEMPLATE = dedent(
 
     - If the question asks for "genes" (no specific variant named), instruct to:
       • match (b:Gene) OR (b:Variant)-[:VARIANT_OF]->(g:Gene),
-      • return gene_symbol only (set variant_name to NULL),
+      • return the complete AFFECTS schema with variant_name = NULL (include all standard
+        AFFECTS columns: variant_name, gene_symbol, therapy_name, effect, disease_name, pmids,
+        best_evidence_level, evidence_levels, evidence_count, avg_rating, max_rating),
       • de-duplicate by gene_symbol, therapy_name, and disease_name,
       • aggregate pmids across evidence rows and deduplicate evidence_levels.
 
