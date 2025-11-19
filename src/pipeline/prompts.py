@@ -29,7 +29,8 @@ SCHEMA_SNIPPET = dedent(
       disease_name, pmids, best_evidence_level, evidence_levels, evidence_count, avg_rating, max_rating,
       and de-duplicate by gene_symbol, therapy_name, disease_name. Aggregate pmids across
       evidence rows into a single array. For aggregated metrics, collect relationships per tuple
-      and compute summary values (best best_evidence_level, sum evidence_count, weighted avg_rating, max max_rating).
+      and compute summary values (best best_evidence_level, sum evidence_count, average avg_rating, max max_rating),
+      and aggregate evidence_levels across relationships (deduplicate tokens).
     - TARGETS queries (mechanism/targeting): project
       gene_symbol, therapy_name, r.moa AS targets_moa. Include
       r.ref_sources, r.ref_ids, r.ref_urls for transparency.
@@ -43,7 +44,7 @@ SCHEMA_SNIPPET = dedent(
       rel.max_rating (integer, nullable). These are pre-aggregated summary metrics on each relationship.
     - For gene-only AFFECTS, aggregate pmids across all relationships for each gene–therapy–disease tuple.
       For evidence metrics, collect relationships per tuple and compute summaries: best best_evidence_level
-      (minimum A-E order), sum evidence_count, weighted average avg_rating, maximum max_rating.
+      (minimum A-E order), sum evidence_count, average avg_rating, maximum max_rating, and deduplicate evidence_levels.
     - For TARGETS queries, include reference arrays (r.ref_sources, r.ref_ids,
       r.ref_urls).
 
@@ -68,27 +69,60 @@ SCHEMA_SNIPPET = dedent(
         rel.disease_name AS disease_name,
         rel
       WHERE gene_symbol IS NOT NULL
-      WITH gene_symbol, therapy_name, disease_name, collect(rel) AS rels
-      WITH gene_symbol, therapy_name, disease_name, rels,
-           reduce(pms = [], r IN rels | pms + coalesce(r.pmids, [])) AS pmids_flat
-      UNWIND pmids_flat AS p
-      WITH gene_symbol, therapy_name, disease_name, rels,
-           collect(DISTINCT p) AS pmids
-      WITH gene_symbol, therapy_name, disease_name, pmids,
-           [r IN rels
-              WHERE r.best_evidence_level IS NOT NULL AND r.best_evidence_level <> ''
-              | r.best_evidence_level] AS level_list,
-           [coalesce(r.evidence_count, 0) | r IN rels] AS count_list,
-           [r.avg_rating | r IN rels WHERE r.avg_rating IS NOT NULL] AS avg_list,
-           [r.max_rating | r IN rels WHERE r.max_rating IS NOT NULL] AS max_list
-      WITH gene_symbol, therapy_name, disease_name, pmids,
-           CASE WHEN size(level_list) > 0 THEN min(level_list) ELSE '' END AS best_evidence_level,
-           reduce(total = 0, value IN count_list | total + value) AS evidence_count,
-           CASE WHEN size(avg_list) > 0
-                THEN toFloat(reduce(sum_val = 0.0, value IN avg_list | sum_val + value)) / size(avg_list)
-                ELSE NULL
+      WITH gene_symbol, therapy_name, disease_name,
+           collect(coalesce(rel.pmids, [])) AS pmid_groups,
+           collect(coalesce(rel.evidence_levels, [])) AS level_groups,
+           collect(rel.best_evidence_level) AS best_levels_raw,
+           collect(coalesce(rel.evidence_count, 0)) AS count_values,
+           collect(rel.avg_rating) AS avg_values_raw,
+           collect(rel.max_rating) AS max_values_raw
+      WITH gene_symbol, therapy_name, disease_name,
+           pmid_groups,
+           level_groups,
+           [lvl IN best_levels_raw
+              WHERE lvl IS NOT NULL AND lvl <> ''
+              | lvl] AS best_levels,
+           count_values,
+           [value IN avg_values_raw
+              WHERE value IS NOT NULL
+              | value] AS avg_values,
+           [value IN max_values_raw
+              WHERE value IS NOT NULL
+              | value] AS max_values
+      WITH gene_symbol, therapy_name, disease_name,
+           reduce(pmid_flat = [], group IN pmid_groups | pmid_flat + group) AS pmids_flat,
+           reduce(level_flat = [], group IN level_groups | level_flat + group) AS levels_flat,
+           best_levels,
+           count_values,
+           avg_values,
+           max_values
+      WITH gene_symbol, therapy_name, disease_name,
+           reduce(unique_pmids = [], p IN pmids_flat
+             | CASE WHEN p IN unique_pmids THEN unique_pmids ELSE unique_pmids + p END) AS pmids,
+           reduce(unique_levels = [], lvl IN levels_flat
+             | CASE WHEN lvl IN unique_levels THEN unique_levels ELSE unique_levels + lvl END) AS evidence_levels,
+           best_levels,
+           count_values,
+           avg_values,
+           max_values
+      WITH gene_symbol, therapy_name, disease_name, pmids, evidence_levels,
+           CASE
+             WHEN size(best_levels) = 0 THEN ''
+             WHEN size(best_levels) = 1 THEN head(best_levels)
+             ELSE reduce(best = head(best_levels), lvl IN tail(best_levels)
+                    | CASE WHEN lvl < best THEN lvl ELSE best END)
+           END AS best_evidence_level,
+           reduce(total = 0, value IN count_values | total + value) AS evidence_count,
+           CASE
+             WHEN size(avg_values) = 0 THEN NULL
+             ELSE toFloat(reduce(sum_val = 0.0, value IN avg_values | sum_val + value)) / size(avg_values)
            END AS avg_rating,
-           CASE WHEN size(max_list) > 0 THEN max(max_list) ELSE NULL END AS max_rating
+           CASE
+             WHEN size(max_values) = 0 THEN NULL
+             WHEN size(max_values) = 1 THEN head(max_values)
+             ELSE reduce(max_val = head(max_values), value IN tail(max_values)
+                    | CASE WHEN value > max_val THEN value ELSE max_val END)
+           END AS max_rating
       RETURN
         NULL AS variant_name,
         gene_symbol,
@@ -97,6 +131,7 @@ SCHEMA_SNIPPET = dedent(
         disease_name,
         pmids,
         best_evidence_level,
+        evidence_levels,
         evidence_count,
         avg_rating,
         max_rating
@@ -267,14 +302,14 @@ INSTRUCTION_PROMPT_TEMPLATE = dedent(
     - For gene-only AFFECTS questions, collapse to gene-level and aggregate pmids
       across relationships for each gene–therapy–disease tuple. For evidence metrics,
       collect relationships per tuple and compute summaries: best best_evidence_level,
-      sum evidence_count, weighted average avg_rating, maximum max_rating.
+      sum evidence_count, average avg_rating, maximum max_rating, and deduplicate evidence_levels.
     - For TARGETS queries, include r.ref_sources, r.ref_ids, r.ref_urls.
 
     - If the question asks for "genes" (no specific variant named), instruct to:
       • match (b:Gene) OR (b:Variant)-[:VARIANT_OF]->(g:Gene),
       • return gene_symbol only (set variant_name to NULL),
       • de-duplicate by gene_symbol, therapy_name, and disease_name,
-      • aggregate pmids across evidence rows.
+      • aggregate pmids across evidence rows and deduplicate evidence_levels.
 
     - When checking array properties (e.g., synonyms, tags), wrap with coalesce(..., [])
       before using any()/all() to avoid nulls.
@@ -342,9 +377,9 @@ CYPHER_PROMPT_TEMPLATE = dedent(
     - Return the minimally sufficient columns for the query type:
       • AFFECTS: variant_name, gene_symbol, therapy_name, effect, disease_name,
         pmids, best_evidence_level, evidence_levels, evidence_count, avg_rating, max_rating.
-      • Gene-only AFFECTS: set variant_name = NULL, aggregate pmids, and include
-        aggregated evidence metrics (best best_evidence_level, sum evidence_count,
-        weighted average avg_rating, maximum max_rating).
+      • Gene-only AFFECTS: set variant_name = NULL, aggregate pmids, deduplicate
+        evidence_levels, and include aggregated evidence metrics (best best_evidence_level,
+        sum evidence_count, average avg_rating, maximum max_rating).
       • TARGETS: gene_symbol, therapy_name, targets_moa, ref_sources, ref_ids, ref_urls.
       • Simple variant lookups: ONLY variant_name and gene_symbol.
       • Include therapy_name and at least one of gene_symbol or variant_name only
