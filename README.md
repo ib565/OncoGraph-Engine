@@ -189,6 +189,23 @@ Models available on Hugging Face as 16-bit merged models (vLLM-compatible) and L
 
 ## Example Queries & Gene Lists
 
+### Curated Example Queries (Frontend)
+
+The frontend includes **10 high-impact example queries** organized into three tabs:
+
+1. **Therapy & Targets** — Queries about therapy mechanisms and target genes
+2. **Biomarkers & Resistance** — Queries about predictive biomarkers and resistance mechanisms
+3. **Evidence & Precision** — Queries about evidence levels and precision medicine
+
+These examples are stored in `web/app/data/exampleQueries.json` and can include **pre-computed cached responses** for instant loading. When you click an example with a cached response, results appear immediately without running the query.
+
+**To update cached responses:**
+1. Run an example query manually in the app
+2. Verify the results look correct
+3. Click the **"Copy Example JSON for Cache"** button (appears when the current query matches an example)
+4. Paste the copied JSON into `web/app/data/exampleQueries.json`, replacing the matching entry's `cachedResponse` field
+5. Commit and redeploy
+
 ### Graph Q&A Examples
 
 **Therapy-centric:**

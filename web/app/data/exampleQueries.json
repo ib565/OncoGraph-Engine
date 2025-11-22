@@ -1,0 +1,63 @@
+[
+  {
+    "id": "resistance_genes_cetuximab_panitumumab_colorectal",
+    "tab": "biomarkers_resistance",
+    "question": "Which genes predict resistance to cetuximab or panitumumab in colorectal cancer?",
+    "cachedResponse": null
+  },
+  {
+    "id": "therapies_target_kras_mechanisms",
+    "tab": "therapy_targets",
+    "question": "Which therapies target KRAS and what are their mechanisms of action?",
+    "cachedResponse": null
+  },
+  {
+    "id": "egfr_l858r_gefitinib_lung_response",
+    "tab": "evidence_precision",
+    "question": "What is the predicted response of EGFR L858R to gefitinib in lung cancer?",
+    "cachedResponse": null
+  },
+  {
+    "id": "therapies_variant_biomarkers_nsclc",
+    "tab": "biomarkers_resistance",
+    "question": "List all therapies with variant-level biomarkers in non-small cell lung cancer.",
+    "cachedResponse": null
+  },
+  {
+    "id": "therapies_target_braf_map2k1_map2k2",
+    "tab": "therapy_targets",
+    "question": "Which therapies target BRAF, MAP2K1, or MAP2K2?",
+    "cachedResponse": null
+  },
+  {
+    "id": "kit_variants_drug_response_gist",
+    "tab": "biomarkers_resistance",
+    "question": "List variants of KIT that affect drug response in GIST.",
+    "cachedResponse": null
+  },
+  {
+    "id": "braf_v600e_dabrafenib_evidence",
+    "tab": "evidence_precision",
+    "question": "Provide PMIDs and evidence levels supporting that BRAF V600E confers sensitivity to dabrafenib.",
+    "cachedResponse": null
+  },
+  {
+    "id": "therapies_target_egfr_not_erbb2",
+    "tab": "therapy_targets",
+    "question": "Which therapies target EGFR but do not target ERBB2?",
+    "cachedResponse": null
+  },
+  {
+    "id": "genes_sensitivity_pembrolizumab_nivolumab_melanoma",
+    "tab": "biomarkers_resistance",
+    "question": "Which genes predict sensitivity to pembrolizumab or nivolumab in melanoma?",
+    "cachedResponse": null
+  },
+  {
+    "id": "genes_level_a_evidence_imatinib",
+    "tab": "evidence_precision",
+    "question": "List genes with Level A evidence for sensitivity to imatinib.",
+    "cachedResponse": null
+  }
+]
+

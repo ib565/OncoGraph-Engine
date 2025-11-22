@@ -7,6 +7,9 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useAppContext, type QueryResponse } from "../contexts/AppContext";
 import { csvEscape, downloadCsv } from "../utils/csv";
+import type { ExampleQuery, ExampleQueryTab, ExampleQueriesByTab } from "../types/exampleQueries";
+import { groupByTab, findExampleByQuestion } from "../types/exampleQueries";
+import exampleQueriesData from "../data/exampleQueries.json";
 
 type GraphPanelProps = {
   rows: Array<Record<string, unknown>>;
@@ -14,11 +17,6 @@ type GraphPanelProps = {
 };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
-const EXAMPLE_QUERIES: string[] = [
-  "Which genes predict resistance to cetuximab or panitumumab in colorectal cancer?",
-  "Which therapies target KRAS and what are their mechanisms of action?",
-  "What is the predicted response of EGFR L858R to Gefitinib in Lung Cancer?",
-];
 
 const HTTP_URL_REGEX = /^https?:\/\//i;
 
@@ -322,10 +320,16 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [copyJsonSuccess, setCopyJsonSuccess] = useState(false);
   const [noCache, setNoCache] = useState(false);
   const [showCacheToggle, setShowCacheToggle] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [activeExampleTab, setActiveExampleTab] = useState<ExampleQueryTab>("therapy_targets");
   const hasPersistedPreference = useRef(false);
+
+  // Load and group example queries
+  const exampleQueries = useMemo(() => exampleQueriesData as ExampleQuery[], []);
+  const groupedExamples = useMemo(() => groupByTab(exampleQueries), [exampleQueries]);
   const geneSymbols = useMemo(
     () => (result?.rows ? extractGeneSymbols(result.rows) : []),
     [result?.rows]
@@ -595,6 +599,68 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
     }
   }
 
+  // Handle clicking an example query
+  function handleExampleClick(example: ExampleQuery) {
+    if (isLoading) return;
+
+    // If cached response exists, hydrate state immediately
+    if (example.cachedResponse) {
+      setGraphState({
+        question: example.question,
+        lastQuery: example.question,
+        result: {
+          answer: example.cachedResponse.answer,
+          cypher: example.cachedResponse.cypher,
+          rows: example.cachedResponse.rows,
+          run_id: `cached-${example.id}`,
+        },
+        error: null,
+        isLoading: false,
+        progress: null,
+        run_id: `cached-${example.id}`,
+      });
+    } else {
+      // Just prefill the question
+      setGraphState({ question: example.question });
+    }
+  }
+
+  // Handle copying example JSON for cache
+  async function handleCopyExampleJson() {
+    if (!result || !lastQuery) return;
+
+    const matchingExample = findExampleByQuestion(exampleQueries, lastQuery);
+    if (!matchingExample) return;
+
+    const cacheEntry = {
+      id: matchingExample.id,
+      tab: matchingExample.tab,
+      question: matchingExample.question,
+      cachedResponse: {
+        answer: result.answer,
+        cypher: result.cypher,
+        rows: result.rows,
+        updatedAt: new Date().toISOString(),
+      },
+    };
+
+    const jsonString = JSON.stringify(cacheEntry, null, 2);
+    
+    try {
+      await navigator.clipboard.writeText(jsonString);
+      setCopyJsonSuccess(true);
+      setTimeout(() => setCopyJsonSuccess(false), 3000);
+    } catch (err) {
+      console.error("Failed to copy to clipboard:", err);
+    }
+  }
+
+  // Check if current query matches an example
+  const currentExample = useMemo(() => {
+    if (!lastQuery) return null;
+    return findExampleByQuestion(exampleQueries, lastQuery);
+  }, [lastQuery, exampleQueries]);
+
   // Handle moving genes to Hypothesis Analyzer
   function handleMoveToHypothesisAnalyzer() {
     if (geneSymbols.length === 0) return;
@@ -758,25 +824,48 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
                 <h3 className="panel-title">Example Queries</h3>
               </header>
               <div className="card-content">
-                {EXAMPLE_QUERIES.length > 0 && (
-                  <div className="examples" aria-label="Example queries">
-                    <div className="examples-grid">
-                      {EXAMPLE_QUERIES.map((example) => (
-                        <button
-                          key={example}
-                          type="button"
-                          className="example-button"
-                          onClick={() => {
-                            setGraphState({ question: example });
-                          }}
-                          disabled={isLoading}
-                        >
-                          {example}
-                        </button>
-                      ))}
-                    </div>
+                <div className="tab-navigation" style={{ marginBottom: "12px" }}>
+                  <button
+                    type="button"
+                    className={`tab-button ${activeExampleTab === "therapy_targets" ? "active" : ""}`}
+                    onClick={() => setActiveExampleTab("therapy_targets")}
+                  >
+                    Therapy & Targets
+                  </button>
+                  <button
+                    type="button"
+                    className={`tab-button ${activeExampleTab === "biomarkers_resistance" ? "active" : ""}`}
+                    onClick={() => setActiveExampleTab("biomarkers_resistance")}
+                  >
+                    Biomarkers & Resistance
+                  </button>
+                  <button
+                    type="button"
+                    className={`tab-button ${activeExampleTab === "evidence_precision" ? "active" : ""}`}
+                    onClick={() => setActiveExampleTab("evidence_precision")}
+                  >
+                    Evidence & Precision
+                  </button>
+                </div>
+                <div className="examples" aria-label="Example queries">
+                  <div className="examples-grid">
+                    {groupedExamples[activeExampleTab].map((example) => (
+                      <button
+                        key={example.id}
+                        type="button"
+                        className="example-button"
+                        onClick={() => handleExampleClick(example)}
+                        disabled={isLoading}
+                        title={example.cachedResponse ? "Click to load cached result" : "Click to run query"}
+                      >
+                        {example.question}
+                        {example.cachedResponse && (
+                          <span style={{ marginLeft: "8px", fontSize: "11px", opacity: 0.7 }}>✓</span>
+                        )}
+                      </button>
+                    ))}
                   </div>
-                )}
+                </div>
               </div>
             </div>
           </div>
@@ -988,6 +1077,30 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
                         </div>
                       )}
                     </div>
+
+                    {/* Copy Example JSON Section (dev-only, shown when current query matches an example) */}
+                    {currentExample && (
+                      <div className="feedback-section" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #e5e7eb' }}>
+                        <p style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#6b7280' }}>
+                          Update example cache:
+                        </p>
+                        {copyJsonSuccess ? (
+                          <p style={{ margin: '0', fontSize: '14px', color: '#10b981' }}>
+                            ✓ Example JSON copied to clipboard! Paste into exampleQueries.json
+                          </p>
+                        ) : (
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            onClick={handleCopyExampleJson}
+                            style={{ fontSize: '14px', padding: '6px 12px' }}
+                            title="Copy JSON snippet to update exampleQueries.json with this result"
+                          >
+                            Copy Example JSON for Cache
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
