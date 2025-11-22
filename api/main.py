@@ -697,9 +697,9 @@ def get_gene_set(
 @app.get("/analyze/genes/stream")
 def analyze_genes_stream(
     genes: str,
-    libraries: str | None = None,
     analyzer: Annotated[GeneEnrichmentAnalyzer, Depends(get_enrichment_analyzer)],
     summarizer: Annotated[GeminiEnrichmentSummarizer, Depends(get_enrichment_summarizer)],
+    libraries: str | None = None,
 ) -> StreamingResponse:
     """Server-Sent Events: stream gene enrichment analysis results progressively.
 
