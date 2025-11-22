@@ -698,8 +698,8 @@ def get_gene_set(
 def analyze_genes_stream(
     genes: str,
     libraries: str | None = None,
-    analyzer: Annotated[GeneEnrichmentAnalyzer, Depends(get_enrichment_analyzer)] = None,
-    summarizer: Annotated[GeminiEnrichmentSummarizer, Depends(get_enrichment_summarizer)] = None,
+    analyzer: Annotated[GeneEnrichmentAnalyzer, Depends(get_enrichment_analyzer)],
+    summarizer: Annotated[GeminiEnrichmentSummarizer, Depends(get_enrichment_summarizer)],
 ) -> StreamingResponse:
     """Server-Sent Events: stream gene enrichment analysis results progressively.
 
