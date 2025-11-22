@@ -45,8 +45,8 @@ SCHEMA_SNIPPET = dedent(
     - For gene-only AFFECTS, aggregate pmids across all relationships for each gene–therapy–disease tuple.
       For evidence metrics, collect relationships per tuple and compute summaries: best best_evidence_level
       (minimum A-E order), sum evidence_count, average avg_rating, maximum max_rating, and deduplicate evidence_levels.
-    - For TARGETS queries, include reference arrays (r.ref_sources, r.ref_ids,
-      r.ref_urls).
+    - For TARGETS queries, include r.moa AS targets_moa and the reference arrays
+      (r.ref_sources, r.ref_ids, r.ref_urls); do not derive pmids for TARGETS from other sources.
 
     Canonical example (AFFECTS; gene-only aggregation; adapt values):
       MATCH (b:Biomarker)-[rel:AFFECTS_RESPONSE_TO]->(t:Therapy)
@@ -211,6 +211,21 @@ SCHEMA_SNIPPET = dedent(
       LIMIT 100
 
     Canonical rules:
+    - Case sensitivity: ALWAYS use toLower() for all string comparisons.
+    - Granularity:
+      • If question asks for "genes", "biomarkers", or "targets" (general):
+        Collapse to GENE level. Return variant_name = NULL. Group by gene_symbol, therapy_name,
+        disease_name. Aggregate metrics across all variants for that gene.
+      • If question asks for "variants", "mutations", "fusions", or specific alterations:
+        Keep VARIANT level. Return variant_name from the variant node.
+    - Aggregation logic (for Gene-level grouping):
+      • best_evidence_level: use min(rel.best_evidence_level) (exploit 'A' < 'B').
+      • evidence_count: use sum(rel.evidence_count).
+      • avg_rating: use avg(rel.avg_rating).
+      • pmids: flatten using reduce(s=[], p IN collect(rel.pmids) | s + p).
+    - Sorting (AFFECTS queries only):
+      • ALWAYS sort results by quality: ORDER BY best_evidence_level ASC, evidence_count DESC.
+      • Apply LIMIT 100 only AFTER sorting.
     - Case sensitivity: ALWAYS use toLower() for all string comparisons (gene symbols,
       synonyms, therapy names, disease names, effects, variant names). Never compare strings directly
       without toLower() as database values may vary in case.
@@ -230,6 +245,10 @@ SCHEMA_SNIPPET = dedent(
         'BCR::ABL1 Fusion'. Fallback to toLower(Variant.name) CONTAINS
         toLower('<TOKEN>') or synonyms equality via
         any(s IN coalesce(v.synonyms, []) WHERE toLower(s) = toLower('<TOKEN>')).
+      - For bare amino-acid tokens (e.g., 'G12C') that appear without a full variant
+        name, NEVER set Variant.name equal to that token; instead, require VARIANT_OF
+        to the gene and use toLower(Variant.name) CONTAINS toLower('<TOKEN>') or
+        synonyms equality via any(s IN coalesce(v.synonyms, []) WHERE toLower(s) = toLower('<TOKEN>')).
       - For fusion tokens (e.g., 'EML4-ALK', 'EML4::ALK'), match either orientation in
         Variant.name using the '::' separator only:
         toLower(Variant.name) CONTAINS toLower('EML4::ALK') OR
@@ -237,6 +256,7 @@ SCHEMA_SNIPPET = dedent(
       - For alteration-class tokens ('Amplification', 'Overexpression',
         'Deletion', 'Loss-of-function', 'Fusion', 'Wildtype'), use
         toLower(Variant.name) CONTAINS toLower('<TOKEN>') together with VARIANT_OF.
+      - Ignore Variant.hgvs_p entirely for matching; do not use it in WHERE clauses.
     - Gene synonyms: ALWAYS use case-insensitive matching with toLower():
       toLower(g.symbol) = toLower('<SYMBOL>') OR
       any(s IN coalesce(g.synonyms, []) WHERE toLower(s) = toLower('<SYMBOL>')).
@@ -245,19 +265,22 @@ SCHEMA_SNIPPET = dedent(
       with toLower(t.name); allow fallbacks to synonyms equality (case-insensitive) or
       toLower(t.name) CONTAINS when needed.
     - Disease filters: CRITICAL - Extract individual tokens from disease names and match
-      each token separately. For "Non-small Cell Lung Carcinoma", use separate CONTAINS
-      clauses: toLower(rel.disease_name) CONTAINS toLower('lung') AND
-      toLower(rel.disease_name) CONTAINS toLower('non-small') AND
-      toLower(rel.disease_name) CONTAINS toLower('cell'). NEVER use phrase matching
-      like CONTAINS 'non-small cell lung' as this will fail. IMPORTANT: When users mention
-      generic disease type terms like "cancer", the database may use alternative terminology
-      (e.g., "carcinoma", "tumor", "neoplasm"). To maximize recall, EXCLUDE generic disease
-      type terms ("cancer", "carcinoma", "tumor", "neoplasm") from token extraction when
-      more specific anatomical/organ tokens or disease-specific modifiers are available.
-      For example, for "Non-small cell lung cancer", extract only: 'lung', 'non-small', 'cell'
-      (exclude 'cancer' since the database may use "Lung Non-small Cell Carcinoma"). For
-      umbrella terms (e.g., "lung cancer"), prefer a minimal anchor token match on
-      rel.disease_name (case-insensitive), e.g., toLower(rel.disease_name) CONTAINS toLower('lung').
+      each token separately using separate CONTAINS clauses combined with AND.
+      For "Non-small Cell Lung Carcinoma", use:
+        toLower(rel.disease_name) CONTAINS toLower('lung') AND
+        toLower(rel.disease_name) CONTAINS toLower('non-small') AND
+        toLower(rel.disease_name) CONTAINS toLower('cell')
+      and you may optionally include toLower(rel.disease_name) CONTAINS toLower('carcinoma')
+      as an additional token. NEVER use phrase matching like CONTAINS 'non-small cell lung'
+      as this will fail. IMPORTANT: When users mention generic disease type terms like "cancer",
+      the database may use alternative terminology (e.g., "carcinoma", "tumor", "neoplasm").
+      To maximize recall, typically EXCLUDE generic disease type terms ("cancer", "carcinoma",
+      "tumor", "neoplasm") from token extraction when more specific anatomical/organ tokens
+      or disease-specific modifiers are available. For example, for "Non-small cell lung cancer",
+      extract only: 'lung', 'non-small', 'cell' (exclude 'cancer' since the database may use
+      "Lung Non-small Cell Carcinoma"). For umbrella terms (e.g., "lung cancer"), prefer a
+      minimal anchor token match on rel.disease_name (case-insensitive), e.g.,
+      toLower(rel.disease_name) CONTAINS toLower('lung').
     - Exclusion patterns: When query asks for "therapies targeting G1 excluding G2", use:
       MATCH (t:Therapy)-[:TARGETS]->(gi:Gene) WHERE gi matches G1,
       OPTIONAL MATCH (t)-[:TARGETS]->(gx:Gene) WHERE gx matches G2,
@@ -286,69 +309,27 @@ SCHEMA_SNIPPET = dedent(
 INSTRUCTION_PROMPT_TEMPLATE = dedent(
     """
     You are an oncology knowledge graph assistant.
-    Produce concise guidance for a Cypher generator following the schema and
-    canonical rules below.
+    Produce concise guidance for a Cypher generator using the schema and canonical rules below.
     {schema}
 
-    Task: Rewrite the user's question as 3–6 short bullet points that
-    reference the schema labels, relationships, and property names. Keep guidance
-    tumor-agnostic unless a disease is explicitly named. Output only bullets
-    starting with "- "; no Cypher and no JSON.
+    Task:
+    - Rewrite the user's question as 3–6 short bullet points that reference the schema labels,
+      relationships, and property names.
+    - Keep guidance tumor-agnostic unless a disease is explicitly named.
+    - Output only bullets starting with "- "; no Cypher and no JSON.
 
-    Always include evidence:
-    - For AFFECTS queries, return pmids from rel.pmids (array; default []), and
-      include rel.best_evidence_level (string, A-E), rel.evidence_levels (array),
-      rel.evidence_count (integer), rel.avg_rating (float, nullable), rel.max_rating (integer, nullable).
-      Use best_evidence_level for filtering/sorting by evidence strength.
-    - For gene-only AFFECTS questions, collapse to gene-level and aggregate pmids
-      across relationships for each gene–therapy–disease tuple. For evidence metrics,
-      collect relationships per tuple and compute summaries: best best_evidence_level,
-      sum evidence_count, average avg_rating, maximum max_rating, and deduplicate evidence_levels.
-    - For TARGETS queries, include r.ref_sources, r.ref_ids, r.ref_urls.
-
-    - If the question asks for "genes" (no specific variant named), instruct to:
-      • match (b:Gene) OR (b:Variant)-[:VARIANT_OF]->(g:Gene),
-      • return the complete AFFECTS schema with variant_name = NULL (include all standard
-        AFFECTS columns: variant_name, gene_symbol, therapy_name, effect, disease_name, pmids,
-        best_evidence_level, evidence_levels, evidence_count, avg_rating, max_rating),
-      • de-duplicate by gene_symbol, therapy_name, and disease_name,
-      • aggregate pmids across evidence rows and deduplicate evidence_levels.
-
-    - When checking array properties (e.g., synonyms, tags), wrap with coalesce(..., [])
-      before using any()/all() to avoid nulls.
-    - Compare effect case-insensitively with toLower(rel.effect).
-
-    Important: If only an amino-acid token (e.g., "G12C") appears in the
-    question, do NOT write equality on Variant.name to that bare token.
-    Instead, reference the guarded token-handling pattern from the
-    canonical rules (require VARIANT_OF to the gene and use
-    toLower(Variant.name) CONTAINS toLower('<TOKEN>') OR
-    any(s IN coalesce(v.synonyms, []) WHERE toLower(s) = toLower('<TOKEN>'))).
-
-    - Fusion handling: the dataset uses '::' only; match both orientations in
-      Variant.name (e.g., 'EML4::ALK' OR 'ALK::EML4').
-
-    - Disease tokenization: CRITICAL - When a disease is mentioned, extract individual
-      tokens and require each token to appear separately. IMPORTANT: When users mention
-      generic disease type terms like "cancer", the database may use alternative terminology
-      (e.g., "carcinoma", "tumor", "neoplasm"). To maximize recall, EXCLUDE generic disease
-      type terms ("cancer", "carcinoma", "tumor", "neoplasm") from token extraction when
-      more specific anatomical/organ tokens or disease-specific modifiers are available.
-      For example, for "Non-small cell lung cancer", extract only: 'lung', 'non-small', 'cell'
-      (exclude 'cancer' since the database may use "Lung Non-small Cell Carcinoma"). For
-      "Non-small Cell Lung Carcinoma" (when user says "carcinoma"), extract: 'lung', 'non-small',
-      'cell', 'carcinoma' using separate CONTAINS clauses with AND. NEVER use phrase matching
-      like CONTAINS 'non-small cell lung' as this will fail. For umbrella terms (e.g., "lung cancer"),
-      use minimal anchor filtering: require only 'lung' (case-insensitive) to appear in
-      rel.disease_name.
-    - Case sensitivity: Always instruct to use toLower() for all string comparisons (gene
-      symbols, synonyms, therapy names, disease names, effects).
-    - When a therapy is explicitly named, include a bullet to match Therapy by
-      case-insensitive name equality and allow synonyms/CONTAINS as fallbacks.
-    - When the question asks which therapies target a gene or requests mechanisms of
-      action (MOA), include a bullet to match (t:Therapy)-[r:TARGETS]->(g:Gene) for the
-      gene (consider synonyms) and to project r.moa AS targets_moa. Include reference
-      arrays (r.ref_sources, r.ref_ids, r.ref_urls) if present.
+    Use the canonical rules from the schema rather than redefining them:
+    - Indicate whether the query is about predictive biomarkers (AFFECTS), therapeutic targets or
+      mechanisms of action (TARGETS), or simple variant lookup, and rely on the corresponding
+      result schemas and evidence fields already defined.
+    - Respect the gene-versus-variant granularity rules (when to collapse to gene level vs keep
+      variant detail), and make clear when aggregation of pmids and evidence metrics is expected.
+    - When diseases, therapies, variants, or fusions are mentioned, rely on the schema's matching
+      and tokenization patterns (including handling of bare amino-acid tokens and fusions) instead
+      of inventing new ones.
+    - When evidence strength or ranking matters, point to the evidence metrics and sorting behavior
+      from the schema (best_evidence_level, evidence_count, avg_rating, max_rating) without restating
+      the full logic.
 
     User question: {question}
     """
@@ -360,44 +341,29 @@ CYPHER_PROMPT_TEMPLATE = dedent(
     described below.
     {schema}
 
-    Follow these essentials:
-    - Use the instruction text exactly once to decide filters, MATCH clauses,
-      and RETURN columns.
-    - Output a single Cypher query only (no commentary or fences); include a
-      RETURN clause and ALWAYS use LIMIT 100.
-    - No parameters: inline single-quoted literals only.
-    - Case-insensitive string handling: use toLower() for all string comparisons.
-    - When checking array properties (synonyms, tags, reference arrays), wrap with
-      coalesce(..., []) before any()/all().
-    - AFFECTS evidence: project pmids from rel.pmids as an array
-      (use coalesce(rel.pmids, [])); include rel.best_evidence_level (string),
-      rel.evidence_levels (array), rel.evidence_count (integer), rel.avg_rating (float, nullable),
-      rel.max_rating (integer, nullable). These are pre-aggregated summary metrics.
-      For gene-only requests, collapse to the gene level and aggregate pmids across relationships.
-      For evidence metrics, collect relationships per tuple and compute summaries.
-    - TARGETS evidence: include r.moa AS targets_moa and the reference arrays
-      r.ref_sources, r.ref_ids, r.ref_urls (do not derive pmids).
-    - Return the minimally sufficient columns for the query type:
-      • AFFECTS: variant_name, gene_symbol, therapy_name, effect, disease_name,
-        pmids, best_evidence_level, evidence_levels, evidence_count, avg_rating, max_rating.
-      • Gene-only AFFECTS: set variant_name = NULL, aggregate pmids, deduplicate
-        evidence_levels, and include aggregated evidence metrics (best best_evidence_level,
-        sum evidence_count, average avg_rating, maximum max_rating).
-      • TARGETS: gene_symbol, therapy_name, targets_moa, ref_sources, ref_ids, ref_urls.
-      • Simple variant lookups: ONLY variant_name and gene_symbol.
-      • Include therapy_name and at least one of gene_symbol or variant_name only
-        when therapies are involved (AFFECTS or TARGETS).
-    - Variant matching:
-      • For full names (e.g., 'KRAS G12C', 'BCR::ABL1 Fusion'), prefer equality on v.name.
-      • Otherwise use toLower(v.name) CONTAINS toLower('<TOKEN>') or
-        synonyms equality via any(s IN coalesce(v.synonyms, [])
-        WHERE toLower(s) = toLower('<TOKEN>')), always guarded with VARIANT_OF.
-      • For fusions, use '::' separator only and match both orientations.
-      • Ignore v.hgvs_p entirely.
-    - Disease filters: apply tokenized matching with AND across tokens; exclude generic
-      type words when more specific tokens exist, or use a minimal organ anchor for
-      umbrella terms.
-    - Keep the pattern simple: prefer MATCH/OPTIONAL MATCH, WHERE, UNWIND, WITH, RETURN.
+    You will receive high-level instruction text that already encodes the user's intent
+    in terms of this schema.
+
+    Requirements:
+    - Use the instruction text exactly once; do not reinterpret the original user question directly.
+    - Implement the instruction text by applying the canonical rules from the schema for:
+      • choosing between AFFECTS, TARGETS, or simple variant lookup and their standard result schemas,
+      • evidence fields and aggregation behavior (including gene-level collapsing),
+      • gene-versus-variant granularity,
+      • disease tokenization and filtering,
+      • matching of genes, variants, therapies, and fusions,
+      • sorting and LIMIT behavior.
+    - Use inline single-quoted literals only (no Cypher parameters like $var).
+    - Use case-insensitive string comparisons with toLower(), and wrap array properties
+      (e.g., synonyms, tags, reference arrays) with coalesce(..., []) before any()/all() checks.
+    - Keep the query pattern simple: prefer MATCH / OPTIONAL MATCH, WHERE, UNWIND, WITH, RETURN,
+      and always include a RETURN clause and LIMIT 100.
+
+    Output:
+    - Output a single Cypher query only, with no commentary, explanation, or code fences.
+    - The projected columns must match the standard schema for the detected query type
+      (AFFECTS, gene-level AFFECTS, TARGETS, or simple variant lookup) as defined in the schema,
+      and the query must include LIMIT 100.
 
     Instruction text:
     {instructions}
