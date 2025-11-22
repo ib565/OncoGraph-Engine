@@ -48,7 +48,7 @@ SCHEMA_SNIPPET = dedent(
     - For TARGETS queries, include r.moa AS targets_moa and the reference arrays
       (r.ref_sources, r.ref_ids, r.ref_urls); do not derive pmids for TARGETS from other sources.
 
-    Canonical example (AFFECTS; gene-only aggregation; adapt values):
+    Canonical example (AFFECTS; gene-level aggregation; adapt values):
       MATCH (b:Biomarker)-[rel:AFFECTS_RESPONSE_TO]->(t:Therapy)
       WHERE (
         toLower(t.name) = toLower('cetuximab')
@@ -63,78 +63,28 @@ SCHEMA_SNIPPET = dedent(
       AND toLower(rel.effect) = 'resistance'
       AND toLower(rel.disease_name) CONTAINS toLower('colorectal')
       OPTIONAL MATCH (b)-[:VARIANT_OF]->(g:Gene)
-      WITH
-        CASE WHEN b:Gene THEN b.symbol ELSE g.symbol END AS gene_symbol,
-        t.name AS therapy_name,
-        rel.disease_name AS disease_name,
-        rel
+      WITH CASE WHEN b:Gene THEN b.symbol ELSE g.symbol END AS gene_symbol,
+           t.name AS therapy_name,
+           rel.disease_name AS disease_name,
+           rel
       WHERE gene_symbol IS NOT NULL
-      WITH gene_symbol, therapy_name, disease_name,
-           collect(coalesce(rel.pmids, [])) AS pmid_groups,
-           collect(coalesce(rel.evidence_levels, [])) AS level_groups,
-           collect(rel.best_evidence_level) AS best_levels_raw,
-           collect(coalesce(rel.evidence_count, 0)) AS count_values,
-           collect(rel.avg_rating) AS avg_values_raw,
-           collect(rel.max_rating) AS max_values_raw
-      WITH gene_symbol, therapy_name, disease_name,
-           pmid_groups,
-           level_groups,
-           [lvl IN best_levels_raw
-              WHERE lvl IS NOT NULL AND lvl <> ''
-              | lvl] AS best_levels,
-           count_values,
-           [value IN avg_values_raw
-              WHERE value IS NOT NULL
-              | value] AS avg_values,
-           [value IN max_values_raw
-              WHERE value IS NOT NULL
-              | value] AS max_values
-      WITH gene_symbol, therapy_name, disease_name,
-           reduce(pmid_flat = [], group IN pmid_groups | pmid_flat + group) AS pmids_flat,
-           reduce(level_flat = [], group IN level_groups | level_flat + group) AS levels_flat,
-           best_levels,
-           count_values,
-           avg_values,
-           max_values
-      WITH gene_symbol, therapy_name, disease_name,
-           reduce(unique_pmids = [], p IN pmids_flat
-             | CASE WHEN p IN unique_pmids THEN unique_pmids ELSE unique_pmids + p END) AS pmids,
-           reduce(unique_levels = [], lvl IN levels_flat
-             | CASE WHEN lvl IN unique_levels THEN unique_levels ELSE unique_levels + lvl END) AS evidence_levels,
-           best_levels,
-           count_values,
-           avg_values,
-           max_values
-      WITH gene_symbol, therapy_name, disease_name, pmids, evidence_levels,
-           CASE
-             WHEN size(best_levels) = 0 THEN ''
-             WHEN size(best_levels) = 1 THEN head(best_levels)
-             ELSE reduce(best = head(best_levels), lvl IN tail(best_levels)
-                    | CASE WHEN lvl < best THEN lvl ELSE best END)
-           END AS best_evidence_level,
-           reduce(total = 0, value IN count_values | total + value) AS evidence_count,
-           CASE
-             WHEN size(avg_values) = 0 THEN NULL
-             ELSE toFloat(reduce(sum_val = 0.0, value IN avg_values | sum_val + value)) / size(avg_values)
-           END AS avg_rating,
-           CASE
-             WHEN size(max_values) = 0 THEN NULL
-             WHEN size(max_values) = 1 THEN head(max_values)
-             ELSE reduce(max_val = head(max_values), value IN tail(max_values)
-                    | CASE WHEN value > max_val THEN value ELSE max_val END)
-           END AS max_rating
       RETURN
         NULL AS variant_name,
         gene_symbol,
         therapy_name,
         'resistance' AS effect,
         disease_name,
-        pmids,
-        best_evidence_level,
-        evidence_levels,
-        evidence_count,
-        avg_rating,
-        max_rating
+        // Flatten PMIDs from multiple edges into one list
+        reduce(s = [], p IN collect(coalesce(rel.pmids, [])) | s + p) AS pmids,
+        // Use built-in min() because 'A' < 'B' string-wise
+        min(rel.best_evidence_level) AS best_evidence_level,
+        // Collect the distinct levels found on these edges
+        collect(DISTINCT rel.best_evidence_level) AS evidence_levels,
+        // Simple math
+        sum(rel.evidence_count) AS evidence_count,
+        avg(rel.avg_rating) AS avg_rating,
+        max(rel.max_rating) AS max_rating
+      ORDER BY best_evidence_level ASC, evidence_count DESC
       LIMIT 100
 
     Canonical example (AFFECTS; adapt values as needed):
@@ -223,6 +173,10 @@ SCHEMA_SNIPPET = dedent(
       • evidence_count: use sum(rel.evidence_count).
       • avg_rating: use avg(rel.avg_rating).
       • pmids: flatten using reduce(s=[], p IN collect(rel.pmids) | s + p).
+      • Prefer the one-step built-in aggregation pattern (single RETURN with
+        min/sum/avg/max/collect(DISTINCT)) from the "gene-level with built-in aggregation"
+        example; use the longer multi-WITH reduce pipeline only when you truly need
+        extra deduplication logic beyond those functions.
     - Sorting (AFFECTS queries only):
       • ALWAYS sort results by quality: ORDER BY best_evidence_level ASC, evidence_count DESC.
       • Apply LIMIT 100 only AFTER sorting.
@@ -234,11 +188,12 @@ SCHEMA_SNIPPET = dedent(
         • return NULL AS variant_name,
         • return gene_symbol (from b:Gene or via VARIANT_OF),
         • de-duplicate by gene_symbol, therapy_name, disease_name,
-        • aggregate pmids across relationships: use UNWIND pmids AS p, then
-          collect(DISTINCT p) AS pmids to ensure no duplicates.
-        • aggregate evidence metrics: collect relationships per tuple, then compute
-          best_evidence_level (minimum A-E), sum evidence_count, average avg_rating,
-          maximum max_rating. See canonical example for aggregation pattern.
+        • aggregate pmids across relationships: flatten with reduce(s=[], p IN
+          collect(coalesce(rel.pmids, [])) | s + p) and only add extra UNWIND/dedup
+          steps when duplicates truly matter.
+        • aggregate evidence metrics with the built-in min/sum/avg/max pattern from the
+          simplified gene-level example; fall back to the longer reduce-based example
+          only when bespoke deduplication beyond those functions is required.
     - Specific variant:
       - Always require VARIANT_OF to the named gene.
       - Prefer equality on Variant.name for full names like 'KRAS G12C' or
@@ -353,6 +308,10 @@ CYPHER_PROMPT_TEMPLATE = dedent(
       • disease tokenization and filtering,
       • matching of genes, variants, therapies, and fusions,
       • sorting and LIMIT behavior.
+    - When a gene-level aggregate is required, default to the built-in aggregation
+      pattern (single RETURN with min/sum/avg/max/collect(DISTINCT)) that appears in the
+      schema; only introduce multi-stage reduce pipelines when the instructions demand
+      additional deduplication beyond those functions.
     - Use inline single-quoted literals only (no Cypher parameters like $var).
     - Use case-insensitive string comparisons with toLower(), and wrap array properties
       (e.g., synonyms, tags, reference arrays) with coalesce(..., []) before any()/all() checks.
@@ -373,7 +332,9 @@ CYPHER_PROMPT_TEMPLATE = dedent(
 
 SUMMARY_PROMPT_TEMPLATE = dedent(
     """
-    You are an expert oncology research assistant summarizing results from a clinical knowledge graph. Your goal is to provide a concise, ranked, and scannable answer based strictly on the provided data rows.
+    You are an expert oncology research assistant summarizing results from a
+    clinical knowledge graph. Your goal is to provide a concise, ranked, and
+    scannable answer based strictly on the provided data rows.
 
     Original Question:
     {question}
@@ -385,11 +346,14 @@ SUMMARY_PROMPT_TEMPLATE = dedent(
 
     1.  **Direct Answer First:** Start with a 1-2 sentence direct answer to the user's question.
     2.  **Rank by Evidence Strength:**
-        *   If rows contain `best_evidence_level`, **prioritize Level A/B** items. Group lower-confidence items (C/D/E) at the bottom or summarized together.
+        *   If rows contain `best_evidence_level`, **prioritize Level A/B** items.
+            Group lower-confidence items (C/D/E) at the bottom or summarized together.
         *   Mention evidence metrics concisely in parentheses, e.g., "**KRAS** (Level A, 40 items)".
         *   Do NOT list every single PMID. Include only the top 2-3 distinct PMIDs per item to support the claim.
     3.  **Consolidate & Group:**
-        *   If a gene/variant affects multiple therapies similarly (e.g., "Resistant to Cetuximab and Panitumumab"), combine them into one bullet point rather than repeating the gene.
+        *   If a gene/variant affects multiple therapies similarly (e.g.,
+            "Resistant to Cetuximab and Panitumumab"), combine them into one bullet
+            point rather than repeating the gene.
         *   If listing targets (`TARGETS` relationship), group by Mechanism of Action (MOA) if available.
     4.  **Format:**
         *   Use **bold** for key entities (Genes, Therapies, Diseases).
@@ -402,7 +366,8 @@ SUMMARY_PROMPT_TEMPLATE = dedent(
 
     ### Example Output Style:
 
-    *   **KRAS** (Level A, 40 items): Strongest predictor of resistance to **Cetuximab** and **Panitumumab**. [PMID:20619739, PMID:19603018]
+    *   **KRAS** (Level A, 40 items): Strongest predictor of resistance to
+        **Cetuximab** and **Panitumumab**. [PMID:20619739, PMID:19603018]
     *   **NRAS** (Level A, 14 items): Validated resistance marker. [PMID:20619739]
     *   **BRAF**, **PIK3CA**, **PTEN** (Level B): Clinical evidence suggests resistance.
     *   **EGFR**, **ERBB3** (Level C/D): Weaker or preclinical evidence found.
