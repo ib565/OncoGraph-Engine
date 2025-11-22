@@ -1,15 +1,578 @@
 [
-  {
-    "id": "resistance_genes_cetuximab_panitumumab_colorectal",
-    "tab": "biomarkers_resistance",
-    "question": "Which genes predict resistance to cetuximab or panitumumab in colorectal cancer?",
-    "cachedResponse": null
-  },
+    {
+        "id": "resistance_genes_cetuximab_panitumumab_colorectal",
+        "tab": "biomarkers_resistance",
+        "question": "Which genes predict resistance to cetuximab or panitumumab in colorectal cancer?",
+        "cachedResponse": {
+          "answer": "Genes predicting resistance to cetuximab or panitumumab in colorectal cancer include KRAS, NRAS, PIK3CA, BRAF, ERBB2, PTEN, EGFR, ERBB3, FBXW7, and SMAD4. KRAS and NRAS show the strongest evidence.\n\n*   **KRAS** (Level A, 40 items): Predicts resistance to **Cetuximab** and **Panitumumab**. [PMID: 20619739, PMID: 19603018, PMID: 20570890]\n*   **NRAS** (Level A, 14 items): Predicts resistance to **Cetuximab**. [PMID: 20619739, PMID: 25666295]\n*   **PIK3CA** (Level B, 29 items): Predicts resistance to **Cetuximab**. [PMID: 20619739, PMID: 19223544, PMID: 28424201]\n*   **BRAF** (Level B, 12 items): Predicts resistance to **Cetuximab**. [PMID: 20619739, PMID: 26989027, PMID: 27404270]\n*   **ERBB2** (Level B, 5 items): Predicts resistance to **Cetuximab**. [PMID: 22586653, PMID: 23348520, PMID: 24146218]\n*   **PTEN** (Level B, 2 items): Predicts resistance to **Cetuximab**. [PMID: 19223544, PMID: 21163703]\n*   **EGFR** (Level C, 5 items): Predicts resistance to **Cetuximab**. [PMID: 26888827, PMID: 22270724, PMID: 29196463]\n*   **NRAS** (Level A, 2 items): Predicts resistance to **Panitumumab**. [PMID: 20619739, PMID: 28275037]\n*   **PIK3CA** (Level B, 5 items): Predicts resistance to **Panitumumab**. [PMID: 19223544]\n*   **BRAF** (Level B, 6 items): Predicts resistance to **Panitumumab**. [PMID: 25673644, PMID: 27404270, PMID: 23325582]\n*   **ERBB2** (Level B, 1 item): Predicts resistance to **Panitumumab**. [PMID: 23348520]\n*   **PTEN** (Level B, 1 item): Predicts resistance to **Panitumumab**. [PMID: 19223544]\n*   **EGFR** (Level C, 2 items): Predicts resistance to **Panitumumab**. [PMID: 26888827, PMID: 29196463]\n*   **ERBB3** (Level B, 1 item): Predicts resistance to **Cetuximab**. [PMID: 25520391]\n*   **FBXW7** (Level B, 1 item): Predicts resistance to **Cetuximab**. [PMID: 26508446]\n*   **SMAD4** (Level B, 1 item): Predicts resistance to **Cetuximab**. [PMID: 26508446]\n*   **FBXW7** (Level B, 1 item): Predicts resistance to **Panitumumab**. [PMID: 26508446]\n*   **SMAD4** (Level B, 1 item): Predicts resistance to **Panitumumab**. [PMID: 26508446]\n*   **HRAS** (Level D, 1 item): Predicts resistance to **Cetuximab**. [PMID: 26561417]\n*   **NRG1** (Level D, 1 item): Predicts resistance to **Cetuximab**. [PMID: 21900593]",
+          "cypher": "MATCH (b:Biomarker)-[rel:AFFECTS_RESPONSE_TO]->(t:Therapy)\nWHERE (\n    toLower(t.name) = toLower('cetuximab')\n    OR toLower(t.name) = toLower('panitumumab')\n    OR any(s IN coalesce(t.synonyms, [])\n           WHERE toLower(s) = toLower('cetuximab'))\n    OR any(s IN coalesce(t.synonyms, [])\n           WHERE toLower(s) = toLower('panitumumab'))\n    OR toLower(t.name) CONTAINS toLower('cetuximab')\n    OR toLower(t.name) CONTAINS toLower('panitumumab')\n)\nAND toLower(rel.effect) = 'resistance'\nAND toLower(rel.disease_name) CONTAINS toLower('colorectal')\nOPTIONAL MATCH (b)-[:VARIANT_OF]->(g:Gene)\nWITH CASE WHEN b:Gene THEN b.symbol ELSE g.symbol END AS gene_symbol,\n     t.name AS therapy_name,\n     rel.disease_name AS disease_name,\n     rel\nWHERE gene_symbol IS NOT NULL\nRETURN\n  NULL AS variant_name,\n  gene_symbol,\n  therapy_name,\n  'resistance' AS effect,\n  disease_name,\n  reduce(s = [], p IN collect(coalesce(rel.pmids, [])) | s + p) AS pmids,\n  min(rel.best_evidence_level) AS best_evidence_level,\n  collect(DISTINCT rel.best_evidence_level) AS evidence_levels,\n  sum(rel.evidence_count) AS evidence_count,\n  avg(rel.avg_rating) AS avg_rating,\n  max(rel.max_rating) AS max_rating\nORDER BY best_evidence_level ASC, evidence_count DESC\nLIMIT 100",
+          "rows": [
+            {
+              "variant_name": null,
+              "gene_symbol": "KRAS",
+              "therapy_name": "Cetuximab",
+              "effect": "resistance",
+              "disease_name": "Colorectal Cancer",
+              "pmids": [
+                "20619739",
+                "19603018",
+                "20570890",
+                "25666295",
+                "16618717",
+                "18946061",
+                "19603024",
+                "18202412",
+                "19223544",
+                "20619739",
+                "19223544",
+                "20619739",
+                "20619739",
+                "19223544",
+                "20619739",
+                "20619739",
+                "22722830",
+                "19223544",
+                "20619739",
+                "19223544",
+                "20619739",
+                "20978259",
+                "19223544",
+                "20619739",
+                "22722830",
+                "25666295",
+                "26371285",
+                "26623049",
+                "26812186",
+                "19223544",
+                "20619739",
+                "22586653",
+                "28275037",
+                "20619739",
+                "20619739",
+                "22722830",
+                "20619739",
+                "20619739",
+                "20619739"
+              ],
+              "best_evidence_level": "A",
+              "evidence_levels": [
+                "B",
+                "C",
+                "A"
+              ],
+              "evidence_count": 40,
+              "avg_rating": 3.0334999999999996,
+              "max_rating": 5
+            },
+            {
+              "variant_name": null,
+              "gene_symbol": "KRAS",
+              "therapy_name": "Panitumumab",
+              "effect": "resistance",
+              "disease_name": "Colorectal Cancer",
+              "pmids": [
+                "18316791",
+                "19223544",
+                "19223544",
+                "18316791",
+                "18316791",
+                "19223544",
+                "20619739",
+                "18316791",
+                "18316791",
+                "19223544",
+                "18316791",
+                "19223544",
+                "20619739",
+                "19223544",
+                "20619739",
+                "19223544",
+                "28275037"
+              ],
+              "best_evidence_level": "A",
+              "evidence_levels": [
+                "B",
+                "C",
+                "A"
+              ],
+              "evidence_count": 18,
+              "avg_rating": 2.703333333333333,
+              "max_rating": 5
+            },
+            {
+              "variant_name": null,
+              "gene_symbol": "NRAS",
+              "therapy_name": "Cetuximab",
+              "effect": "resistance",
+              "disease_name": "Colorectal Cancer",
+              "pmids": [
+                "20619739",
+                "20619739",
+                "25666295",
+                "20619739",
+                "20619739",
+                "22586653",
+                "28275037",
+                "25666295",
+                "20619739",
+                "20619739",
+                "20619739",
+                "20619739",
+                "20619739"
+              ],
+              "best_evidence_level": "A",
+              "evidence_levels": [
+                "C",
+                "B",
+                "A"
+              ],
+              "evidence_count": 14,
+              "avg_rating": 2.4633333333333334,
+              "max_rating": 4
+            },
+            {
+              "variant_name": null,
+              "gene_symbol": "NRAS",
+              "therapy_name": "Panitumumab",
+              "effect": "resistance",
+              "disease_name": "Colorectal Cancer",
+              "pmids": [
+                "20619739",
+                "28275037"
+              ],
+              "best_evidence_level": "A",
+              "evidence_levels": [
+                "C",
+                "A"
+              ],
+              "evidence_count": 2,
+              "avg_rating": 2.5,
+              "max_rating": 4
+            },
+            {
+              "variant_name": null,
+              "gene_symbol": "PIK3CA",
+              "therapy_name": "Cetuximab",
+              "effect": "resistance",
+              "disease_name": "Colorectal Cancer",
+              "pmids": [
+                "20619739",
+                "20619739",
+                "19223544",
+                "20619739",
+                "20619739",
+                "20619739",
+                "20619739",
+                "20619739",
+                "28424201",
+                "20619739",
+                "20619739",
+                "19223544",
+                "20619739",
+                "28424201",
+                "28424201",
+                "28424201",
+                "19223544",
+                "19603024",
+                "20619739",
+                "22586653",
+                "20619739",
+                "20619739",
+                "20619739",
+                "20619739",
+                "20619739",
+                "28424201",
+                "28424201"
+              ],
+              "best_evidence_level": "B",
+              "evidence_levels": [
+                "C",
+                "B"
+              ],
+              "evidence_count": 29,
+              "avg_rating": 2.920454545454546,
+              "max_rating": 4
+            },
+            {
+              "variant_name": null,
+              "gene_symbol": "BRAF",
+              "therapy_name": "Cetuximab",
+              "effect": "resistance",
+              "disease_name": "Colorectal Cancer",
+              "pmids": [
+                "20619739",
+                "26989027",
+                "27404270",
+                "19603024",
+                "20619739",
+                "22586653",
+                "19001320",
+                "20619739",
+                "25666295",
+                "25989278",
+                "27729313",
+                "27729313"
+              ],
+              "best_evidence_level": "B",
+              "evidence_levels": [
+                "C",
+                "B"
+              ],
+              "evidence_count": 12,
+              "avg_rating": 2.3,
+              "max_rating": 4
+            },
+            {
+              "variant_name": null,
+              "gene_symbol": "BRAF",
+              "therapy_name": "Panitumumab",
+              "effect": "resistance",
+              "disease_name": "Colorectal Cancer",
+              "pmids": [
+                "25673644",
+                "27404270",
+                "23325582",
+                "19001320",
+                "20619739",
+                "25989278"
+              ],
+              "best_evidence_level": "B",
+              "evidence_levels": [
+                "C",
+                "B"
+              ],
+              "evidence_count": 6,
+              "avg_rating": 2.5825,
+              "max_rating": 4
+            },
+            {
+              "variant_name": null,
+              "gene_symbol": "ERBB2",
+              "therapy_name": "Cetuximab",
+              "effect": "resistance",
+              "disease_name": "Colorectal Cancer",
+              "pmids": [
+                "22586653",
+                "23348520",
+                "24146218",
+                "28223103"
+              ],
+              "best_evidence_level": "B",
+              "evidence_levels": [
+                "B"
+              ],
+              "evidence_count": 5,
+              "avg_rating": 2.8,
+              "max_rating": 4
+            },
+            {
+              "variant_name": null,
+              "gene_symbol": "PIK3CA",
+              "therapy_name": "Panitumumab",
+              "effect": "resistance",
+              "disease_name": "Colorectal Cancer",
+              "pmids": [
+                "19223544",
+                "19223544",
+                "19223544"
+              ],
+              "best_evidence_level": "B",
+              "evidence_levels": [
+                "C",
+                "B"
+              ],
+              "evidence_count": 5,
+              "avg_rating": 2.5,
+              "max_rating": 3
+            },
+            {
+              "variant_name": null,
+              "gene_symbol": "PTEN",
+              "therapy_name": "Cetuximab",
+              "effect": "resistance",
+              "disease_name": "Colorectal Cancer",
+              "pmids": [
+                "19223544",
+                "21163703"
+              ],
+              "best_evidence_level": "B",
+              "evidence_levels": [
+                "B"
+              ],
+              "evidence_count": 2,
+              "avg_rating": 3,
+              "max_rating": 3
+            },
+            {
+              "variant_name": null,
+              "gene_symbol": "ERBB3",
+              "therapy_name": "Cetuximab",
+              "effect": "resistance",
+              "disease_name": "Colorectal Cancer",
+              "pmids": [
+                "25520391"
+              ],
+              "best_evidence_level": "B",
+              "evidence_levels": [
+                "B"
+              ],
+              "evidence_count": 1,
+              "avg_rating": 4,
+              "max_rating": 4
+            },
+            {
+              "variant_name": null,
+              "gene_symbol": "FBXW7",
+              "therapy_name": "Cetuximab",
+              "effect": "resistance",
+              "disease_name": "Colorectal Cancer",
+              "pmids": [
+                "26508446"
+              ],
+              "best_evidence_level": "B",
+              "evidence_levels": [
+                "B"
+              ],
+              "evidence_count": 1,
+              "avg_rating": 2,
+              "max_rating": 2
+            },
+            {
+              "variant_name": null,
+              "gene_symbol": "SMAD4",
+              "therapy_name": "Cetuximab",
+              "effect": "resistance",
+              "disease_name": "Colorectal Cancer",
+              "pmids": [
+                "26508446"
+              ],
+              "best_evidence_level": "B",
+              "evidence_levels": [
+                "B"
+              ],
+              "evidence_count": 1,
+              "avg_rating": 2,
+              "max_rating": 2
+            },
+            {
+              "variant_name": null,
+              "gene_symbol": "ERBB2",
+              "therapy_name": "Panitumumab",
+              "effect": "resistance",
+              "disease_name": "Colorectal Cancer",
+              "pmids": [
+                "23348520"
+              ],
+              "best_evidence_level": "B",
+              "evidence_levels": [
+                "B"
+              ],
+              "evidence_count": 1,
+              "avg_rating": 2,
+              "max_rating": 2
+            },
+            {
+              "variant_name": null,
+              "gene_symbol": "FBXW7",
+              "therapy_name": "Panitumumab",
+              "effect": "resistance",
+              "disease_name": "Colorectal Cancer",
+              "pmids": [
+                "26508446"
+              ],
+              "best_evidence_level": "B",
+              "evidence_levels": [
+                "B"
+              ],
+              "evidence_count": 1,
+              "avg_rating": 2,
+              "max_rating": 2
+            },
+            {
+              "variant_name": null,
+              "gene_symbol": "PTEN",
+              "therapy_name": "Panitumumab",
+              "effect": "resistance",
+              "disease_name": "Colorectal Cancer",
+              "pmids": [
+                "19223544"
+              ],
+              "best_evidence_level": "B",
+              "evidence_levels": [
+                "B"
+              ],
+              "evidence_count": 1,
+              "avg_rating": 3,
+              "max_rating": 3
+            },
+            {
+              "variant_name": null,
+              "gene_symbol": "SMAD4",
+              "therapy_name": "Panitumumab",
+              "effect": "resistance",
+              "disease_name": "Colorectal Cancer",
+              "pmids": [
+                "26508446"
+              ],
+              "best_evidence_level": "B",
+              "evidence_levels": [
+                "B"
+              ],
+              "evidence_count": 1,
+              "avg_rating": 2,
+              "max_rating": 2
+            },
+            {
+              "variant_name": null,
+              "gene_symbol": "EGFR",
+              "therapy_name": "Cetuximab",
+              "effect": "resistance",
+              "disease_name": "Colorectal Cancer",
+              "pmids": [
+                "26888827",
+                "26888827",
+                "22270724",
+                "26888827",
+                "29196463"
+              ],
+              "best_evidence_level": "C",
+              "evidence_levels": [
+                "C",
+                "D",
+                "E"
+              ],
+              "evidence_count": 5,
+              "avg_rating": 3.25,
+              "max_rating": 4
+            },
+            {
+              "variant_name": null,
+              "gene_symbol": "EGFR",
+              "therapy_name": "Panitumumab",
+              "effect": "resistance",
+              "disease_name": "Colorectal Cancer",
+              "pmids": [
+                "26888827",
+                "29196463"
+              ],
+              "best_evidence_level": "C",
+              "evidence_levels": [
+                "C",
+                "E"
+              ],
+              "evidence_count": 2,
+              "avg_rating": 3,
+              "max_rating": 4
+            },
+            {
+              "variant_name": null,
+              "gene_symbol": "HRAS",
+              "therapy_name": "Cetuximab",
+              "effect": "resistance",
+              "disease_name": "Colorectal Cancer",
+              "pmids": [
+                "26561417"
+              ],
+              "best_evidence_level": "D",
+              "evidence_levels": [
+                "D"
+              ],
+              "evidence_count": 1,
+              "avg_rating": null,
+              "max_rating": null
+            },
+            {
+              "variant_name": null,
+              "gene_symbol": "NRG1",
+              "therapy_name": "Cetuximab",
+              "effect": "resistance",
+              "disease_name": "Colorectal Cancer",
+              "pmids": [
+                "21900593"
+              ],
+              "best_evidence_level": "D",
+              "evidence_levels": [
+                "D"
+              ],
+              "evidence_count": 1,
+              "avg_rating": 4,
+              "max_rating": 4
+            }
+          ],
+          "updatedAt": "2025-11-22T13:47:17.598Z"
+        }
+      },
   {
     "id": "therapies_target_kras_mechanisms",
     "tab": "therapy_targets",
     "question": "Which therapies target KRAS and what are their mechanisms of action?",
-    "cachedResponse": null
+    "cachedResponse": {
+      "answer": "The following therapies target KRAS with the indicated mechanisms of action:\n\n*   **Adagrasib**: GTPase KRas inhibitor. [PMID: 31658955]\n*   **Sotorasib**: GTPase KRas inhibitor. [PMID: 31189530, 31666701, 31820981, 32568546]\n*   **Salirasib**: RAS inhibitor. [PMID: 22547163]",
+      "cypher": "MATCH (t:Therapy)-[r:TARGETS]->(g:Gene)\nWHERE toLower(g.symbol) = toLower('KRAS')\n   OR any(s IN coalesce(g.synonyms, []) WHERE toLower(s) = toLower('KRAS'))\nRETURN\n  NULL AS variant_name,\n  g.symbol AS gene_symbol,\n  t.name AS therapy_name,\n  NULL AS effect,\n  NULL AS disease_name,\n  r.moa AS targets_moa,\n  coalesce(r.ref_sources, []) AS ref_sources,\n  coalesce(r.ref_ids, []) AS ref_ids,\n  coalesce(r.ref_urls, []) AS ref_urls\nLIMIT 100",
+      "rows": [
+        {
+          "variant_name": null,
+          "gene_symbol": "KRAS",
+          "therapy_name": "Adagrasib",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "GTPase KRas inhibitor",
+          "ref_sources": [
+            "PubMed"
+          ],
+          "ref_ids": [
+            "31658955"
+          ],
+          "ref_urls": [
+            "https://pubmed.ncbi.nlm.nih.gov/31658955/"
+          ]
+        },
+        {
+          "variant_name": null,
+          "gene_symbol": "KRAS",
+          "therapy_name": "Salirasib",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "RAS inhibitor",
+          "ref_sources": [
+            "PubMed"
+          ],
+          "ref_ids": [
+            "22547163"
+          ],
+          "ref_urls": [
+            "https://pubmed.ncbi.nlm.nih.gov/22547163/"
+          ]
+        },
+        {
+          "variant_name": null,
+          "gene_symbol": "KRAS",
+          "therapy_name": "Sotorasib",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "GTPase KRas inhibitor",
+          "ref_sources": [
+            "PubMed",
+            "PubMed",
+            "PubMed",
+            "PubMed"
+          ],
+          "ref_ids": [
+            "31189530",
+            "31666701",
+            "31820981",
+            "32568546"
+          ],
+          "ref_urls": [
+            "http://europepmc.org/abstract/MED/31189530",
+            "http://europepmc.org/abstract/MED/31666701",
+            "http://europepmc.org/abstract/MED/31820981",
+            "http://europepmc.org/abstract/MED/32568546"
+          ]
+        }
+      ],
+      "updatedAt": "2025-11-22T13:39:25.875Z"
+    }
   },
   {
     "id": "egfr_l858r_gefitinib_lung_response",
@@ -27,7 +590,594 @@
     "id": "therapies_target_braf_map2k1_map2k2",
     "tab": "therapy_targets",
     "question": "Which therapies target BRAF, MAP2K1, or MAP2K2?",
-    "cachedResponse": null
+    "cachedResponse": {
+      "answer": "The following therapies target **BRAF**, **MAP2K1**, or **MAP2K2**:\n\n*   **BRAF** therapies include **Agerafenib**, **BRAF Inhibitor**, **Dabrafenib**, **Encorafenib**, **Pan-RAF Inhibitor LY3009120**, **Regorafenib Anhydrous**, **Sorafenib**, **TRK Inhibitor**, **Tovorafenib**, and **Vemurafenib**.\n*   **MAP2K1** therapies include **Binimetinib**, **Cobimetinib**, **MEK Inhibitor CI-1040**, **MEK Inhibitor GDC-0623**, **MEK Inhibitor RO4987655**, **Mirdametinib**, **Refametinib**, **Selumetinib**, and **Trametinib**.\n*   **MAP2K2** therapies include **Binimetinib**, **Cobimetinib**, **MEK Inhibitor CI-1040**, **MEK Inhibitor GDC-0623**, **MEK Inhibitor RO4987655**, **Mirdametinib**, **Refametinib**, **Selumetinib**, and **Trametinib**.\n\n**BRAF** Therapies:\n*   **Agerafenib** [http://ignyta.com/wp-content/uploads/2015/11/ENA-2015-poster-RXDX-105.pdf]\n*   **BRAF Inhibitor** [10.1158/1538-7445.AM2012-3790, 23617957]\n*   **Dabrafenib** [http://dailymed.nlm.nih.gov/dailymed/lookup.cfm?setid=803beaaa-33f9-48cc-9a95-c2e887e095b4#nlm34090-1]\n*   **Encorafenib** [10.1158/1538-7445.AM2012-3790, 23617957]\n*   **Pan-RAF Inhibitor LY3009120** [25965804]\n*   **Regorafenib Anhydrous** [http://chembl.blogspot.co.uk/search?q=REGORAFENIB, https://www.accessdata.fda.gov/drugsatfda_docs/label/2012/203085lbl.pdf]\n*   **Sorafenib** [http://www.accessdata.fda.gov/drugsatfda_docs/label/2011/021923s012lbl.pdf]\n*   **TRK Inhibitor** [http://chembl.blogspot.co.uk/search?q=REGORAFENIB, https://www.accessdata.fda.gov/drugsatfda_docs/label/2012/203085lbl.pdf]\n*   **Tovorafenib** [http://www.cancer.gov/publications/dictionaries/cancer-drug?cdrid=710688, http://www.sunesis.com/products-in-development/product/MLN2480.php, 5653214]\n*   **Vemurafenib** [http://www.accessdata.fda.gov/drugsatfda_docs/label/2011/202429s000lbl.pdf]\n\n**MAP2K1** Therapies:\n*   **Binimetinib** [http://arraybiopharma.com/files/4813/9810/8023/PubAttachment490.pdf, http://arraybiopharma.com/product-pipeline/binimetinib/, 23414587]\n*   **Cobimetinib** [http://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=c387579e-cee0-4334-bd1e-73f93ac1bde6, 22084396, 22496205]\n*   **MEK Inhibitor CI-1040** [10395327, 16009947]\n*   **MEK Inhibitor GDC-0623** [http://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=c387579e-cee0-4334-bd1e-73f93ac1bde6, 22084396, 22496205]\n*   **MEK Inhibitor RO4987655** [http://cancerres.aacrjournals.org/content/69/9_Supplement/3701.abstract, 19934286, 23587417]\n*   **Mirdametinib** [http://cancerres.aacrjournals.org/content/64/7_Supplement/925.1, 15573115]\n*   **Refametinib** [19706763]\n*   **Selumetinib** [label/2020/213756s000lbl.pdf, 17332304, 17699718]\n*   **Trametinib** [label/2018/204114s007lbl.pdf, https://www.accessdata.fda.gov/drugsatfda_docs/nda/2013/204114Orig1s000ClinPharmR.pdf, https://www.ema.europa.eu/en/documents/product-information/mekinist-epar-product-information_en.pdf]\n\n**MAP2K2** Therapies:\n*   **Binimetinib** [http://arraybiopharma.com/files/4813/9810/8023/PubAttachment490.pdf, http://arraybiopharma.com/product-pipeline/binimetinib/, 23414587]\n*   **Cobimetinib** [http://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=c387579e-cee0-4334-bd1e-73f93ac1bde6, 22084396, 22496205]\n*   **MEK Inhibitor CI-1040** [10395327, 16009947]\n*   **MEK Inhibitor GDC-0623** [http://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=c387579e-cee0-4334-bd1e-73f93ac1bde6, 22084396, 22496205]\n*   **MEK Inhibitor RO4987655** [http://cancerres.aacrjournals.org/content/69/9_Supplement/3701.abstract, 19934286, 23587417]\n*   **Mirdametinib** [http://cancerres.aacrjournals.org/content/64/7_Supplement/925.1, 15573115]\n*   **Refametinib** [19706763]\n*   **Selumetinib** [label/2020/213756s000lbl.pdf, 17332304, 17699718]\n*   **Trametinib** [label/2018/204114s007lbl.pdf, https://www.accessdata.fda.gov/drugsatfda_docs/nda/2013/204114Orig1s000ClinPharmR.pdf, https://www.ema.europa.eu/en/documents/product-information/mekinist-epar-product-information_en.pdf]",
+      "cypher": "MATCH (t:Therapy)-[r:TARGETS]->(g:Gene)\nWHERE (toLower(g.symbol) = toLower('BRAF') OR any(s IN coalesce(g.synonyms, []) WHERE toLower(s) = toLower('BRAF')))\n   OR (toLower(g.symbol) = toLower('MAP2K1') OR any(s IN coalesce(g.synonyms, []) WHERE toLower(s) = toLower('MAP2K1')))\n   OR (toLower(g.symbol) = toLower('MAP2K2') OR any(s IN coalesce(g.synonyms, []) WHERE toLower(s) = toLower('MAP2K2')))\nRETURN\n  NULL AS variant_name,\n  g.symbol AS gene_symbol,\n  t.name AS therapy_name,\n  NULL AS effect,\n  NULL AS disease_name,\n  r.moa AS targets_moa,\n  coalesce(r.ref_sources, []) AS ref_sources,\n  coalesce(r.ref_ids, []) AS ref_ids,\n  coalesce(r.ref_urls, []) AS ref_urls\nLIMIT 100",
+      "rows": [
+        {
+          "variant_name": null,
+          "gene_symbol": "BRAF",
+          "therapy_name": "Agerafenib",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "Serine/threonine-protein kinase B-raf inhibitor",
+          "ref_sources": [
+            "Other",
+            "Other"
+          ],
+          "ref_ids": [
+            "http://ignyta.com/wp-content/uploads/2015/11/ENA-2015-poster-RXDX-105.pdf",
+            "http://ignyta.com/wp-content/uploads/2015/11/RXDX-105-ENA-Clinical-Poster.pdf"
+          ],
+          "ref_urls": [
+            "http://ignyta.com/wp-content/uploads/2015/11/ENA-2015-poster-RXDX-105.pdf",
+            "http://ignyta.com/wp-content/uploads/2015/11/RXDX-105-ENA-Clinical-Poster.pdf"
+          ]
+        },
+        {
+          "variant_name": null,
+          "gene_symbol": "BRAF",
+          "therapy_name": "BRAF Inhibitor",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "Serine/threonine-protein kinase B-raf inhibitor",
+          "ref_sources": [
+            "DOI",
+            "PubMed"
+          ],
+          "ref_ids": [
+            "10.1158/1538-7445.AM2012-3790",
+            "23617957"
+          ],
+          "ref_urls": [
+            "http://cancerres.aacrjournals.org/content/72/8_Supplement/3790",
+            "http://europepmc.org/abstract/MED/23617957"
+          ]
+        },
+        {
+          "variant_name": null,
+          "gene_symbol": "BRAF",
+          "therapy_name": "Dabrafenib",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "Serine/threonine-protein kinase B-raf inhibitor",
+          "ref_sources": [
+            "DailyMed"
+          ],
+          "ref_ids": [
+            "setid=803beaaa-33f9-48cc-9a95-c2e887e095b4#nlm34090-1"
+          ],
+          "ref_urls": [
+            "http://dailymed.nlm.nih.gov/dailymed/lookup.cfm?setid=803beaaa-33f9-48cc-9a95-c2e887e095b4#nlm34090-1"
+          ]
+        },
+        {
+          "variant_name": null,
+          "gene_symbol": "BRAF",
+          "therapy_name": "Encorafenib",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "Serine/threonine-protein kinase B-raf inhibitor",
+          "ref_sources": [
+            "DOI",
+            "PubMed"
+          ],
+          "ref_ids": [
+            "10.1158/1538-7445.AM2012-3790",
+            "23617957"
+          ],
+          "ref_urls": [
+            "http://cancerres.aacrjournals.org/content/72/8_Supplement/3790",
+            "http://europepmc.org/abstract/MED/23617957"
+          ]
+        },
+        {
+          "variant_name": null,
+          "gene_symbol": "BRAF",
+          "therapy_name": "Pan-RAF Inhibitor LY3009120",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "Serine/threonine-protein kinase B-raf inhibitor",
+          "ref_sources": [
+            "PubMed"
+          ],
+          "ref_ids": [
+            "25965804"
+          ],
+          "ref_urls": [
+            "http://europepmc.org/abstract/MED/25965804"
+          ]
+        },
+        {
+          "variant_name": null,
+          "gene_symbol": "BRAF",
+          "therapy_name": "Regorafenib Anhydrous",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "Serine/threonine-protein kinase B-raf inhibitor",
+          "ref_sources": [
+            "Expert",
+            "FDA"
+          ],
+          "ref_ids": [
+            "REGORAFENIB",
+            "label/2012/203085lbl.pdf"
+          ],
+          "ref_urls": [
+            "http://chembl.blogspot.co.uk/search?q=REGORAFENIB",
+            "https://www.accessdata.fda.gov/drugsatfda_docs/label/2012/203085lbl.pdf"
+          ]
+        },
+        {
+          "variant_name": null,
+          "gene_symbol": "BRAF",
+          "therapy_name": "Sorafenib",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "Serine/threonine-protein kinase B-raf inhibitor",
+          "ref_sources": [
+            "FDA"
+          ],
+          "ref_ids": [
+            "label/2011/021923s012lbl.pdf"
+          ],
+          "ref_urls": [
+            "http://www.accessdata.fda.gov/drugsatfda_docs/label/2011/021923s012lbl.pdf"
+          ]
+        },
+        {
+          "variant_name": null,
+          "gene_symbol": "BRAF",
+          "therapy_name": "TRK Inhibitor",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "Serine/threonine-protein kinase B-raf inhibitor",
+          "ref_sources": [
+            "Expert",
+            "FDA"
+          ],
+          "ref_ids": [
+            "REGORAFENIB",
+            "label/2012/203085lbl.pdf"
+          ],
+          "ref_urls": [
+            "http://chembl.blogspot.co.uk/search?q=REGORAFENIB",
+            "https://www.accessdata.fda.gov/drugsatfda_docs/label/2012/203085lbl.pdf"
+          ]
+        },
+        {
+          "variant_name": null,
+          "gene_symbol": "BRAF",
+          "therapy_name": "Tovorafenib",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "RAF serine/threonine protein kinase inhibitor",
+          "ref_sources": [
+            "Other",
+            "Other",
+            "PubMed"
+          ],
+          "ref_ids": [
+            "http://www.cancer.gov/publications/dictionaries/cancer-drug?cdrid=710688",
+            "http://www.sunesis.com/products-in-development/product/MLN2480.php",
+            "5653214"
+          ],
+          "ref_urls": [
+            "http://europepmc.org/abstract/MED/5653214",
+            "http://www.cancer.gov/publications/dictionaries/cancer-drug?cdrid=710688",
+            "http://www.sunesis.com/products-in-development/product/MLN2480.php"
+          ]
+        },
+        {
+          "variant_name": null,
+          "gene_symbol": "BRAF",
+          "therapy_name": "Vemurafenib",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "Serine/threonine-protein kinase B-raf inhibitor",
+          "ref_sources": [
+            "FDA"
+          ],
+          "ref_ids": [
+            "label/2011/202429s000lbl.pdf"
+          ],
+          "ref_urls": [
+            "http://www.accessdata.fda.gov/drugsatfda_docs/label/2011/202429s000lbl.pdf"
+          ]
+        },
+        {
+          "variant_name": null,
+          "gene_symbol": "MAP2K1",
+          "therapy_name": "Binimetinib",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "Dual specificity mitogen-activated protein kinase kinase 1 inhibitor",
+          "ref_sources": [
+            "Other",
+            "Other",
+            "PubMed"
+          ],
+          "ref_ids": [
+            "http://arraybiopharma.com/files/4813/9810/8023/PubAttachment490.pdf",
+            "http://arraybiopharma.com/product-pipeline/binimetinib/",
+            "23414587"
+          ],
+          "ref_urls": [
+            "http://arraybiopharma.com/files/4813/9810/8023/PubAttachment490.pdf",
+            "http://arraybiopharma.com/product-pipeline/binimetinib/",
+            "http://europepmc.org/abstract/MED/23414587"
+          ]
+        },
+        {
+          "variant_name": null,
+          "gene_symbol": "MAP2K1",
+          "therapy_name": "Cobimetinib",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "Dual specificity mitogen-activated protein kinase kinase 1 inhibitor",
+          "ref_sources": [
+            "DailyMed",
+            "PubMed",
+            "PubMed"
+          ],
+          "ref_ids": [
+            "setid=c387579e-cee0-4334-bd1e-73f93ac1bde6",
+            "22084396",
+            "22496205"
+          ],
+          "ref_urls": [
+            "http://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=c387579e-cee0-4334-bd1e-73f93ac1bde6",
+            "http://europepmc.org/abstract/MED/22084396",
+            "http://europepmc.org/abstract/MED/22496205"
+          ]
+        },
+        {
+          "variant_name": null,
+          "gene_symbol": "MAP2K1",
+          "therapy_name": "MEK Inhibitor CI-1040",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "Dual specificity mitogen-activated protein kinase kinase 1 inhibitor",
+          "ref_sources": [
+            "PubMed",
+            "PubMed"
+          ],
+          "ref_ids": [
+            "10395327",
+            "16009947"
+          ],
+          "ref_urls": [
+            "http://europepmc.org/abstract/MED/10395327",
+            "http://europepmc.org/abstract/MED/16009947"
+          ]
+        },
+        {
+          "variant_name": null,
+          "gene_symbol": "MAP2K1",
+          "therapy_name": "MEK Inhibitor GDC-0623",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "Dual specificity mitogen-activated protein kinase kinase 1 inhibitor",
+          "ref_sources": [
+            "DailyMed",
+            "PubMed",
+            "PubMed"
+          ],
+          "ref_ids": [
+            "setid=c387579e-cee0-4334-bd1e-73f93ac1bde6",
+            "22084396",
+            "22496205"
+          ],
+          "ref_urls": [
+            "http://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=c387579e-cee0-4334-bd1e-73f93ac1bde6",
+            "http://europepmc.org/abstract/MED/22084396",
+            "http://europepmc.org/abstract/MED/22496205"
+          ]
+        },
+        {
+          "variant_name": null,
+          "gene_symbol": "MAP2K1",
+          "therapy_name": "MEK Inhibitor RO4987655",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "Dual specificity mitogen-activated protein kinase kinase 1 inhibitor",
+          "ref_sources": [
+            "Other",
+            "PubMed",
+            "PubMed"
+          ],
+          "ref_ids": [
+            "http://cancerres.aacrjournals.org/content/69/9_Supplement/3701.abstract",
+            "19934286",
+            "23587417"
+          ],
+          "ref_urls": [
+            "http://cancerres.aacrjournals.org/content/69/9_Supplement/3701.abstract",
+            "http://europepmc.org/abstract/MED/19934286",
+            "http://europepmc.org/abstract/MED/23587417"
+          ]
+        },
+        {
+          "variant_name": null,
+          "gene_symbol": "MAP2K1",
+          "therapy_name": "Mirdametinib",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "Dual specificity mitogen-activated protein kinase kinase 1 inhibitor",
+          "ref_sources": [
+            "Other",
+            "PubMed"
+          ],
+          "ref_ids": [
+            "http://cancerres.aacrjournals.org/content/64/7_Supplement/925.1",
+            "15573115"
+          ],
+          "ref_urls": [
+            "http://cancerres.aacrjournals.org/content/64/7_Supplement/925.1",
+            "http://europepmc.org/abstract/MED/15573115"
+          ]
+        },
+        {
+          "variant_name": null,
+          "gene_symbol": "MAP2K1",
+          "therapy_name": "Refametinib",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "Dual specificity mitogen-activated protein kinase kinase 1 inhibitor",
+          "ref_sources": [
+            "PubMed"
+          ],
+          "ref_ids": [
+            "19706763"
+          ],
+          "ref_urls": [
+            "http://europepmc.org/abstract/MED/19706763"
+          ]
+        },
+        {
+          "variant_name": null,
+          "gene_symbol": "MAP2K1",
+          "therapy_name": "Selumetinib",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "Dual specificity mitogen-activated protein kinase kinase 1 inhibitor | Dual specificity mitogen-activated protein kinase kinase; MEK1/2 inhibitor",
+          "ref_sources": [
+            "FDA",
+            "PubMed",
+            "PubMed"
+          ],
+          "ref_ids": [
+            "label/2020/213756s000lbl.pdf",
+            "17332304",
+            "17699718"
+          ],
+          "ref_urls": [
+            "http://europepmc.org/abstract/MED/17332304",
+            "http://europepmc.org/abstract/MED/17699718",
+            "http://www.accessdata.fda.gov/drugsatfda_docs/label/2020/213756s000lbl.pdf"
+          ]
+        },
+        {
+          "variant_name": null,
+          "gene_symbol": "MAP2K1",
+          "therapy_name": "Trametinib",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "Dual specificity mitogen-activated protein kinase kinase; MEK1/2 inhibitor",
+          "ref_sources": [
+            "FDA",
+            "FDA",
+            "Other"
+          ],
+          "ref_ids": [
+            "label/2018/204114s007lbl.pdf",
+            "nda/2013/204114Orig1s000ClinPharmR.pdf",
+            "https://www.ema.europa.eu/en/documents/product-information/mekinist-epar-product-information_en.pdf"
+          ],
+          "ref_urls": [
+            "https://www.accessdata.fda.gov/drugsatfda_docs/label/2018/204114s007lbl.pdf",
+            "https://www.accessdata.fda.gov/drugsatfda_docs/nda/2013/204114Orig1s000ClinPharmR.pdf",
+            "https://www.ema.europa.eu/en/documents/product-information/mekinist-epar-product-information_en.pdf"
+          ]
+        },
+        {
+          "variant_name": null,
+          "gene_symbol": "MAP2K2",
+          "therapy_name": "Binimetinib",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "Dual specificity mitogen-activated protein kinase kinase 2 inhibitor",
+          "ref_sources": [
+            "Other",
+            "Other",
+            "PubMed"
+          ],
+          "ref_ids": [
+            "http://arraybiopharma.com/files/4813/9810/8023/PubAttachment490.pdf",
+            "http://arraybiopharma.com/product-pipeline/binimetinib/",
+            "23414587"
+          ],
+          "ref_urls": [
+            "http://arraybiopharma.com/files/4813/9810/8023/PubAttachment490.pdf",
+            "http://arraybiopharma.com/product-pipeline/binimetinib/",
+            "http://europepmc.org/abstract/MED/23414587"
+          ]
+        },
+        {
+          "variant_name": null,
+          "gene_symbol": "MAP2K2",
+          "therapy_name": "Cobimetinib",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "Dual specificity mitogen-activated protein kinase kinase 2 inhibitor",
+          "ref_sources": [
+            "DailyMed",
+            "PubMed",
+            "PubMed"
+          ],
+          "ref_ids": [
+            "setid=c387579e-cee0-4334-bd1e-73f93ac1bde6",
+            "22084396",
+            "22496205"
+          ],
+          "ref_urls": [
+            "http://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=c387579e-cee0-4334-bd1e-73f93ac1bde6",
+            "http://europepmc.org/abstract/MED/22084396",
+            "http://europepmc.org/abstract/MED/22496205"
+          ]
+        },
+        {
+          "variant_name": null,
+          "gene_symbol": "MAP2K2",
+          "therapy_name": "MEK Inhibitor CI-1040",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "Dual specificity mitogen-activated protein kinase kinase 2 inhibitor",
+          "ref_sources": [
+            "PubMed",
+            "PubMed"
+          ],
+          "ref_ids": [
+            "10395327",
+            "16009947"
+          ],
+          "ref_urls": [
+            "http://europepmc.org/abstract/MED/10395327",
+            "http://europepmc.org/abstract/MED/16009947"
+          ]
+        },
+        {
+          "variant_name": null,
+          "gene_symbol": "MAP2K2",
+          "therapy_name": "MEK Inhibitor GDC-0623",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "Dual specificity mitogen-activated protein kinase kinase 2 inhibitor",
+          "ref_sources": [
+            "DailyMed",
+            "PubMed",
+            "PubMed"
+          ],
+          "ref_ids": [
+            "setid=c387579e-cee0-4334-bd1e-73f93ac1bde6",
+            "22084396",
+            "22496205"
+          ],
+          "ref_urls": [
+            "http://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=c387579e-cee0-4334-bd1e-73f93ac1bde6",
+            "http://europepmc.org/abstract/MED/22084396",
+            "http://europepmc.org/abstract/MED/22496205"
+          ]
+        },
+        {
+          "variant_name": null,
+          "gene_symbol": "MAP2K2",
+          "therapy_name": "MEK Inhibitor RO4987655",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "Dual specificity mitogen-activated protein kinase kinase 2 inhibitor",
+          "ref_sources": [
+            "Other",
+            "PubMed",
+            "PubMed"
+          ],
+          "ref_ids": [
+            "http://cancerres.aacrjournals.org/content/69/9_Supplement/3701.abstract",
+            "19934286",
+            "23587417"
+          ],
+          "ref_urls": [
+            "http://cancerres.aacrjournals.org/content/69/9_Supplement/3701.abstract",
+            "http://europepmc.org/abstract/MED/19934286",
+            "http://europepmc.org/abstract/MED/23587417"
+          ]
+        },
+        {
+          "variant_name": null,
+          "gene_symbol": "MAP2K2",
+          "therapy_name": "Mirdametinib",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "Dual specificity mitogen-activated protein kinase kinase 2 inhibitor",
+          "ref_sources": [
+            "Other",
+            "PubMed"
+          ],
+          "ref_ids": [
+            "http://cancerres.aacrjournals.org/content/64/7_Supplement/925.1",
+            "15573115"
+          ],
+          "ref_urls": [
+            "http://cancerres.aacrjournals.org/content/64/7_Supplement/925.1",
+            "http://europepmc.org/abstract/MED/15573115"
+          ]
+        },
+        {
+          "variant_name": null,
+          "gene_symbol": "MAP2K2",
+          "therapy_name": "Refametinib",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "Dual specificity mitogen-activated protein kinase kinase 2 inhibitor",
+          "ref_sources": [
+            "PubMed"
+          ],
+          "ref_ids": [
+            "19706763"
+          ],
+          "ref_urls": [
+            "http://europepmc.org/abstract/MED/19706763"
+          ]
+        },
+        {
+          "variant_name": null,
+          "gene_symbol": "MAP2K2",
+          "therapy_name": "Selumetinib",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "Dual specificity mitogen-activated protein kinase kinase 2 inhibitor | Dual specificity mitogen-activated protein kinase kinase; MEK1/2 inhibitor",
+          "ref_sources": [
+            "FDA",
+            "PubMed",
+            "PubMed"
+          ],
+          "ref_ids": [
+            "label/2020/213756s000lbl.pdf",
+            "17332304",
+            "17699718"
+          ],
+          "ref_urls": [
+            "http://europepmc.org/abstract/MED/17332304",
+            "http://europepmc.org/abstract/MED/17699718",
+            "http://www.accessdata.fda.gov/drugsatfda_docs/label/2020/213756s000lbl.pdf"
+          ]
+        },
+        {
+          "variant_name": null,
+          "gene_symbol": "MAP2K2",
+          "therapy_name": "Trametinib",
+          "effect": null,
+          "disease_name": null,
+          "targets_moa": "Dual specificity mitogen-activated protein kinase kinase; MEK1/2 inhibitor",
+          "ref_sources": [
+            "FDA",
+            "FDA",
+            "Other"
+          ],
+          "ref_ids": [
+            "label/2018/204114s007lbl.pdf",
+            "nda/2013/204114Orig1s000ClinPharmR.pdf",
+            "https://www.ema.europa.eu/en/documents/product-information/mekinist-epar-product-information_en.pdf"
+          ],
+          "ref_urls": [
+            "https://www.accessdata.fda.gov/drugsatfda_docs/label/2018/204114s007lbl.pdf",
+            "https://www.accessdata.fda.gov/drugsatfda_docs/nda/2013/204114Orig1s000ClinPharmR.pdf",
+            "https://www.ema.europa.eu/en/documents/product-information/mekinist-epar-product-information_en.pdf"
+          ]
+        }
+      ],
+      "updatedAt": "2025-11-22T13:36:53.186Z"
+    }
   },
   {
     "id": "kit_variants_drug_response_gist",
@@ -45,7 +1195,230 @@
     "id": "therapies_target_egfr_not_erbb2",
     "tab": "therapy_targets",
     "question": "Which therapies target EGFR but do not target ERBB2?",
-    "cachedResponse": null
+    "cachedResponse": {
+      "answer": "The following therapies target **EGFR** but do not explicitly target **ERBB2** based on the provided data:\n\n*   **Agerafenib** [http://ignyta.com/wp-content/uploads/2015/11/ENA-2015-poster-RXDX-105.pdf]\n*   **Amivantamab** [PMID: 32414908]\n*   **Brigatinib** [PMID: 25888090]\n*   **Cetuximab** [http://dailymed.nlm.nih.gov/dailymed/lookup.cfm?setid=8bc6397e-4bd8-4d37-a007-a327e4da34d9]\n*   **Erlotinib** [http://dailymed.nlm.nih.gov/dailymed/lookup.cfm?setid=57bccb29-1c47-4c64-ab6a-77960a91cc20#section-13]\n*   **Gefitinib** [http://dailymed.nlm.nih.gov/dailymed/lookup.cfm?setid=827d60e8-7e07-41b7-c28b-49ef1c4a5a41]\n*   **Icotinib** [PMID: 22112293]\n*   **Lazertinib** [PMID: 34028784]\n*   **Mobocertinib** [https://www.accessdata.fda.gov/drugsatfda_docs/label/2021/215310s000lbl.pdf]\n*   **Nimotuzumab** [PMID: 19584289]\n*   **Osimertinib** [PMID: 24893891]\n*   **Panitumumab** [http://dailymed.nlm.nih.gov/dailymed/lookup.cfm?setid=e0fa4bca-f245-4d92-ae29-b0c630a315c2]\n*   **Rindopepimut** [PMID: 28274144]\n*   **Rociletinib** [PMID: 24723450]",
+      "cypher": "MATCH (t:Therapy)-[r_egfr:TARGETS]->(egfr_gene:Gene)\nWHERE toLower(egfr_gene.symbol) = toLower('EGFR')\n   OR any(s IN coalesce(egfr_gene.synonyms, []) WHERE toLower(s) = toLower('EGFR'))\nOPTIONAL MATCH (t)-[:TARGETS]->(erbb2_gene:Gene)\nWHERE toLower(erbb2_gene.symbol) = toLower('ERBB2')\n   OR any(s IN coalesce(erbb2_gene.synonyms, []) WHERE toLower(s) = toLower('ERBB2'))\nWITH t, r_egfr, egfr_gene, erbb2_gene\nWHERE erbb2_gene IS NULL\nRETURN\n  egfr_gene.symbol AS gene_symbol,\n  t.name AS therapy_name,\n  r_egfr.moa AS targets_moa,\n  coalesce(r_egfr.ref_sources, []) AS ref_sources,\n  coalesce(r_egfr.ref_ids, []) AS ref_ids,\n  coalesce(r_egfr.ref_urls, []) AS ref_urls\nLIMIT 100",
+      "rows": [
+        {
+          "gene_symbol": "EGFR",
+          "therapy_name": "Agerafenib",
+          "targets_moa": "Epidermal growth factor receptor erbB1 inhibitor",
+          "ref_sources": [
+            "Other",
+            "Other"
+          ],
+          "ref_ids": [
+            "http://ignyta.com/wp-content/uploads/2015/11/ENA-2015-poster-RXDX-105.pdf",
+            "http://ignyta.com/wp-content/uploads/2015/11/RXDX-105-ENA-Clinical-Poster.pdf"
+          ],
+          "ref_urls": [
+            "http://ignyta.com/wp-content/uploads/2015/11/ENA-2015-poster-RXDX-105.pdf",
+            "http://ignyta.com/wp-content/uploads/2015/11/RXDX-105-ENA-Clinical-Poster.pdf"
+          ]
+        },
+        {
+          "gene_symbol": "EGFR",
+          "therapy_name": "Amivantamab",
+          "targets_moa": "Epidermal growth factor receptor inhibitor",
+          "ref_sources": [
+            "PubMed"
+          ],
+          "ref_ids": [
+            "32414908"
+          ],
+          "ref_urls": [
+            "https://pubmed.ncbi.nlm.nih.gov/32414908/"
+          ]
+        },
+        {
+          "gene_symbol": "EGFR",
+          "therapy_name": "Brigatinib",
+          "targets_moa": "Epidermal growth factor receptor erbB1 inhibitor",
+          "ref_sources": [
+            "Other",
+            "Other",
+            "PubMed"
+          ],
+          "ref_ids": [
+            "http://www.ariad.com/AP26113",
+            "http://www.ariad.com/pdf/Rivera_2012_AACR_POSTER_AP26113_noQRcode.pdf",
+            "25888090"
+          ],
+          "ref_urls": [
+            "http://europepmc.org/abstract/MED/25888090",
+            "http://www.ariad.com/AP26113",
+            "http://www.ariad.com/pdf/Rivera_2012_AACR_POSTER_AP26113_noQRcode.pdf"
+          ]
+        },
+        {
+          "gene_symbol": "EGFR",
+          "therapy_name": "Cetuximab",
+          "targets_moa": "Epidermal growth factor receptor erbB1 inhibitor",
+          "ref_sources": [
+            "DailyMed"
+          ],
+          "ref_ids": [
+            "setid=8bc6397e-4bd8-4d37-a007-a327e4da34d9"
+          ],
+          "ref_urls": [
+            "http://dailymed.nlm.nih.gov/dailymed/lookup.cfm?setid=8bc6397e-4bd8-4d37-a007-a327e4da34d9"
+          ]
+        },
+        {
+          "gene_symbol": "EGFR",
+          "therapy_name": "Erlotinib",
+          "targets_moa": "Epidermal growth factor receptor erbB1 inhibitor",
+          "ref_sources": [
+            "DailyMed"
+          ],
+          "ref_ids": [
+            "setid=57bccb29-1c47-4c64-ab6a-77960a91cc20#section-13"
+          ],
+          "ref_urls": [
+            "http://dailymed.nlm.nih.gov/dailymed/lookup.cfm?setid=57bccb29-1c47-4c64-ab6a-77960a91cc20#section-13"
+          ]
+        },
+        {
+          "gene_symbol": "EGFR",
+          "therapy_name": "Gefitinib",
+          "targets_moa": "Epidermal growth factor receptor erbB1 inhibitor",
+          "ref_sources": [
+            "DailyMed"
+          ],
+          "ref_ids": [
+            "setid=827d60e8-7e07-41b7-c28b-49ef1c4a5a41"
+          ],
+          "ref_urls": [
+            "http://dailymed.nlm.nih.gov/dailymed/lookup.cfm?setid=827d60e8-7e07-41b7-c28b-49ef1c4a5a41"
+          ]
+        },
+        {
+          "gene_symbol": "EGFR",
+          "therapy_name": "Icotinib",
+          "targets_moa": "Epidermal growth factor receptor erbB1 inhibitor",
+          "ref_sources": [
+            "PubMed",
+            "PubMed",
+            "PubMed"
+          ],
+          "ref_ids": [
+            "22112293",
+            "22446631",
+            "23586056"
+          ],
+          "ref_urls": [
+            "http://europepmc.org/abstract/MED/22112293",
+            "http://europepmc.org/abstract/MED/22446631",
+            "http://europepmc.org/abstract/MED/23586056"
+          ]
+        },
+        {
+          "gene_symbol": "EGFR",
+          "therapy_name": "Lazertinib",
+          "targets_moa": "Epidermal growth factor receptor erbB1 inhibitor",
+          "ref_sources": [
+            "PubMed"
+          ],
+          "ref_ids": [
+            "34028784"
+          ],
+          "ref_urls": [
+            "https://pubmed.ncbi.nlm.nih.gov/34028784/"
+          ]
+        },
+        {
+          "gene_symbol": "EGFR",
+          "therapy_name": "Mobocertinib",
+          "targets_moa": "Epidermal growth factor receptor erbB1 inhibitor",
+          "ref_sources": [
+            "FDA"
+          ],
+          "ref_ids": [
+            "label/2021/215310s000lbl.pdf"
+          ],
+          "ref_urls": [
+            "https://www.accessdata.fda.gov/drugsatfda_docs/label/2021/215310s000lbl.pdf"
+          ]
+        },
+        {
+          "gene_symbol": "EGFR",
+          "therapy_name": "Nimotuzumab",
+          "targets_moa": "Epidermal growth factor receptor erbB1 inhibitor",
+          "ref_sources": [
+            "PubMed"
+          ],
+          "ref_ids": [
+            "19584289"
+          ],
+          "ref_urls": [
+            "http://europepmc.org/abstract/MED/19584289"
+          ]
+        },
+        {
+          "gene_symbol": "EGFR",
+          "therapy_name": "Osimertinib",
+          "targets_moa": "Epidermal growth factor receptor erbB1 inhibitor",
+          "ref_sources": [
+            "DailyMed",
+            "PubMed",
+            "PubMed"
+          ],
+          "ref_ids": [
+            "setid=5e81b4a7-b971-45e1-9c31-29cea8c87ce7",
+            "24893891",
+            "25271963"
+          ],
+          "ref_urls": [
+            "http://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=5e81b4a7-b971-45e1-9c31-29cea8c87ce7",
+            "http://europepmc.org/abstract/MED/24893891",
+            "http://europepmc.org/abstract/MED/25271963"
+          ]
+        },
+        {
+          "gene_symbol": "EGFR",
+          "therapy_name": "Panitumumab",
+          "targets_moa": "Epidermal growth factor receptor erbB1 inhibitor",
+          "ref_sources": [
+            "DailyMed"
+          ],
+          "ref_ids": [
+            "setid=e0fa4bca-f245-4d92-ae29-b0c630a315c2"
+          ],
+          "ref_urls": [
+            "http://dailymed.nlm.nih.gov/dailymed/lookup.cfm?setid=e0fa4bca-f245-4d92-ae29-b0c630a315c2"
+          ]
+        },
+        {
+          "gene_symbol": "EGFR",
+          "therapy_name": "Rindopepimut",
+          "targets_moa": "Epidermal growth factor receptor erbB1 vaccine antigen",
+          "ref_sources": [
+            "PubMed"
+          ],
+          "ref_ids": [
+            "28274144"
+          ],
+          "ref_urls": [
+            "https://pubmed.ncbi.nlm.nih.gov/28274144/"
+          ]
+        },
+        {
+          "gene_symbol": "EGFR",
+          "therapy_name": "Rociletinib",
+          "targets_moa": "Epidermal growth factor receptor erbB1 inhibitor",
+          "ref_sources": [
+            "PubMed"
+          ],
+          "ref_ids": [
+            "24723450"
+          ],
+          "ref_urls": [
+            "http://europepmc.org/abstract/MED/24723450"
+          ]
+        }
+      ],
+      "updatedAt": "2025-11-22T13:43:39.480Z"
+    }
   },
   {
     "id": "genes_sensitivity_pembrolizumab_nivolumab_melanoma",
