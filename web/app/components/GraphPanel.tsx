@@ -80,6 +80,7 @@ const PREFERRED_COLUMN_ORDER = [
   'variant_name',
   'gene_symbol',
   'therapy_name',
+  'therapies', // Array of therapy names (aggregated format)
   // AFFECTS fields
   'effect',
   'disease_name',
@@ -98,6 +99,7 @@ const PREFERRED_COLUMN_ORDER = [
 const COLUMN_MIN_WIDTHS: Record<string, number> = {
   gene_symbol: 100,
   therapy_name: 140,
+  therapies: 200, // Wider for array of therapy names
   effect: 120,
   disease_name: 160,
   pmids: 100,
@@ -112,6 +114,7 @@ const COLUMN_LABELS: Record<string, string> = {
   variant_name: 'Variant',
   gene_symbol: 'Gene',
   therapy_name: 'Therapy',
+  therapies: 'Therapies', // Array of therapy names
   effect: 'Effect',
   disease_name: 'Disease',
   pmids: 'PMIDs',

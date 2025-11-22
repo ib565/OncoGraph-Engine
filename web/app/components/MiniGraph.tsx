@@ -103,9 +103,19 @@ export function MiniGraph({ rows, height = "100%" }: MiniGraphProps) {
       let variantName = normalizeString(
         getValueCI(row, ["variant_name", "VariantName", "variantname"]) as unknown
       );
-      let therapyName = normalizeString(
-        getValueCI(row, ["therapy_name", "TherapyName", "therapyname"]) as unknown
-      );
+      // Support both single string and array values for therapy_name/therapies
+      const therapyNameOrArray = getValueCI(row, ["therapy_name", "therapies", "TherapyName", "therapyname"]) as unknown;
+      let therapyNames: string[] = [];
+      if (Array.isArray(therapyNameOrArray)) {
+        // Handle array of therapy names
+        therapyNames = asStringArray(therapyNameOrArray) || [];
+      } else {
+        // Handle single string (backward compatibility)
+        const singleName = normalizeString(therapyNameOrArray);
+        if (singleName) {
+          therapyNames = [singleName];
+        }
+      }
       let diseaseName = normalizeString(
         getValueCI(row, ["disease_name", "DiseaseName", "diseasename"]) as unknown
       );
@@ -146,7 +156,9 @@ export function MiniGraph({ rows, height = "100%" }: MiniGraphProps) {
       const therapyVal = (row as Record<string, unknown>)["Therapy"] as Record<string, unknown> | undefined;
       if (therapyVal && typeof therapyVal === "object") {
         const tName = normalizeString((therapyVal as any)["name"]);
-        if (!therapyName && tName) therapyName = tName;
+        if (tName && therapyNames.length === 0) {
+          therapyNames = [tName];
+        }
       }
 
       const relVal = (row as Record<string, unknown>)["AffectsResponseToRelationship"] as unknown;
@@ -163,7 +175,9 @@ export function MiniGraph({ rows, height = "100%" }: MiniGraphProps) {
           const toName = normalizeString((toNode as any)?.name);
           if (!geneSymbol && fromSymbol) geneSymbol = fromSymbol;
           if (!variantName && fromName) variantName = fromName;
-          if (!therapyName && toName) therapyName = toName;
+          if (toName && therapyNames.length === 0) {
+            therapyNames = [toName];
+          }
         } else if (typeof relVal === "object") {
           const relObj = relVal as Record<string, unknown>;
           const rEffect = normalizeString((relObj as any)["effect"]);
@@ -196,7 +210,10 @@ export function MiniGraph({ rows, height = "100%" }: MiniGraphProps) {
         biomarkerNodeId = geneId;
       }
 
-      if (therapyName) {
+      // Process all therapy names (supports both single and multiple)
+      for (const therapyName of therapyNames) {
+        if (!therapyName) continue;
+        
         const therapyId = `Therapy:${therapyName}`;
         addNode(therapyId, therapyName, "Therapy");
 
