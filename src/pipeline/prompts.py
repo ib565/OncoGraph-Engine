@@ -432,6 +432,7 @@ SUMMARY_PROMPT_TEMPLATE = dedent(
     5.  **Constraints:**
         *   If no rows are returned, state: "No evidence found in the current knowledge graph."
         *   Do not invent data or external knowledge not present in rows.
+        *   If there are too many rows, focus on the most important ones and omit the rest with a comment.
 
     ### Example Output Style:
 
