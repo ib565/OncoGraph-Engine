@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import MiniGraph from "./MiniGraph";
 import ReactMarkdown from "react-markdown";
@@ -74,6 +74,235 @@ const extractGeneSymbols = (rows: Array<Record<string, unknown>>): string[] => {
   return Array.from(geneSymbols).sort();
 };
 
+// Schema-driven column order preference (based on prompts.py schema)
+const PREFERRED_COLUMN_ORDER = [
+  // Core identifiers
+  'variant_name',
+  'gene_symbol',
+  'therapy_name',
+  // AFFECTS fields
+  'effect',
+  'disease_name',
+  'pmids',
+  'evidence_levels',
+  'evidence_count',
+  'avg_rating',
+  'max_rating',
+  // TARGETS fields
+  'targets_moa',
+  'ref_sources',
+  'ref_ids',
+  'ref_urls',
+];
+
+const COLUMN_MIN_WIDTHS: Record<string, number> = {
+  gene_symbol: 100,
+  therapy_name: 140,
+  effect: 120,
+  disease_name: 160,
+  pmids: 100,
+  evidence_levels: 130,
+  evidence_count: 100,
+  avg_rating: 90,
+  max_rating: 90,
+};
+
+// Shortened column labels for display
+const COLUMN_LABELS: Record<string, string> = {
+  variant_name: 'Variant',
+  gene_symbol: 'Gene',
+  therapy_name: 'Therapy',
+  effect: 'Effect',
+  disease_name: 'Disease',
+  pmids: 'PMIDs',
+  evidence_levels: 'Evidence',
+  evidence_count: '# Evid',
+  avg_rating: 'Avg Rating',
+  max_rating: 'Max Rating',
+  targets_moa: 'MOA',
+  ref_sources: 'Sources',
+  ref_ids: 'Ref IDs',
+  ref_urls: 'Ref URLs',
+};
+
+// Evidence level ranking for sorting (A is strongest)
+const EVIDENCE_LEVEL_RANK: Record<string, number> = {
+  'A': 0,
+  'B': 1,
+  'C': 2,
+  'D': 3,
+  'E': 4,
+};
+
+// Comparator for evidence levels (A < B < C < D < E)
+const compareEvidenceLevels = (a: string, b: string): number => {
+  const rankA = EVIDENCE_LEVEL_RANK[a.toUpperCase()] ?? 999;
+  const rankB = EVIDENCE_LEVEL_RANK[b.toUpperCase()] ?? 999;
+  return rankA - rankB;
+};
+
+// Get the best (strongest) evidence level from a row's evidence_levels array
+const getBestEvidenceLevel = (row: Record<string, unknown>): string | null => {
+  const evidenceLevels = row.evidence_levels;
+  if (!Array.isArray(evidenceLevels) || evidenceLevels.length === 0) {
+    return null;
+  }
+  
+  const sanitized = sanitizeArrayValue(evidenceLevels);
+  if (sanitized.length === 0) {
+    return null;
+  }
+  
+  const sorted = [...sanitized]
+    .map(item => String(item).toUpperCase())
+    .sort(compareEvidenceLevels);
+  
+  return sorted[0] ?? null;
+};
+
+// Sort rows by best evidence level (A is strongest, so A comes first)
+const sortRowsByBestEvidence = (rows: Array<Record<string, unknown>>): Array<Record<string, unknown>> => {
+  return [...rows].sort((a, b) => {
+    const bestA = getBestEvidenceLevel(a);
+    const bestB = getBestEvidenceLevel(b);
+    
+    // Rows with no evidence levels go to the end
+    if (!bestA && !bestB) return 0;
+    if (!bestA) return 1;
+    if (!bestB) return -1;
+    
+    // Compare by evidence level rank (lower rank = stronger evidence)
+    const rankA = EVIDENCE_LEVEL_RANK[bestA] ?? 999;
+    const rankB = EVIDENCE_LEVEL_RANK[bestB] ?? 999;
+    return rankA - rankB;
+  });
+};
+
+// Infer dynamic columns from rows with schema-driven ordering
+const inferColumns = (rows: Array<Record<string, unknown>>): string[] => {
+  if (!rows || rows.length === 0) return [];
+  
+  // Collect all unique keys from all rows
+  const allKeys = new Set<string>();
+  rows.forEach(row => {
+    Object.keys(row).forEach(key => {
+      // Exclude best_evidence_level as it's redundant with sorted evidence_levels
+      if (key !== 'best_evidence_level' && isMeaningfulValue(row[key])) {
+        allKeys.add(key);
+      }
+    });
+  });
+  
+  // Order columns: preferred order first, then remaining alphabetically
+  const preferred = PREFERRED_COLUMN_ORDER.filter(key => allKeys.has(key));
+  const remaining = Array.from(allKeys)
+    .filter(key => !PREFERRED_COLUMN_ORDER.includes(key))
+    .sort();
+  
+  return [...preferred, ...remaining];
+};
+
+// Render cell value based on type (reusing existing formatting logic)
+const renderCellValue = (value: unknown, columnKey?: string): React.ReactNode => {
+  if (value === null || value === undefined) {
+    return <span className="cell-empty">—</span>;
+  }
+
+  if (Array.isArray(value)) {
+    const sanitized = sanitizeArrayValue(value);
+    if (!sanitized.length) {
+      return <span className="cell-empty">—</span>;
+    }
+
+    if (columnKey === "pmids") {
+      return (
+        <div className="value-stack">
+          {sanitized.map((item, pillIndex) => (
+            <span key={pillIndex} className="value-stack-item">
+              {String(item)}
+            </span>
+          ))}
+        </div>
+      );
+    }
+
+    if (columnKey === "evidence_levels") {
+      // Sort evidence levels: A (strongest) to E (weakest)
+      const sorted = [...sanitized]
+        .map(item => String(item).toUpperCase())
+        .sort(compareEvidenceLevels);
+      
+      return (
+        <div className="value-pills">
+          {sorted.map((level, index) => (
+            <span
+              key={level}
+              className={`value-pill ${index === 0 ? "value-pill-strong" : ""}`}
+              title={index === 0 ? "Strongest evidence level" : undefined}
+            >
+              {level}
+            </span>
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div className="value-pills">
+        {sanitized.map((item, pillIndex) => {
+          if (typeof item === "string") {
+            return isHttpUrl(item) ? (
+              <a
+                key={pillIndex}
+                className="value-pill value-pill-link"
+                href={item}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {getUrlLabel(item)}
+              </a>
+            ) : (
+              <span key={pillIndex} className="value-pill">
+                {item}
+              </span>
+            );
+          }
+          return (
+            <span key={pillIndex} className="value-pill">
+              {String(item)}
+            </span>
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return <span className="cell-empty">—</span>;
+    }
+
+    return isHttpUrl(trimmed) ? (
+      <a className="value-link" href={trimmed} target="_blank" rel="noreferrer">
+        {getUrlLabel(trimmed)}
+      </a>
+    ) : (
+      <span>{trimmed}</span>
+    );
+  }
+
+  if (typeof value === "object" && value !== null) {
+    return (
+      <pre className="value-json">
+        {JSON.stringify(value, null, 2)}
+      </pre>
+    );
+  }
+
+  return <span>{String(value)}</span>;
+};
+
 export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
   const { graphState, setGraphState, setHypothesisState, hypothesisState } = useAppContext();
   const { question, result, error, isLoading, progress, lastQuery, run_id } = graphState;
@@ -94,6 +323,10 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
     [result?.rows]
   );
   const hasRows = Boolean(result?.rows?.length);
+  const columns = useMemo(
+    () => (result?.rows ? inferColumns(result.rows) : []),
+    [result?.rows]
+  );
 
   // Initialize from localStorage and set mounted flag after hydration
   useEffect(() => {
@@ -583,14 +816,14 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
               </div>
             </div>
 
-            {/* Row 3: Cypher Rows | Cypher Query */}
+            {/* Row 3: Results Table | Cypher Query */}
             <div className="layout-row">
               <div className="layout-column rows-column">
                 <div className="card">
                   <header className="panel-header">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
                       <div style={{ flex: 1 }}>
-                        <h3 className="panel-title">Cypher Rows</h3>
+                        <h3 className="panel-title">Results Table</h3>
                         <p className="panel-copy">
                           Explore the raw query results with references.
                         </p>
@@ -651,7 +884,7 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
                               padding: '6px 12px'
                             }}
                             disabled={!hasRows}
-                            title="Download Cypher rows with metadata as CSV"
+                            title="Download results table with metadata as CSV"
                           >
                             ⬇ Download CSV
                           </button>
@@ -660,126 +893,42 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
                     </div>
                   </header>
                   <div className="card-content">
-                    {result.rows?.length ? (
-                      <div className="rows-scroll" role="list">
-                        {result.rows.map((row, index) => {
-                          const entries = Object.entries(row).filter(([, value]) => isMeaningfulValue(value));
-
-                          if (entries.length === 0) {
-                            return (
-                              <article className="row-card" key={`row-${index}`} role="listitem">
-                                <header className="row-heading">Row {index + 1}</header>
-                                <p className="empty-row">No populated columns.</p>
-                              </article>
-                            );
-                          }
-
-                          return (
-                            <article className="row-card" key={`row-${index}`} role="listitem">
-                              <header className="row-heading">Row {index + 1}</header>
-                              <dl className="row-details">
-                                {entries.map(([key, value]) => {
-                                  const label = formatKeyLabel(key);
-
-                                  if (Array.isArray(value)) {
-                                    const sanitized = sanitizeArrayValue(value);
-                                    if (!sanitized.length) {
-                                      return null;
-                                    }
-
-                                    return (
-                                      <Fragment key={key}>
-                                        <dt className="row-key">{label}</dt>
-                                        <dd className="row-value">
-                                          <div className="value-pills">
-                                            {sanitized.map((item, pillIndex) => {
-                                              if (typeof item === "string") {
-                                                return isHttpUrl(item) ? (
-                                                  <a
-                                                    key={`${key}-${pillIndex}`}
-                                                    className="value-pill value-pill-link"
-                                                    href={item}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                  >
-                                                    {getUrlLabel(item)}
-                                                  </a>
-                                                ) : (
-                                                  <span
-                                                    key={`${key}-${pillIndex}`}
-                                                    className="value-pill"
-                                                  >
-                                                    {item}
-                                                  </span>
-                                                );
-                                              }
-
-                                              return (
-                                                <span
-                                                  key={`${key}-${pillIndex}`}
-                                                  className="value-pill"
-                                                >
-                                                  {String(item)}
-                                                </span>
-                                              );
-                                            })}
-                                          </div>
-                                        </dd>
-                                      </Fragment>
-                                    );
-                                  }
-
-                                  if (typeof value === "string") {
-                                    const trimmed = value.trim();
-                                    if (!trimmed) {
-                                      return null;
-                                    }
-
-                                    return (
-                                      <Fragment key={key}>
-                                        <dt className="row-key">{label}</dt>
-                                        <dd className="row-value">
-                                          {isHttpUrl(trimmed) ? (
-                                            <a
-                                              className="value-link"
-                                              href={trimmed}
-                                              target="_blank"
-                                              rel="noreferrer"
-                                            >
-                                              {getUrlLabel(trimmed)}
-                                            </a>
-                                          ) : (
-                                            <span>{trimmed}</span>
-                                          )}
-                                        </dd>
-                                      </Fragment>
-                                    );
-                                  }
-
-                                  if (typeof value === "object" && value !== null) {
-                                    return (
-                                      <Fragment key={key}>
-                                        <dt className="row-key">{label}</dt>
-                                        <dd className="row-value">
-                                          <pre className="value-json">
-                                            {JSON.stringify(value, null, 2)}
-                                          </pre>
-                                        </dd>
-                                      </Fragment>
-                                    );
-                                  }
-
-                                  return (
-                                    <Fragment key={key}>
-                                      <dt className="row-key">{label}</dt>
-                                      <dd className="row-value">{String(value)}</dd>
-                                    </Fragment>
-                                  );
-                                })}
-                              </dl>
-                            </article>
-                          );
-                        })}
+                    {result.rows?.length && columns.length > 0 ? (
+                      <div className="results-table-container">
+                        <table className="results-table">
+                          <thead>
+                            <tr>
+                              {columns.map((col) => (
+                                <th
+                                  key={col}
+                                  className="results-table-header"
+                                  style={{
+                                    minWidth: COLUMN_MIN_WIDTHS[col] ?? 100,
+                                  }}
+                                >
+                                  {COLUMN_LABELS[col] ?? formatKeyLabel(col)}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {sortRowsByBestEvidence(result.rows).map((row, index) => (
+                              <tr key={index} className="results-table-row">
+                                {columns.map((col) => (
+                                  <td
+                                    key={col}
+                                    className="results-table-cell"
+                                    style={{
+                                      minWidth: COLUMN_MIN_WIDTHS[col] ?? 100,
+                                    }}
+                                  >
+                                    {renderCellValue(row[col], col)}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     ) : (
                       <p className="empty-state">No rows returned from the query.</p>

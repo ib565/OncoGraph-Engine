@@ -374,6 +374,98 @@ body {
   min-height: 0;
 }
 
+/* Results Table */
+.results-table-container {
+  width: 100%;
+  height: 400px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+}
+
+.results-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.results-table-header {
+  position: sticky;
+  top: 0;
+  background: var(--bg-raised);
+  color: var(--text-1);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 2px solid var(--border);
+  white-space: normal;
+  line-height: 1.3;
+  word-break: break-word;
+  z-index: 1;
+}
+
+.results-table-header[data-column="pmids"] {
+  max-width: 130px;
+}
+
+.results-table-row {
+  border-bottom: 1px solid var(--border);
+  transition: background-color 0.1s ease;
+}
+
+.results-table-row:hover {
+  background: var(--bg-raised);
+}
+
+.results-table-row:last-child {
+  border-bottom: none;
+}
+
+.results-table-cell {
+  padding: 10px 12px;
+  color: var(--text-1);
+  vertical-align: top;
+  word-break: break-word;
+  max-width: 300px;
+}
+
+.results-table-cell .cell-empty {
+  color: var(--text-2);
+  font-style: italic;
+}
+
+.results-table-cell .value-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.results-table-cell .value-json {
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.value-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.value-stack-item {
+  display: block;
+  background: transparent;
+  color: var(--text-1);
+  font-size: 11px;
+  padding: 1px 0;
+}
+
 .row-card {
   background: var(--bg-raised);
   border: 1px solid var(--border);
@@ -427,6 +519,13 @@ body {
   border-radius: 3px;
   font-size: 11px;
   color: var(--text-2);
+}
+
+.value-pill-strong {
+  background: var(--accent);
+  color: var(--bg-app);
+  border-color: var(--accent);
+  font-weight: 600;
 }
 
 /* Alerts */
