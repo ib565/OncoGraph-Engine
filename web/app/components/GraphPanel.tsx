@@ -303,6 +303,11 @@ const renderCellValue = (value: unknown, columnKey?: string): React.ReactNode =>
     );
   }
 
+  // Format rating columns to 1 decimal place
+  if ((columnKey === "avg_rating" || columnKey === "max_rating") && typeof value === "number") {
+    return <span>{value.toFixed(1)}</span>;
+  }
+
   return <span>{String(value)}</span>;
 };
 
