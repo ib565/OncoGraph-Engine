@@ -66,6 +66,13 @@ class QueryResponse(BaseModel):
 
 class GeneListRequest(BaseModel):
     genes: str = Field(..., min_length=1, description="Comma or newline separated gene symbols")
+    libraries: list[str] | None = Field(
+        default=None,
+        description=(
+            "List of enrichment libraries to use. "
+            "Valid options: GO_Biological_Process_2023, KEGG_2021_Human, Reactome_2022"
+        ),
+    )
 
 
 class GeneSetRequest(BaseModel):
@@ -690,8 +697,9 @@ def get_gene_set(
 @app.get("/analyze/genes/stream")
 def analyze_genes_stream(
     genes: str,
-    analyzer: Annotated[GeneEnrichmentAnalyzer, Depends(get_enrichment_analyzer)],
-    summarizer: Annotated[GeminiEnrichmentSummarizer, Depends(get_enrichment_summarizer)],
+    libraries: str | None = None,
+    analyzer: Annotated[GeneEnrichmentAnalyzer, Depends(get_enrichment_analyzer)] = None,
+    summarizer: Annotated[GeminiEnrichmentSummarizer, Depends(get_enrichment_summarizer)] = None,
 ) -> StreamingResponse:
     """Server-Sent Events: stream gene enrichment analysis results progressively.
 
@@ -704,6 +712,24 @@ def analyze_genes_stream(
     started = datetime.now(UTC).isoformat()
     started_perf = __import__("time").perf_counter()
     run_id = os.getenv("TRACE_RUN_ID_OVERRIDE") or __import__("uuid").uuid4().hex
+
+    # Parse and validate libraries
+    valid_libraries = ["GO_Biological_Process_2023", "KEGG_2021_Human", "Reactome_2022"]
+    libraries_list = None
+    if libraries:
+        libraries_list = [lib.strip() for lib in libraries.split(",") if lib.strip()]
+        # Validate libraries
+        invalid_libs = [lib for lib in libraries_list if lib not in valid_libraries]
+        if invalid_libs:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid library names: {invalid_libs}. Valid options: {valid_libraries}",
+            )
+        if not libraries_list:
+            raise HTTPException(
+                status_code=400,
+                detail="At least one library must be selected",
+            )
 
     # Set run_id in context for cache key generation
     set_run_id(run_id)
@@ -731,6 +757,7 @@ def analyze_genes_stream(
     done_event = threading.Event()
 
     def worker() -> None:
+        # libraries_list is captured from outer scope
         set_run_id(run_id)
         start_cache_hit_collection()
         try:
@@ -763,6 +790,7 @@ def analyze_genes_stream(
                     "started_at": started,
                     "gene_count": len(gene_symbols),
                     "genes_preview": gene_symbols[:5] if len(gene_symbols) > 5 else gene_symbols,
+                    "libraries": libraries_list if libraries_list else analyzer.enrichr_libraries,
                 },
             )
 
@@ -771,7 +799,7 @@ def analyze_genes_stream(
             try:
                 # Pass trace sink to analyzer for detailed logging
                 analyzer.trace = contextual_trace
-                enrichment_result = analyzer.analyze(gene_symbols)
+                enrichment_result = analyzer.analyze(gene_symbols, libraries=libraries_list)
             except Exception as exc:
                 import traceback
 
@@ -986,6 +1014,23 @@ def analyze_genes(
         for line in body.genes.split("\n"):
             gene_symbols.extend([gene.strip() for gene in line.split(",") if gene.strip()])
 
+        # Parse and validate libraries
+        valid_libraries = ["GO_Biological_Process_2023", "KEGG_2021_Human", "Reactome_2022"]
+        libraries_list = body.libraries
+        if libraries_list:
+            # Validate libraries
+            invalid_libs = [lib for lib in libraries_list if lib not in valid_libraries]
+            if invalid_libs:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid library names: {invalid_libs}. Valid options: {valid_libraries}",
+                )
+            if len(libraries_list) == 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail="At least one library must be selected",
+                )
+
         if not gene_symbols:
             contextual_trace.record(
                 "error",
@@ -1006,6 +1051,7 @@ def analyze_genes(
                 "started_at": started,
                 "gene_count": len(gene_symbols),
                 "genes_preview": gene_symbols[:5] if len(gene_symbols) > 5 else gene_symbols,
+                "libraries": libraries_list if libraries_list else analyzer.enrichr_libraries,
             },
         )
 
@@ -1014,7 +1060,7 @@ def analyze_genes(
         try:
             # Pass trace sink to analyzer for detailed logging
             analyzer.trace = contextual_trace
-            result = analyzer.analyze(gene_symbols)
+            result = analyzer.analyze(gene_symbols, libraries=libraries_list)
         except Exception as exc:
             import traceback
 

@@ -80,6 +80,7 @@ def test_pipeline_with_gemini_stubs(monkeypatch):
         responses={
             "User question": "- Investigate KRAS and Cetuximab",
             "Instruction text": "MATCH (b:Biomarker)-[:AFFECTS_RESPONSE_TO]->(t:Therapy) RETURN b LIMIT 5",
+            "Original Question": "**KRAS** mutations confer resistance to **Cetuximab**.",
             "Original question": "KRAS mutations confer resistance",
         }
     )

@@ -44,7 +44,17 @@ const getLibraryColor = (library: string): string => {
 
 export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnalyzerProps = {}) {
   const { hypothesisState, setHypothesisState } = useAppContext();
-  const { genes, result, partialResult, summaryResult, error, isLoading, isLoadingPreset, isSummaryLoading } = hypothesisState;
+  const { genes, selectedLibraries = [], result, partialResult, summaryResult, error, isLoading, isLoadingPreset, isSummaryLoading } = hypothesisState;
+  
+  // Ensure selectedLibraries is always an array
+  const currentLibraries = Array.isArray(selectedLibraries) ? selectedLibraries : [];
+  
+  // Available enrichment libraries
+  const availableLibraries = [
+    { id: "GO_Biological_Process_2023", label: "GO Biological Process 2023" },
+    { id: "KEGG_2021_Human", label: "KEGG 2021 Human" },
+    { id: "Reactome_2022", label: "Reactome 2022" },
+  ];
   
   // State for dot plot drawer
   const [selectedTerm, setSelectedTerm] = useState<{
@@ -135,7 +145,11 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
     });
 
     try {
-      const url = `${API_URL}/analyze/genes/stream?genes=${encodeURIComponent(trimmed)}`;
+      // Build URL with libraries parameter
+      const librariesParam = currentLibraries.length > 0 
+        ? `&libraries=${encodeURIComponent(currentLibraries.join(","))}`
+        : "";
+      const url = `${API_URL}/analyze/genes/stream?genes=${encodeURIComponent(trimmed)}${librariesParam}`;
       const eventSource = new EventSource(url);
 
       eventSource.onmessage = (event) => {
@@ -414,7 +428,8 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
                 <button
                   type="submit"
                   className="primary-button"
-                  disabled={isLoading || isLoadingPreset || !genes.trim()}
+                  disabled={isLoading || isLoadingPreset || !genes.trim() || currentLibraries.length === 0}
+                  title={currentLibraries.length === 0 ? "Please select at least one enrichment database" : ""}
                 >
                   {isLoading ? (
                     <>
@@ -454,6 +469,67 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
         </div>
       </div>
 
+      {/* Row 2: Enrichment Database Selection */}
+      <div className="layout-row">
+        <div className="layout-column full-width">
+          <div className="card">
+            <header className="panel-header">
+              <h3 className="panel-title">Enrichment Databases</h3>
+              <p className="panel-copy">
+                Select which databases to use for enrichment analysis. At least one must be selected.
+              </p>
+            </header>
+            <div className="card-content">
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", alignItems: "center" }}>
+                {availableLibraries.map((lib) => (
+                  <label
+                    key={lib.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      cursor: isLoading || isLoadingPreset ? "not-allowed" : "pointer",
+                      opacity: isLoading || isLoadingPreset ? 0.6 : 1,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={currentLibraries.includes(lib.id)}
+                      onChange={(e) => {
+                        if (isLoading || isLoadingPreset) return;
+                        
+                        const isCurrentlySelected = currentLibraries.includes(lib.id);
+                        const willBeChecked = e.target.checked;
+                        
+                        if (willBeChecked && !isCurrentlySelected) {
+                          // Add library (only if not already present)
+                          setHypothesisState({
+                            selectedLibraries: [...currentLibraries, lib.id],
+                          });
+                        } else if (!willBeChecked && isCurrentlySelected) {
+                          // Remove library, but ensure at least one remains
+                          const newLibraries = currentLibraries.filter((l) => l !== lib.id);
+                          if (newLibraries.length > 0) {
+                            setHypothesisState({ selectedLibraries: newLibraries });
+                          }
+                        }
+                      }}
+                      disabled={isLoading || isLoadingPreset || (currentLibraries.includes(lib.id) && currentLibraries.length === 1)}
+                      style={{ cursor: isLoading || isLoadingPreset ? "not-allowed" : "pointer" }}
+                    />
+                    <span>{lib.label}</span>
+                  </label>
+                ))}
+                {currentLibraries.length === 0 && (
+                  <span style={{ color: "#d32f2f", fontSize: "14px", marginLeft: "8px" }}>
+                    Please select at least one database
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {error && (
         <div className="alert" role="alert">
@@ -787,7 +863,14 @@ export default function HypothesisAnalyzer({ onNavigateToQuery }: HypothesisAnal
                       color: "#666",
                       borderLeft: "3px solid #2196f3"
                     }}>
-                      <strong>Methods:</strong> Over-representation analysis via Enrichr (GSEApy). Libraries: KEGG 2021 Human, Reactome 2022, GO BP 2023. Multiple testing: adjusted p-value (FDR).
+                      <strong>Methods:</strong> Over-representation analysis via Enrichr (GSEApy). Libraries: {currentLibraries.map(lib => {
+                        const libMap: Record<string, string> = {
+                          "GO_Biological_Process_2023": "GO BP 2023",
+                          "KEGG_2021_Human": "KEGG 2021 Human",
+                          "Reactome_2022": "Reactome 2022"
+                        };
+                        return libMap[lib] || lib;
+                      }).join(", ")}. Multiple testing: adjusted p-value (FDR).
                     </div>
                   </div>
                 </div>

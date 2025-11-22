@@ -119,7 +119,7 @@ class GeneEnrichmentAnalyzer:
             valid_genes = list(dict.fromkeys(valid_genes))
 
             result = (valid_genes, invalid_genes)
-            
+
             # Cache the result
             self._cache.set(cache_key, result)
             # Log cache set
@@ -151,11 +151,12 @@ class GeneEnrichmentAnalyzer:
             # Fallback: treat all genes as invalid
             return [], cleaned_genes
 
-    def run_enrichment(self, gene_list: list[str]) -> list[dict[str, Any]]:
+    def run_enrichment(self, gene_list: list[str], libraries: list[str] | None = None) -> list[dict[str, Any]]:
         """Run enrichment analysis using GSEAPy.
 
         Args:
             gene_list: List of valid gene symbols
+            libraries: Optional list of library names to use. If None, uses default libraries.
 
         Returns:
             List of enrichment results with metadata
@@ -163,8 +164,15 @@ class GeneEnrichmentAnalyzer:
         if not gene_list:
             return []
 
+        # Use provided libraries or default to instance libraries
+        libraries_to_use = libraries if libraries is not None else self.enrichr_libraries
+
+        if not libraries_to_use:
+            logger.warning("No libraries specified for enrichment analysis")
+            return []
+
         # Check cache first
-        cache_key = make_cache_key("run_enrichment", sorted(gene_list), self.enrichr_libraries)
+        cache_key = make_cache_key("run_enrichment", sorted(gene_list), sorted(libraries_to_use))
         cached_result = self._cache.get(cache_key)
         if cached_result is not None:
             # Log cache hit
@@ -179,14 +187,14 @@ class GeneEnrichmentAnalyzer:
                 {
                     "gene_list_count": len(gene_list),
                     "gene_list_preview": gene_list[:10] if len(gene_list) > 10 else gene_list,
-                    "libraries": self.enrichr_libraries,
+                    "libraries": libraries_to_use,
                 },
             )
 
             # Run enrichr analysis
             enr = gp.enrichr(
                 gene_list=gene_list,
-                gene_sets=self.enrichr_libraries,
+                gene_sets=libraries_to_use,
                 organism="human",
                 outdir=None,
                 cutoff=0.05,
@@ -347,11 +355,12 @@ class GeneEnrichmentAnalyzer:
         # Convert to JSON-serializable format
         return fig.to_dict()
 
-    def analyze(self, gene_symbols: list[str]) -> EnrichmentResult:
+    def analyze(self, gene_symbols: list[str], libraries: list[str] | None = None) -> EnrichmentResult:
         """Run complete enrichment analysis pipeline.
 
         Args:
             gene_symbols: List of gene symbols to analyze
+            libraries: Optional list of library names to use. If None, uses default libraries.
 
         Returns:
             Structured enrichment analysis results
@@ -360,7 +369,7 @@ class GeneEnrichmentAnalyzer:
         valid_genes, invalid_genes = self.normalize_genes(gene_symbols)
 
         # Run enrichment analysis
-        enrichment_results = self.run_enrichment(valid_genes)
+        enrichment_results = self.run_enrichment(valid_genes, libraries=libraries)
 
         # Create plot data
         plot_data = self.create_plot_data(enrichment_results)

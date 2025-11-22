@@ -58,6 +58,72 @@ class TestGeneEnrichmentAnalyzer:
 
     @patch("pipeline.enrichment.mygene")
     @patch("pipeline.enrichment.gp")
+    def test_run_enrichment_with_custom_libraries(self, mock_gp, mock_mygene):
+        """Test enrichment analysis with custom library selection."""
+        mock_mygene.MyGeneInfo.return_value = MagicMock()
+
+        # Mock GSEAPy enrichr results
+        mock_enr = MagicMock()
+        mock_gp.enrichr.return_value = mock_enr
+        mock_enr.results = {}  # Empty results for simplicity
+
+        analyzer = GeneEnrichmentAnalyzer()
+        custom_libraries = ["GO_Biological_Process_2023", "Reactome_2022"]
+        results = analyzer.run_enrichment(["BRCA1", "BRCA2"], libraries=custom_libraries)
+
+        # Verify that enrichr was called with custom libraries
+        mock_gp.enrichr.assert_called_once()
+        call_args = mock_gp.enrichr.call_args
+        assert call_args[1]["gene_list"] == ["BRCA1", "BRCA2"]
+        assert call_args[1]["gene_sets"] == custom_libraries
+        assert call_args[1]["organism"] == "human"
+        assert call_args[1]["cutoff"] == 0.05
+
+        # With empty results, we should get empty list
+        assert results == []
+
+    @patch("pipeline.enrichment.mygene")
+    @patch("pipeline.enrichment.gp")
+    def test_run_enrichment_with_empty_libraries(self, mock_gp, mock_mygene):
+        """Test enrichment analysis with empty library list."""
+        mock_mygene.MyGeneInfo.return_value = MagicMock()
+
+        analyzer = GeneEnrichmentAnalyzer()
+        results = analyzer.run_enrichment(["BRCA1", "BRCA2"], libraries=[])
+
+        # Should return empty list without calling enrichr
+        assert results == []
+        mock_gp.enrichr.assert_not_called()
+
+    @patch("pipeline.enrichment.mygene")
+    @patch("pipeline.enrichment.gp")
+    def test_analyze_with_custom_libraries(self, mock_gp, mock_mygene):
+        """Test the complete analyze method with custom libraries."""
+        mock_mg = MagicMock()
+        mock_mygene.MyGeneInfo.return_value = mock_mg
+        mock_mg.querymany.return_value = {"out": [{"query": "BRCA1", "symbol": "BRCA1"}]}
+
+        # Mock enrichment results
+        mock_enr = MagicMock()
+        mock_gp.enrichr.return_value = mock_enr
+        mock_enr.results = {}
+
+        analyzer = GeneEnrichmentAnalyzer()
+        custom_libraries = ["GO_Biological_Process_2023"]
+        result = analyzer.analyze(["BRCA1"], libraries=custom_libraries)
+
+        assert isinstance(result, EnrichmentResult)
+        assert "BRCA1" in result.valid_genes
+        assert result.invalid_genes == []
+        assert isinstance(result.enrichment_results, list)
+        assert isinstance(result.plot_data, dict)
+
+        # Verify enrichr was called with custom libraries
+        call_args = mock_gp.enrichr.call_args
+        assert call_args[1]["gene_sets"] == custom_libraries
+
+    @patch("pipeline.enrichment.mygene")
+    @patch("pipeline.enrichment.gp")
     def test_normalize_genes_empty_input(self, mock_gp, mock_mygene):
         """Test gene normalization with empty input."""
         mock_mygene.MyGeneInfo.return_value = MagicMock()

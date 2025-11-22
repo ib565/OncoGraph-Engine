@@ -64,6 +64,7 @@ type SummaryResult = {
 
 type HypothesisState = {
   genes: string;
+  selectedLibraries: string[];
   result: EnrichmentResponse | null;
   partialResult: PartialEnrichmentResult | null;
   summaryResult: SummaryResult | null;
@@ -95,6 +96,7 @@ const initialState: AppState = {
   },
   hypothesisState: {
     genes: '',
+    selectedLibraries: ['GO_Biological_Process_2023', 'Reactome_2022'], // Default: GO + Reactome, KEGG unchecked
     result: null,
     partialResult: null,
     summaryResult: null,
@@ -154,6 +156,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (savedHypothesisState.summaryResult && typeof savedHypothesisState.summaryResult !== 'object') {
         console.warn('Corrupted summaryResult detected, clearing it');
         savedHypothesisState.summaryResult = null;
+      }
+      // Ensure selectedLibraries exists and has valid defaults
+      if (
+        !savedHypothesisState.selectedLibraries ||
+        !Array.isArray(savedHypothesisState.selectedLibraries) ||
+        savedHypothesisState.selectedLibraries.length === 0
+      ) {
+        savedHypothesisState.selectedLibraries = ['GO_Biological_Process_2023', 'Reactome_2022'];
       }
       setHypothesisStateInternal(savedHypothesisState);
     }

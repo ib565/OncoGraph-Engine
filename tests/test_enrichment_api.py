@@ -15,8 +15,9 @@ class StubEnrichmentAnalyzer:
 
     def __init__(self, result: EnrichmentResult):
         self._result = result
+        self.enrichr_libraries = ["GO_Biological_Process_2023", "KEGG_2021_Human", "Reactome_2022"]
 
-    def analyze(self, gene_symbols: list[str]) -> EnrichmentResult:
+    def analyze(self, gene_symbols: list[str], libraries: list[str] | None = None) -> EnrichmentResult:
         return self._result
 
 
@@ -174,7 +175,10 @@ def test_analyze_genes_analyzer_exception(app_client: TestClient) -> None:
     """Test handling of analyzer exceptions."""
 
     class ErrorAnalyzer:
-        def analyze(self, gene_symbols: list[str]) -> EnrichmentResult:
+        def __init__(self):
+            self.enrichr_libraries = ["GO_Biological_Process_2023", "KEGG_2021_Human", "Reactome_2022"]
+        
+        def analyze(self, gene_symbols: list[str], libraries: list[str] | None = None) -> EnrichmentResult:
             raise Exception("Analysis failed")
 
     main.app.dependency_overrides[main.get_enrichment_analyzer] = lambda: ErrorAnalyzer()
