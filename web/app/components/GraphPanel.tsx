@@ -85,11 +85,61 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [noCache, setNoCache] = useState(false);
+  const [showCacheToggle, setShowCacheToggle] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const hasPersistedPreference = useRef(false);
   const geneSymbols = useMemo(
     () => (result?.rows ? extractGeneSymbols(result.rows) : []),
     [result?.rows]
   );
   const hasRows = Boolean(result?.rows?.length);
+
+  // Initialize from localStorage and set mounted flag after hydration
+  useEffect(() => {
+    setIsMounted(true);
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("oncograph_no_cache");
+      if (saved === "true") {
+        setNoCache(true);
+        // Show toggle if user has previously enabled it
+        setShowCacheToggle(true);
+      } else if (saved === "false") {
+        // User has interacted before but currently has it disabled
+        setShowCacheToggle(true);
+      }
+      // If saved is null, user has never interacted, so keep toggle hidden
+    }
+  }, []);
+
+  // Save to localStorage when the user changes the toggle (skip the first hydration run)
+  useEffect(() => {
+    if (!isMounted || typeof window === "undefined") {
+      return;
+    }
+
+    if (!hasPersistedPreference.current) {
+      hasPersistedPreference.current = true;
+      return;
+    }
+
+    localStorage.setItem("oncograph_no_cache", String(noCache));
+    if (!showCacheToggle) {
+      setShowCacheToggle(true);
+    }
+  }, [noCache, isMounted, showCacheToggle]);
+
+  // Global keyboard shortcut to toggle cache override (Ctrl+Shift+C)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key === "C") {
+        e.preventDefault();
+        setNoCache((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   useEffect(() => {
     if (!isLoading || !progress) {
@@ -143,7 +193,7 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
     });
 
     // Try SSE first for progress streaming
-    const url = `${API_URL}/query/stream?question=${encodeURIComponent(trimmed)}`;
+    const url = `${API_URL}/query/stream?question=${encodeURIComponent(trimmed)}${noCache ? "&no_cache=true" : ""}`;
     try {
       const es = new EventSource(url, { withCredentials: false });
       sseRef.current = es;
@@ -198,7 +248,7 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
           close();
           void (async () => {
             try {
-              const response = await fetch(`${API_URL}/query`, {
+              const response = await fetch(`${API_URL}/query?no_cache=${noCache}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ question: trimmed }),
@@ -223,7 +273,7 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
     } catch (err) {
       // As a safety net, fall back to POST if constructing EventSource throws
       try {
-        const response = await fetch(`${API_URL}/query`, {
+        const response = await fetch(`${API_URL}/query?no_cache=${noCache}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ question: trimmed }),
@@ -243,7 +293,7 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
         setGraphState({ progress: null, isLoading: false });
       }
     }
-  }, []);
+  }, [noCache, setGraphState, setDotCount]);
 
   useEffect(() => {
     const trimmedInitial = initialQuestion?.trim();
@@ -396,6 +446,55 @@ export default function GraphPanel({ rows, initialQuestion }: GraphPanelProps) {
                     {isLoading ? "Running..." : "Ask"}
                   </button>
                 </form>
+                
+                {/* Hidden cache override toggle - accessible via dev tools or keyboard shortcut (Ctrl+Shift+C) */}
+                <div style={{ 
+                  position: "absolute", 
+                  top: "-9999px", 
+                  left: "-9999px",
+                  opacity: 0,
+                  pointerEvents: "none"
+                }}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={noCache}
+                      onChange={(e) => setNoCache(e.target.checked)}
+                      onKeyDown={(e) => {
+                        // Toggle with Ctrl+Shift+C
+                        if (e.ctrlKey && e.shiftKey && e.key === "C") {
+                          e.preventDefault();
+                          setNoCache((prev) => !prev);
+                        }
+                      }}
+                      tabIndex={-1}
+                    />
+                    Disable Cache (for testing prompts)
+                  </label>
+                </div>
+                
+                {/* Visible toggle - show if localStorage has been set (user has interacted with it before) */}
+                {isMounted && showCacheToggle && (
+                  <div style={{ 
+                    marginTop: "8px", 
+                    fontSize: "12px", 
+                    color: "#666",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}>
+                    <input
+                      type="checkbox"
+                      id="no-cache-toggle"
+                      checked={noCache}
+                      onChange={(e) => setNoCache(e.target.checked)}
+                      style={{ cursor: "pointer" }}
+                    />
+                    <label htmlFor="no-cache-toggle" style={{ cursor: "pointer", userSelect: "none" }}>
+                      Disable cache (for testing prompts)
+                    </label>
+                  </div>
+                )}
                 
                 {error && (
                   <div className="alert" role="alert">

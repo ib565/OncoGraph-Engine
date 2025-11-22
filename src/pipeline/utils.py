@@ -24,6 +24,12 @@ _run_id_context: ContextVar[str | None] = ContextVar("run_id", default=None)
 # Context variable to track cache operations per request
 _cache_ops_context: ContextVar[set[str] | None] = ContextVar("cache_operations", default=None)
 
+# Context variable for cache override (set at API level, accessible throughout pipeline)
+_cache_override_context: ContextVar[bool] = ContextVar("cache_override", default=False)
+
+# Check environment variable for global cache override
+_global_cache_override = os.getenv("DISABLE_CACHE", "").strip().lower() in {"1", "true", "yes"} or os.getenv("OVERRIDE_CACHE", "").strip().lower() in {"1", "true", "yes"}
+
 
 def start_cache_hit_collection() -> None:
     """Initialize cache hit collection for the current request context."""
@@ -419,6 +425,18 @@ def get_run_id() -> str | None:
 def set_run_id(run_id: str) -> None:
     """Set the run_id in context (called at API level)."""
     _run_id_context.set(run_id)
+
+
+def get_cache_override() -> bool:
+    """Get the current cache override flag from context or environment variable."""
+    # Check context first (per-request override), then fall back to global env var
+    context_override = _cache_override_context.get()
+    return context_override or _global_cache_override
+
+
+def set_cache_override(override: bool) -> None:
+    """Set the cache override flag in context (called at API level)."""
+    _cache_override_context.set(override)
 
 
 def stable_hash(obj: Any) -> str:

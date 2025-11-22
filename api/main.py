@@ -45,6 +45,7 @@ from pipeline.utils import (
     get_collected_cache_hits,
     get_enrichment_cache,
     get_llm_cache,
+    set_cache_override,
     set_run_id,
     start_cache_hit_collection,
 )
@@ -202,13 +203,18 @@ async def healthz_head():
 
 
 @app.post("/query", response_model=QueryResponse)
-def query(body: QueryRequest, engine: Annotated[QueryEngine, Depends(get_engine)]) -> QueryResponse:
+def query(
+    body: QueryRequest,
+    no_cache: bool = False,
+    engine: Annotated[QueryEngine, Depends(get_engine)] = None,
+) -> QueryResponse:
     started = datetime.now(UTC).isoformat()
     started_perf = __import__("time").perf_counter()
     run_id = os.getenv("TRACE_RUN_ID_OVERRIDE") or __import__("uuid").uuid4().hex
 
-    # Set run_id in context for cache key generation
+    # Set run_id and cache override in context for cache key generation
     set_run_id(run_id)
+    set_cache_override(no_cache)
     start_cache_hit_collection()
 
     # Wrap trace with run_id so all events share a common identifier
@@ -321,13 +327,21 @@ def query(body: QueryRequest, engine: Annotated[QueryEngine, Depends(get_engine)
 
 
 @app.get("/query/stream")
-def query_stream(question: str, engine: Annotated[QueryEngine, Depends(get_engine)]) -> StreamingResponse:
+def query_stream(
+    question: str,
+    no_cache: bool = False,
+    engine: Annotated[QueryEngine, Depends(get_engine)] = None,
+) -> StreamingResponse:
     """Server-Sent Events: stream progress updates and final result.
 
     Events emitted:
       - event: progress, data: {"message": str}
       - event: result,   data: {"answer": str, "cypher": str, "rows": list[dict]}
       - event: error,    data: {"message": str, "step": str | None}
+
+    Args:
+        question: Natural-language oncology question
+        no_cache: If True, bypass cache for this request (useful for testing prompts)
     """
 
     run_id = os.getenv("TRACE_RUN_ID_OVERRIDE") or __import__("uuid").uuid4().hex
@@ -353,6 +367,7 @@ def query_stream(question: str, engine: Annotated[QueryEngine, Depends(get_engin
 
     def worker() -> None:
         set_run_id(run_id)
+        set_cache_override(no_cache)
         start_cache_hit_collection()
         started = datetime.now(UTC).isoformat()
         started_perf = __import__("time").perf_counter()

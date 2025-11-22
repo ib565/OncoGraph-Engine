@@ -20,7 +20,7 @@ from .types import (
     PipelineError,
     Summarizer,
 )
-from .utils import get_llm_cache, make_cache_key
+from .utils import get_cache_override, get_llm_cache, make_cache_key
 
 try:  # pragma: no cover - optional dependency at runtime
     from google import genai  # type: ignore
@@ -234,15 +234,17 @@ class GeminiInstructionExpander(_GeminiBase, InstructionExpander):
     """Gemini-backed instruction expansion adapter."""
 
     def expand_instructions(self, question: str) -> str:
-        # Check cache first
+        # Check cache first (unless override is enabled)
         cache = get_llm_cache()
         cache_key = make_cache_key("expand_instructions", question.strip())
-        cached_result = cache.get(cache_key)
-        if cached_result is not None:
-            # Log cache hit
-            if hasattr(self, "trace") and self.trace:
-                self.trace.record("cache_hit", {"cache_key": cache_key, "operation": "expand_instructions"})
-            return cached_result
+        cached_result = None
+        if not get_cache_override():
+            cached_result = cache.get(cache_key)
+            if cached_result is not None:
+                # Log cache hit
+                if hasattr(self, "trace") and self.trace:
+                    self.trace.record("cache_hit", {"cache_key": cache_key, "operation": "expand_instructions"})
+                return cached_result
 
         prompt = INSTRUCTION_PROMPT_TEMPLATE.format(schema=SCHEMA_SNIPPET, question=question.strip())
         text = self._call_model(prompt=prompt)
@@ -259,15 +261,17 @@ class GeminiCypherGenerator(_GeminiBase, CypherGenerator):
     """Gemini-backed Cypher generator adapter."""
 
     def generate_cypher(self, instructions: str) -> str:
-        # Check cache first
+        # Check cache first (unless override is enabled)
         cache = get_llm_cache()
         cache_key = make_cache_key("generate_cypher", instructions.strip())
-        cached_result = cache.get(cache_key)
-        if cached_result is not None:
-            # Log cache hit
-            if hasattr(self, "trace") and self.trace:
-                self.trace.record("cache_hit", {"cache_key": cache_key, "operation": "generate_cypher"})
-            return cached_result
+        cached_result = None
+        if not get_cache_override():
+            cached_result = cache.get(cache_key)
+            if cached_result is not None:
+                # Log cache hit
+                if hasattr(self, "trace") and self.trace:
+                    self.trace.record("cache_hit", {"cache_key": cache_key, "operation": "generate_cypher"})
+                return cached_result
 
         prompt = CYPHER_PROMPT_TEMPLATE.format(schema=SCHEMA_SNIPPET, instructions=instructions.strip())
         text = self._call_model(prompt=prompt)
@@ -284,15 +288,17 @@ class GeminiSummarizer(_GeminiBase, Summarizer):
     """Gemini-backed summarizer for Cypher results."""
 
     def summarize(self, question: str, rows: list[dict[str, object]]) -> str:
-        # Check cache first
+        # Check cache first (unless override is enabled)
         cache = get_llm_cache()
         cache_key = make_cache_key("summarize", question.strip(), rows)
-        cached_result = cache.get(cache_key)
-        if cached_result is not None:
-            # Log cache hit
-            if hasattr(self, "trace") and self.trace:
-                self.trace.record("cache_hit", {"cache_key": cache_key, "operation": "summarize"})
-            return cached_result
+        cached_result = None
+        if not get_cache_override():
+            cached_result = cache.get(cache_key)
+            if cached_result is not None:
+                # Log cache hit
+                if hasattr(self, "trace") and self.trace:
+                    self.trace.record("cache_hit", {"cache_key": cache_key, "operation": "summarize"})
+                return cached_result
 
         formatted_rows = _format_rows(rows)
         prompt = SUMMARY_PROMPT_TEMPLATE.format(
