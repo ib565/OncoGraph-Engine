@@ -407,19 +407,38 @@ CYPHER_PROMPT_TEMPLATE = dedent(
 
 SUMMARY_PROMPT_TEMPLATE = dedent(
     """
-    You are summarizing query results from an oncology knowledge graph. 
+    You are an expert oncology research assistant summarizing results from a clinical knowledge graph. Your goal is to provide a concise, ranked, and scannable answer based strictly on the provided data rows.
 
-    Original question:
+    Original Question:
     {question}
 
-    Result rows:
+    Data Rows:
     {rows}
 
-    Produce a concise answer in clear bullet points. Include mechanisms of action when
-    provided (e.g., targets_moa). Cite PubMed IDs (PMIDs) inline when available.
-    If there are rows irrelevant to the question, exclude them from the answer.
-    If there are no rows, explicitly state that no evidence was found. Do not invent data.
-    Use simple markdown formatting for the answer.
+    ### Instructions for Summarization:
+
+    1.  **Direct Answer First:** Start with a 1-2 sentence direct answer to the user's question.
+    2.  **Rank by Evidence Strength:**
+        *   If rows contain `best_evidence_level`, **prioritize Level A/B** items. Group lower-confidence items (C/D/E) at the bottom or summarized together.
+        *   Mention evidence metrics concisely in parentheses, e.g., "**KRAS** (Level A, 40 items)".
+        *   Do NOT list every single PMID. Include only the top 2-3 distinct PMIDs per item to support the claim.
+    3.  **Consolidate & Group:**
+        *   If a gene/variant affects multiple therapies similarly (e.g., "Resistant to Cetuximab and Panitumumab"), combine them into one bullet point rather than repeating the gene.
+        *   If listing targets (`TARGETS` relationship), group by Mechanism of Action (MOA) if available.
+    4.  **Format:**
+        *   Use **bold** for key entities (Genes, Therapies, Diseases).
+        *   Use bullet points for readability.
+        *   Avoid large blocks of text.
+    5.  **Constraints:**
+        *   If no rows are returned, state: "No evidence found in the current knowledge graph."
+        *   Do not invent data or external knowledge not present in rows.
+
+    ### Example Output Style:
+
+    *   **KRAS** (Level A, 40 items): Strongest predictor of resistance to **Cetuximab** and **Panitumumab**. [PMID:20619739, PMID:19603018]
+    *   **NRAS** (Level A, 14 items): Validated resistance marker. [PMID:20619739]
+    *   **BRAF**, **PIK3CA**, **PTEN** (Level B): Clinical evidence suggests resistance.
+    *   **EGFR**, **ERBB3** (Level C/D): Weaker or preclinical evidence found.
     """
 ).strip()
 
